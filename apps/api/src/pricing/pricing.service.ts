@@ -10,8 +10,8 @@ import { PriceSource, Prisma } from "@prisma/client";
 import { fromPrismaLanguage } from "../common/mappers";
 import { PrismaService } from "../prisma/prisma.service";
 
-const BRAZILIAN_PRICE_SOURCES: PriceSource[] = [PriceSource.LIGAPOKEMON, PriceSource.MYPCARDS];
-
+// const BRAZILIAN_PRICE_SOURCES: PriceSource[] = [PriceSource.LIGAPOKEMON, PriceSource.MYPCARDS];
+const BRAZILIAN_PRICE_SOURCES = ["LIGAPOKEMON", "MYPCARDS"] as PriceSource[];
 type CardWithPrices = Prisma.CardGetPayload<{ include: { prices: { orderBy: { capturedAt: "desc" }; take: 5 } } }>;
 type CardPriceLookup = { setCode: string; number: string; printedTotal: number };
 type RawCardPrice = {
@@ -194,7 +194,8 @@ export class PricingService {
       void this.prisma.priceSnapshot.create({
         data: {
           cardId: card.id,
-          source: PriceSource.CONVERTED_INTERNATIONAL,
+          // source: PriceSource.CONVERTED_INTERNATIONAL,
+          source: "CONVERTED_INTERNATIONAL" as PriceSource,
           currency: "BRL",
           amount: derived.amount,
           label: derived.label,
