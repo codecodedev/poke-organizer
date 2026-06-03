@@ -36,9 +36,9 @@ ENV NODE_ENV=production
 RUN apk add --no-cache openssl
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
-COPY --from=deps /workspace/node_modules node_modules
-COPY --from=deps /workspace/apps/api/node_modules apps/api/node_modules
-COPY --from=deps /workspace/packages/shared/node_modules packages/shared/node_modules
+COPY --from=build /workspace/node_modules node_modules
+COPY --from=build /workspace/apps/api/node_modules apps/api/node_modules
+COPY --from=build /workspace/packages/shared/node_modules packages/shared/node_modules
 COPY --from=build /workspace/packages/shared/dist packages/shared/dist
 COPY --from=build /workspace/apps/api/dist apps/api/dist
 COPY apps/api/prisma apps/api/prisma
