@@ -1,0 +1,23 @@
+import type { Session } from "./api";
+
+const KEY = "poke-organizer-session";
+
+export function loadSession(): Session | null {
+  const raw = localStorage.getItem(KEY);
+  if (!raw) return null;
+
+  try {
+    return JSON.parse(raw) as Session;
+  } catch {
+    localStorage.removeItem(KEY);
+    return null;
+  }
+}
+
+export function saveSession(session: Session) {
+  localStorage.setItem(KEY, JSON.stringify(session));
+}
+
+export function clearSession() {
+  localStorage.removeItem(KEY);
+}

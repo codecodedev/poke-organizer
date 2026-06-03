@@ -1,0 +1,25 @@
+{
+  "name": "pricing-service",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "pnpm --filter @poke-organizer/shared build && prisma generate && rm -rf dist && tsc -p tsconfig.build.json",
+    "dev": "pnpm --filter @poke-organizer/shared build && prisma generate && rm -rf dist && tsc -p tsconfig.build.json && node dist/main.js",
+    "start": "node dist/main.js",
+    "typecheck": "pnpm --filter @poke-organizer/shared build && prisma generate && tsc -p tsconfig.build.json --noEmit",
+    "test": "pnpm --filter @poke-organizer/shared build && prisma generate && vitest run",
+    "prisma": "prisma"
+  },
+  "dependencies": {
+    "@poke-organizer/shared": "workspace:*",
+    "@prisma/client": "^6.2.1",
+    "fastify": "^5.6.2",
+    "playwright": "^1.56.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "prisma": "^6.2.1",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

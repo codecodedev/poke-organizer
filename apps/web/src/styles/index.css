@@ -1,0 +1,337 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color: #18212f;
+  background: #fbf8ff;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background:
+    linear-gradient(135deg, rgba(255, 224, 138, 0.26), transparent 24%),
+    linear-gradient(225deg, rgba(105, 205, 231, 0.18), transparent 30%),
+    linear-gradient(180deg, #fffaf4 0%, #f7f5ff 48%, #f3fbff 100%);
+  background-attachment: fixed;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.focus-ring {
+  @apply focus:outline-none focus:ring-2 focus:ring-brand/30 focus:border-brand;
+}
+
+@layer components {
+  .app-shell {
+    @apply min-h-screen text-ink;
+  }
+
+  .glass-panel {
+    @apply rounded-[22px] border border-white/80 bg-white/80 shadow-card backdrop-blur;
+  }
+
+  .panel-padding {
+    @apply p-4 sm:p-5;
+  }
+
+  .section-title {
+    @apply text-xl font-black tracking-normal text-ink;
+  }
+
+  .section-copy {
+    @apply text-sm leading-6 text-slate-600;
+  }
+
+  .premium-input {
+    @apply focus-ring min-h-12 rounded-2xl border border-line bg-white/90 px-4 text-ink shadow-sm placeholder:text-slate-400;
+  }
+
+  .premium-select {
+    @apply focus-ring min-h-12 rounded-2xl border border-line bg-white/90 px-4 text-ink shadow-sm;
+  }
+
+  .btn {
+    @apply inline-flex min-h-11 items-center justify-center gap-2 rounded-2xl px-4 text-sm font-extrabold transition duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-night text-white shadow-soft hover:-translate-y-0.5 hover:shadow-glow;
+  }
+
+  .btn-brand {
+    @apply btn bg-gradient-to-r from-brand via-coral to-amber text-white shadow-glow hover:-translate-y-0.5;
+  }
+
+  .btn-ghost {
+    @apply btn border border-line bg-white/80 text-night shadow-sm hover:-translate-y-0.5 hover:border-lilac/40 hover:bg-white;
+  }
+
+  .soft-card {
+    @apply rounded-[18px] border border-line/80 bg-white/80 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-lilac/40 hover:shadow-soft;
+  }
+
+  .chip {
+    @apply inline-flex min-h-8 items-center gap-2 rounded-full border border-white/70 bg-white/70 px-3 text-xs font-extrabold text-slate-600 shadow-sm;
+  }
+
+  .success-note {
+    @apply rounded-2xl border border-leaf/25 bg-leaf/10 px-4 py-3 text-sm font-semibold text-emerald-800;
+  }
+
+  .warning-note {
+    @apply rounded-2xl border border-amber/35 bg-amber/15 px-4 py-3 text-sm font-semibold text-orange-900;
+  }
+
+  .danger-note {
+    @apply rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700;
+  }
+
+  .holo-strip {
+    background-image: linear-gradient(90deg, rgba(239, 93, 117, .18), rgba(105, 205, 231, .22), rgba(168, 145, 245, .18), rgba(255, 224, 138, .22));
+    background-size: 200% 100%;
+  }
+
+  .variant-card-image {
+    @apply relative isolate overflow-hidden bg-gradient-to-br from-aqua/15 to-lilac/15;
+    --variant-frame: linear-gradient(135deg, rgba(105, 205, 231, .18), rgba(168, 145, 245, .18));
+    --variant-glow: rgba(67, 56, 120, .12);
+    --variant-prism-opacity: .5;
+    transform: translateZ(0);
+  }
+
+  .variant-card-image__img {
+    @apply relative z-10 h-full w-full;
+  }
+
+  .variant-card-image--effect-frame {
+    background: var(--variant-frame);
+    background-size: 320% 320%;
+    border-color: rgba(255, 255, 255, .72);
+    box-shadow:
+      0 18px 50px rgba(67, 56, 120, .12),
+      0 0 34px var(--variant-glow);
+    animation: holo-frame-flow 3.4s linear infinite;
+  }
+
+  .variant-card-image--effect-frame::before {
+    @apply pointer-events-none absolute inset-0 z-20;
+    content: "";
+    border-radius: inherit;
+    background:
+      radial-gradient(ellipse at 16% 20%, rgba(0, 255, 183, .95) 0 12%, transparent 30%),
+      radial-gradient(ellipse at 84% 26%, rgba(255, 83, 211, .9) 0 13%, transparent 31%),
+      radial-gradient(ellipse at 64% 74%, rgba(43, 229, 255, .95) 0 14%, transparent 34%),
+      linear-gradient(118deg,
+        rgba(255, 38, 92, 0.69) 0%,
+        rgba(255, 236, 35, 0.69) 15%,
+        rgba(0, 243, 115, 0.69) 30%,
+        rgba(0, 211, 255, 0.69) 45%,
+        rgba(89, 72, 255, 0.69) 60%,
+        rgba(255, 61, 224, 0.69) 75%,
+        rgba(255, 135, 26, 0.69) 88%,
+        rgba(0, 240, 255, 0.69) 100%);
+    background-size: 180% 180%, 190% 190%, 170% 170%, 260% 260%;
+    mix-blend-mode: color-dodge;
+    opacity: var(--variant-prism-opacity);
+    filter: saturate(1.85) contrast(1.18) brightness(1.1);
+    animation: prismatic-flow 5.2s ease-in-out infinite;
+  }
+
+  .variant-card-image--effect-frame::after {
+    @apply pointer-events-none absolute inset-0 z-20;
+    content: "";
+    border-radius: inherit;
+    background:
+      repeating-linear-gradient(102deg,
+        rgba(255, 255, 255, .18) 0 1px,
+        rgba(255, 255, 255, 0) 1px 7px),
+      linear-gradient(112deg,
+        transparent 0%,
+        rgba(255, 255, 255, .86) 12%,
+        rgba(255, 255, 255, .12) 18%,
+        transparent 30%,
+        transparent 57%,
+        rgba(255, 255, 255, .7) 66%,
+        transparent 78%);
+    background-size: 100% 100%, 230% 230%;
+    mix-blend-mode: screen;
+    opacity: .42;
+    animation: prismatic-shine 3.8s ease-in-out infinite;
+  }
+
+  .variant-card-image--foil {
+    --variant-frame:
+      conic-gradient(from 15deg at 50% 50%, #ff5d7d, #ffe08a, #5be2ff, #a891f5, #55c7a9, #ff5d7d);
+    --variant-glow: rgba(105, 205, 231, .42);
+    --variant-prism-opacity: .58;
+  }
+
+  .variant-card-image--holo {
+    --variant-frame:
+      conic-gradient(from 20deg at 50% 50%, #ff244f, #ffe81f, #00f276, #00d6ff, #6b45ff, #ff38dd, #ff244f);
+    --variant-glow: rgba(0, 214, 255, .5);
+    --variant-prism-opacity: .66;
+  }
+
+  .variant-card-image--reverse {
+    --variant-frame:
+      conic-gradient(from 28deg at 50% 50%, #f8fafc, #8b96a8, #fefefe, #c7d0dc, #596272, #f8fafc);
+    --variant-glow: rgba(148, 163, 184, .42);
+    --variant-prism-opacity: .48;
+  }
+
+  .variant-card-image--reverse.variant-card-image--effect-frame::before {
+    background:
+      radial-gradient(ellipse at 22% 18%, rgba(255, 255, 255, 0) 0 10%, transparent 28%),
+      radial-gradient(ellipse at 76% 72%, rgba(190, 205, 224, .62) 0 14%, transparent 34%),
+      linear-gradient(118deg,
+        rgba(255, 255, 255, 0) 0%,
+        rgba(117, 128, 145, .62) 16%,
+        rgba(238, 244, 250, 0.113) 29%,
+        rgba(91, 101, 118, 0) 43%,
+        rgba(255, 255, 255, 0.253) 56%,
+        rgba(168, 180, 196, .68) 71%,
+        rgba(77, 86, 102, .5) 86%,
+        rgba(245, 248, 252, 0) 100%);
+    background-size: 150% 150%, 165% 165%, 230% 230%;
+    mix-blend-mode: hard-light;
+    filter: saturate(.45) contrast(1.28) brightness(1.18);
+  }
+
+  .variant-card-image--reverse.variant-card-image--effect-frame::after {
+    
+  }
+
+  .collection-item-card {
+    --collection-frame: transparent;
+    --collection-frame-glow: transparent;
+  }
+
+  .collection-item-card > * {
+    @apply relative z-10;
+  }
+
+  .collection-item-card::before {
+    @apply pointer-events-none absolute inset-0 z-0 opacity-0 transition duration-300;
+    content: "";
+    border: 2px solid transparent;
+    border-radius: inherit;
+    background: var(--collection-frame) border-box;
+    background-size: 320% 320%;
+    box-shadow: 0 0 28px var(--collection-frame-glow);
+    -webkit-mask:
+      linear-gradient(#000 0 0) padding-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask:
+      linear-gradient(#000 0 0) padding-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+    animation: holo-frame-flow 3.2s linear infinite;
+  }
+
+  .collection-item-card--foil {
+    --collection-frame:
+      conic-gradient(from 15deg at 50% 50%, #ff5d7d, #ffe08a, #5be2ff, #a891f5, #55c7a9, #ff5d7d);
+    --collection-frame-glow: rgba(105, 205, 231, .32);
+  }
+
+  .collection-item-card--holo {
+    --collection-frame:
+      conic-gradient(from 20deg at 50% 50%, #ef5d75, #ffe08a, #69cde7, #a891f5, #55c7a9, #ef5d75);
+    --collection-frame-glow: rgba(168, 145, 245, .34);
+  }
+
+  .collection-item-card--reverse {
+    --collection-frame:
+      conic-gradient(from 28deg at 50% 50%, #f8fafc, #8b96a8, #fefefe, #c7d0dc, #596272, #f8fafc);
+    --collection-frame-glow: rgba(148, 163, 184, .32);
+  }
+
+  .collection-item-card--foil::before,
+  .collection-item-card--holo::before,
+  .collection-item-card--reverse::before {
+    opacity: 1;
+  }
+
+  .collection-item-card--foil:hover::before,
+  .collection-item-card--holo:hover::before,
+  .collection-item-card--reverse:hover::before {
+    border-width: 3px;
+  }
+
+  .variant-badge {
+    @apply absolute left-3 top-3 z-30 inline-flex min-h-8 items-center gap-1.5 rounded-full border border-white/80 bg-white/90 px-2.5 text-[11px] font-black text-slate-700 shadow-sm backdrop-blur;
+  }
+
+  .variant-badge--normal {
+    @apply text-slate-600;
+  }
+
+  .variant-badge--foil {
+    @apply text-sky-700;
+    background: linear-gradient(135deg, rgba(255, 255, 255, .92), rgba(219, 245, 255, .88));
+  }
+
+  .variant-badge--holo {
+    @apply text-purple-800;
+    background: linear-gradient(135deg, rgba(255, 255, 255, .94), rgba(232, 222, 255, .9), rgba(219, 245, 255, .86));
+  }
+
+  .variant-badge--reverse {
+    @apply text-rose-800;
+    background: linear-gradient(135deg, rgba(255, 255, 255, .94), rgba(255, 232, 238, .9), rgba(231, 247, 255, .9));
+  }
+}
+
+@keyframes holo-frame-flow {
+  0% {
+    background-position: 0% 50%, 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%, 100% 50%;
+  }
+  100% {
+    background-position: 200% 50%, 200% 50%;
+  }
+}
+
+@keyframes prismatic-flow {
+  0% {
+    background-position: 0% 18%, 100% 22%, 48% 100%, 0% 50%;
+    transform: translate3d(-2%, -1%, 0) rotate(0deg) scale(1.04);
+  }
+  50% {
+    background-position: 72% 42%, 24% 72%, 82% 12%, 100% 50%;
+    transform: translate3d(2%, 1%, 0) rotate(1deg) scale(1.08);
+  }
+  100% {
+    background-position: 0% 18%, 100% 22%, 48% 100%, 120% 50%;
+    transform: translate3d(-2%, -1%, 0) rotate(0deg) scale(1.04);
+  }
+}
+
+@keyframes prismatic-shine {
+  0% {
+    background-position: 0 0, -120% 0%;
+  }
+  55% {
+    background-position: 0 0, 120% 100%;
+  }
+  100% {
+    background-position: 0 0, 180% 100%;
+  }
+}

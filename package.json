@@ -1,0 +1,27 @@
+{
+  "name": "poke-organizer",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test",
+    "format": "prettier --write .",
+    "dev:api:local": "set -a; . apps/api/.env.local; set +a; pnpm --filter api dev",
+    "dev:pricing:local": "zsh scripts/dev-pricing-local.sh",
+    "dev:pricing:manual": "zsh scripts/dev-pricing-local.sh",
+    "dev:pricing:restart": "LIGA_SYNC_RESTART_BROWSER=true zsh scripts/dev-pricing-local.sh",
+    "dev:pricing:playwright": "set -a; . apps/pricing-service/.env.local; set +a; pnpm --filter pricing-service dev",
+    "docker:up": "docker compose up --build postgres api web",
+    "docker:up:pricing": "docker compose --profile docker-pricing up --build pricing-service",
+    "docker:down": "docker compose down"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.7",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3"
+  }
+}

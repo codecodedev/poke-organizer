@@ -1,0 +1,264 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  schemas  = ["public", "pricing"]
+}
+
+enum CardCondition {
+  NM
+  LP
+  MP
+  HP
+  DMG
+
+  @@schema("public")
+}
+
+enum CardLanguage {
+  PT_BR
+  EN
+  JA
+  UNKNOWN
+
+  @@schema("public")
+}
+
+enum PriceSource {
+  MANUAL
+  POKEMON_TCG_API
+  TCGDEX
+  LIGAPOKEMON
+  MYPCARDS
+  CONVERTED_INTERNATIONAL
+
+  @@schema("public")
+}
+
+enum PriceProvider {
+  LIGAPOKEMON
+  MYPCARDS
+
+  @@schema("pricing")
+}
+
+model User {
+  id           String           @id @default(cuid())
+  email        String           @unique
+  name         String?
+  passwordHash String
+  identities   UserIdentity[]
+  refreshTokens RefreshToken[]
+  collection   CollectionItem[]
+  folders      CollectionFolder[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@schema("public")
+}
+
+model UserIdentity {
+  id             String   @id @default(cuid())
+  userId         String
+  provider       String
+  providerUserId String
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@index([userId])
+  @@schema("public")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@schema("public")
+}
+
+model Card {
+  id           String           @id @default(cuid())
+  externalId   String           @unique
+  provider     String
+  name         String
+  normalizedName String
+  number       String
+  printedTotal Int?
+  setTotal     Int?
+  setId        String?
+  setCode      String?
+  setName      String?
+  rarity       String?
+  artist       String?
+  releaseDate  String?
+  nationalPokedexNumbers Int[] @default([])
+  types        String[]         @default([])
+  regulationMark String?
+  variants     String[]         @default([])
+  language     CardLanguage     @default(UNKNOWN)
+  imageSmall   String?
+  imageLarge   String?
+  raw          Json?
+  prices       PriceSnapshot[]
+  collection   CollectionItem[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  @@index([normalizedName])
+  @@index([number])
+  @@index([printedTotal])
+  @@index([setId])
+  @@index([setCode])
+  @@schema("public")
+}
+
+model CollectionItem {
+  id             String        @id @default(cuid())
+  userId         String
+  cardId         String
+  quantity       Int           @default(1)
+  condition      CardCondition @default(NM)
+  variant        String        @default("normal")
+  foil           Boolean       @default(false)
+  language       CardLanguage  @default(UNKNOWN)
+  notes          String?
+  cardPriceId    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card           Card          @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  price          CardPrice?    @relation(fields: [cardPriceId], references: [id], onDelete: SetNull)
+  folders        CollectionFolderItem[]
+
+  @@index([userId])
+  @@index([cardId])
+  @@index([cardPriceId])
+  @@unique([userId, cardId, condition, variant, foil, language])
+  @@schema("public")
+}
+
+model CollectionFolder {
+  id        String                 @id @default(cuid())
+  userId    String
+  name      String
+  createdAt DateTime               @default(now())
+  updatedAt DateTime               @updatedAt
+  user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items     CollectionFolderItem[]
+
+  @@index([userId])
+  @@unique([userId, name])
+  @@schema("public")
+}
+
+model CollectionFolderItem {
+  id               String           @id @default(cuid())
+  folderId         String
+  collectionItemId String
+  createdAt        DateTime         @default(now())
+  folder           CollectionFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  collectionItem   CollectionItem   @relation(fields: [collectionItemId], references: [id], onDelete: Cascade)
+
+  @@index([collectionItemId])
+  @@unique([folderId, collectionItemId])
+  @@schema("public")
+}
+
+model PriceSnapshot {
+  id         String      @id @default(cuid())
+  cardId     String
+  source     PriceSource
+  currency   String
+  amount     Decimal?    @db.Decimal(10, 2)
+  label      String
+  isFallback Boolean     @default(false)
+  capturedAt DateTime    @default(now())
+  card       Card        @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, source, capturedAt])
+  @@schema("public")
+}
+
+model CardPrice {
+  id              String             @id @default(cuid())
+  number          String
+  printedTotal    Int
+  name            String?
+  setCode         String?
+  setName         String?
+  provider        PriceProvider
+  amountBrl       Decimal            @db.Decimal(10, 2)
+  label           String
+  sourceUrl       String?
+  firstSeenAt     DateTime           @default(now())
+  lastCheckedAt   DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  history         CardPriceHistory[]
+  collectionItems CollectionItem[]
+
+  @@unique([setCode, number, printedTotal, provider])
+  @@index([setCode, number, printedTotal])
+  @@index([number, printedTotal])
+  @@index([provider])
+  @@index([setCode])
+  @@schema("pricing")
+}
+
+model CardPriceHistory {
+  id                String    @id @default(cuid())
+  cardPriceId       String
+  previousAmountBrl Decimal   @db.Decimal(10, 2)
+  newAmountBrl      Decimal   @db.Decimal(10, 2)
+  changedAt         DateTime  @default(now())
+  cardPrice         CardPrice @relation(fields: [cardPriceId], references: [id], onDelete: Cascade)
+
+  @@index([cardPriceId, changedAt])
+  @@schema("pricing")
+}
+
+model LigaSyncJob {
+  id                String               @id @default(cuid())
+  status            String
+  delayMs           Int
+  totalEditions     Int                  @default(0)
+  completedEditions Int                  @default(0)
+  currentEdition    String?
+  message           String?
+  editions          LigaSyncJobEdition[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  finishedAt        DateTime?
+
+  @@index([status, createdAt])
+  @@schema("pricing")
+}
+
+model LigaSyncJobEdition {
+  id            String      @id @default(cuid())
+  jobId         String
+  edid          String
+  code          String
+  name          String
+  year          Int?
+  status        String
+  cardsFound    Int         @default(0)
+  pricesUpdated Int         @default(0)
+  message       String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  job           LigaSyncJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, status])
+  @@index([code])
+  @@schema("pricing")
+}

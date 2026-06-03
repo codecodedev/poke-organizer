@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "./client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("PRICING_DATABASE_URL")
+}
+
+enum PriceProvider {
+  LIGAPOKEMON
+  MYPCARDS
+}
+
+model CardPrice {
+  id            String             @id @default(cuid())
+  number        String
+  printedTotal  Int
+  name          String?
+  setCode       String?
+  setName       String?
+  provider      PriceProvider
+  amountBrl     Decimal            @db.Decimal(10, 2)
+  label         String
+  sourceUrl     String?
+  firstSeenAt   DateTime           @default(now())
+  lastCheckedAt DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  history       CardPriceHistory[]
+
+  @@unique([setCode, number, printedTotal, provider])
+  @@index([setCode, number, printedTotal])
+  @@index([number, printedTotal])
+  @@index([provider])
+  @@index([setCode])
+}
+
+model CardPriceHistory {
+  id                String        @id @default(cuid())
+  cardPriceId       String
+  previousAmountBrl Decimal       @db.Decimal(10, 2)
+  newAmountBrl      Decimal       @db.Decimal(10, 2)
+  changedAt         DateTime      @default(now())
+  cardPrice         CardPrice     @relation(fields: [cardPriceId], references: [id], onDelete: Cascade)
+
+  @@index([cardPriceId, changedAt])
+}
+
+model LigaSyncJob {
+  id                String               @id @default(cuid())
+  status            String
+  delayMs           Int
+  totalEditions     Int                  @default(0)
+  completedEditions Int                  @default(0)
+  currentEdition    String?
+  message           String?
+  editions          LigaSyncJobEdition[]
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  finishedAt        DateTime?
+
+  @@index([status, createdAt])
+}
+
+model LigaSyncJobEdition {
+  id               String      @id @default(cuid())
+  jobId            String
+  edid             String
+  code             String
+  name             String
+  year             Int?
+  status           String
+  cardsFound       Int         @default(0)
+  pricesUpdated    Int         @default(0)
+  message          String?
+  startedAt        DateTime?
+  finishedAt       DateTime?
+  job              LigaSyncJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId, status])
+  @@index([code])
+}
