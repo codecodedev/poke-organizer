@@ -3,7 +3,7 @@ services:
     name: poke-organizer-api
     runtime: docker
     dockerfilePath: ./apps/api/Dockerfile
-    plan: starter
+    plan: free
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
@@ -33,7 +33,6 @@ services:
 
 databases:
   - name: poke-organizer-db
-    plan: starter
+    plan: free
     databaseName: poke_organizer
     user: poke
-
