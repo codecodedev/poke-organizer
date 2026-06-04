@@ -1,6 +1,19 @@
 import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { CalendarDays, Circle, DollarSign, Hash, Pencil, Plus, Save, Shield, Sparkles, Tag, X, Zap } from "lucide-react";
+import {
+  CalendarDays,
+  Circle,
+  DollarSign,
+  Hash,
+  Pencil,
+  Plus,
+  Save,
+  Shield,
+  Sparkles,
+  Tag,
+  X,
+  Zap,
+} from "lucide-react";
 import {
   CARD_CONDITIONS,
   CARD_LANGUAGES,
@@ -13,7 +26,7 @@ import {
   type CardSummary,
   type CollectionAddResult,
   type CollectionItem,
-  type PriceEstimate
+  type PriceEstimate,
 } from "@poke-organizer/shared";
 import { api } from "../lib/api";
 import { formatBrl } from "../lib/format";
@@ -34,11 +47,16 @@ export type UpdateCardDetails = Omit<AddCardDetails, "cardId">;
 type Props = {
   card: CardSummary | null;
   onClose: () => void;
-  onAdd?: (details: AddCardDetails) => Promise<CollectionAddResult | void> | CollectionAddResult | void;
+  onAdd?: (
+    details: AddCardDetails,
+  ) => Promise<CollectionAddResult | void> | CollectionAddResult | void;
   initialVariant?: string | null;
   collectionItem?: CollectionItem | null;
   collectionPrice?: PriceEstimate | null;
-  onUpdate?: (itemId: string, details: UpdateCardDetails) => Promise<void> | void;
+  onUpdate?: (
+    itemId: string,
+    details: UpdateCardDetails,
+  ) => Promise<void> | void;
 };
 
 export function CardDetailModal({
@@ -48,7 +66,7 @@ export function CardDetailModal({
   initialVariant,
   collectionItem,
   collectionPrice,
-  onUpdate
+  onUpdate,
 }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [condition, setCondition] = useState<CardCondition>("NM");
@@ -62,7 +80,9 @@ export function CardDetailModal({
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
   const variants = useMemo(() => {
-    const values = card?.variants?.length ? [...card.variants] : [DEFAULT_CARD_VARIANT];
+    const values = card?.variants?.length
+      ? [...card.variants]
+      : [DEFAULT_CARD_VARIANT];
     if (initialVariant && !values.includes(initialVariant)) {
       values.push(initialVariant);
     }
@@ -72,13 +92,24 @@ export function CardDetailModal({
     return Array.from(new Set(values));
   }, [card?.variants, collectionItem?.variant, initialVariant]);
 
-  const mode: "add" | "edit" | "view" = onAdd ? "add" : collectionItem && onUpdate ? "edit" : "view";
+  const mode: "add" | "edit" | "view" = onAdd
+    ? "add"
+    : collectionItem && onUpdate
+      ? "edit"
+      : "view";
 
   useEffect(() => {
     if (!card) return;
     setQuantity(collectionItem?.quantity ?? 1);
     setCondition(collectionItem?.condition ?? "NM");
-    setVariant(collectionItem?.variant ?? initialVariant ?? (card.variants?.includes(DEFAULT_CARD_VARIANT) ? DEFAULT_CARD_VARIANT : card.variants?.[0]) ?? DEFAULT_CARD_VARIANT);
+    setVariant(
+      collectionItem?.variant ??
+        initialVariant ??
+        (card.variants?.includes(DEFAULT_CARD_VARIANT)
+          ? DEFAULT_CARD_VARIANT
+          : card.variants?.[0]) ??
+        DEFAULT_CARD_VARIANT,
+    );
     setLanguage(collectionItem?.language ?? card.language);
     setNotes(collectionItem?.notes ?? "");
     setError(null);
@@ -102,7 +133,12 @@ export function CardDetailModal({
     api
       .getPrice(card.id, { variant, language, condition })
       .then((estimate) => {
-        if (!cancelled) setPrice(estimate);
+        if (!cancelled) {
+          setPrice({
+            ...estimate,
+            history: estimate.history ?? collectionPrice?.history,
+          });
+        }
       })
       .catch(() => {
         if (!cancelled) setPrice(null);
@@ -114,7 +150,7 @@ export function CardDetailModal({
     return () => {
       cancelled = true;
     };
-  }, [card, condition, language, variant]);
+  }, [card, collectionPrice?.history, condition, language, variant]);
 
   useEffect(() => {
     setPrice(collectionPrice ?? null);
@@ -135,7 +171,8 @@ export function CardDetailModal({
 
   const detailCard = card;
   const fullNumber = formatCardNumber(card.number, card.printedTotal);
-  const nationalNumber = card.nationalPokedexNumbers?.[0]?.toString() ?? "Nao informado";
+  const nationalNumber =
+    card.nationalPokedexNumbers?.[0]?.toString() ?? "Nao informado";
   const typeText = card.types?.length ? card.types.join(", ") : "Nao informado";
   const hasBrazilianPrice = Boolean(price?.amount && !price.isFallback);
   const displayedPrice = priceLoading
@@ -144,7 +181,9 @@ export function CardDetailModal({
       ? formatBrl(price.amount)
       : "Valor nao encontrado";
   const variantAttributeLabel = collectionItem ? "Variante" : "Variantes";
-  const variantAttributeValue = collectionItem ? formatCardVariant(variant) : variants.map(formatCardVariant).join(", ");
+  const variantAttributeValue = collectionItem
+    ? formatCardVariant(variant)
+    : variants.map(formatCardVariant).join(", ");
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -160,16 +199,18 @@ export function CardDetailModal({
         variant,
         foil: isFoilVariant(variant),
         language,
-        notes: notes.trim() || undefined
+        notes: notes.trim() || undefined,
       };
 
       if (onAdd) {
         const result = await onAdd({
           cardId: detailCard.id,
-          ...details
+          ...details,
         });
         if (result?.action === "incremented") {
-          setSubmitMessage("Carta ja existia com estes atributos; a quantidade foi incrementada.");
+          setSubmitMessage(
+            "Carta ja existia com estes atributos; a quantidade foi incrementada.",
+          );
         } else if (result?.action === "created") {
           setSubmitMessage("Carta adicionada como nova entrada na colecao.");
         }
@@ -229,19 +270,58 @@ export function CardDetailModal({
           <div className="min-w-0">
             <h3 className="mb-3 text-xl font-black text-ink">Atributos</h3>
             <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <Detail icon={<Pencil size={18} />} label="Ilustrador" value={card.artist ?? "Nao informado"} />
-              <Detail icon={<CalendarDays size={18} />} label="Lancamento" value={card.releaseDate ?? "Nao informado"} />
-              <Detail icon={<Circle size={18} />} label="Raridade" value={card.rarity ?? "Nao informado"} />
-              <Detail icon={<Hash size={18} />} label="Numero Nacional" value={nationalNumber} />
+              <Detail
+                icon={<Pencil size={18} />}
+                label="Ilustrador"
+                value={card.artist ?? "Nao informado"}
+              />
+              <Detail
+                icon={<CalendarDays size={18} />}
+                label="Lancamento"
+                value={card.releaseDate ?? "Nao informado"}
+              />
+              <Detail
+                icon={<Circle size={18} />}
+                label="Raridade"
+                value={card.rarity ?? "Nao informado"}
+              />
+              <Detail
+                icon={<Hash size={18} />}
+                label="Numero Nacional"
+                value={nationalNumber}
+              />
               <Detail icon={<Zap size={18} />} label="Tipo" value={typeText} />
-              <Detail icon={<Shield size={18} />} label="Marca de Regulamento" value={card.regulationMark ?? "Nao informado"} />
-              <Detail icon={<Tag size={18} />} label="Colecao" value={card.setName ?? "Nao informado"} />
-              <Detail icon={<Sparkles size={18} />} label={variantAttributeLabel} value={variantAttributeValue} />
-              <Detail icon={<DollarSign size={18} />} label="Valor" value={displayedPrice} />
+              <Detail
+                icon={<Shield size={18} />}
+                label="Marca de Regulamento"
+                value={card.regulationMark ?? "Nao informado"}
+              />
+              <Detail
+                icon={<Tag size={18} />}
+                label="Colecao"
+                value={card.setName ?? "Nao informado"}
+              />
+              <Detail
+                icon={<Sparkles size={18} />}
+                label={variantAttributeLabel}
+                value={variantAttributeValue}
+              />
+              <Detail
+                icon={<DollarSign size={18} />}
+                label="Valor"
+                value={displayedPrice}
+              />
             </dl>
 
+            {price?.history?.length ? (
+              <PriceHistoryChart price={price} />
+            ) : null}
+
             {(onAdd || (collectionItem && onUpdate)) && (
-              <form onSubmit={submit} className="mt-5 rounded-[22px] border border-line/80 bg-gradient-to-br from-white to-field/80 p-4 shadow-sm">
+              <form
+                onSubmit={submit}
+                className="mt-5 rounded-[22px] border border-line/80 bg-gradient-to-br from-white to-field/80 p-4 shadow-sm"
+              >
                 <h3 className="text-lg font-black text-ink">
                   {mode === "add" ? "Adicionar a colecao" : "Editar na colecao"}
                 </h3>
@@ -269,7 +349,9 @@ export function CardDetailModal({
                       type="number"
                       min={1}
                       value={quantity}
-                      onChange={(event) => setQuantity(Math.max(1, Number(event.target.value)))}
+                      onChange={(event) =>
+                        setQuantity(Math.max(1, Number(event.target.value)))
+                      }
                     />
                   </label>
 
@@ -278,7 +360,9 @@ export function CardDetailModal({
                     <select
                       className="premium-select mt-2 w-full"
                       value={condition}
-                      onChange={(event) => setCondition(event.target.value as CardCondition)}
+                      onChange={(event) =>
+                        setCondition(event.target.value as CardCondition)
+                      }
                     >
                       {CARD_CONDITIONS.map((item) => (
                         <option key={item} value={item}>
@@ -293,7 +377,9 @@ export function CardDetailModal({
                     <select
                       className="premium-select mt-2 w-full"
                       value={language}
-                      onChange={(event) => setLanguage(event.target.value as CardLanguage)}
+                      onChange={(event) =>
+                        setLanguage(event.target.value as CardLanguage)
+                      }
                     >
                       {CARD_LANGUAGES.map((item) => (
                         <option key={item} value={item}>
@@ -334,9 +420,7 @@ export function CardDetailModal({
                   </p>
                 )}
                 {submitMessage && (
-                  <p className="success-note mt-3">
-                    {submitMessage}
-                  </p>
+                  <p className="success-note mt-3">{submitMessage}</p>
                 )}
                 {error && <p className="danger-note mt-3">{error}</p>}
 
@@ -346,7 +430,11 @@ export function CardDetailModal({
                   className="btn-primary mt-4 disabled:opacity-60"
                 >
                   {mode === "add" ? <Plus size={18} /> : <Save size={18} />}
-                  {submitting ? "Salvando" : mode === "add" ? "Adicionar" : "Salvar alteracoes"}
+                  {submitting
+                    ? "Salvando"
+                    : mode === "add"
+                      ? "Adicionar"
+                      : "Salvar alteracoes"}
                 </button>
               </form>
             )}
@@ -354,21 +442,137 @@ export function CardDetailModal({
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   );
 }
 
 function isFoilVariant(variant: string): boolean {
-  return variant === FOIL_CARD_VARIANT || variant.toLowerCase().includes("holo");
+  return (
+    variant === FOIL_CARD_VARIANT || variant.toLowerCase().includes("holo")
+  );
 }
 
-function Detail({ icon, label, value }: { icon: ReactNode; label: string; value: string }) {
+function PriceHistoryChart({ price }: { price: PriceEstimate }) {
+  const history = price.history ?? [];
+  const first = history[0];
+  if (!first) return null;
+
+  const data = [
+    { amount: first.previousAmount, changedAt: first.changedAt },
+    ...history.map((entry) => ({
+      amount: entry.amount,
+      changedAt: entry.changedAt,
+    })),
+  ];
+  const latest = history[history.length - 1];
+  const latestChange = latest.amount - latest.previousAmount;
+  const values = data.map((entry) => entry.amount);
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const width = 320;
+  const height = 130;
+  const paddingX = 18;
+  const paddingY = 18;
+  const points = data.map((entry, index) => {
+    const x =
+      paddingX +
+      (index / Math.max(1, data.length - 1)) * (width - paddingX * 2);
+    const y =
+      paddingY + ((max - entry.amount) / range) * (height - paddingY * 2);
+    return { ...entry, x, y };
+  });
+  const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
+  const latestTone = latestChange >= 0 ? "text-emerald-800" : "text-red-700";
+
+  return (
+    <section className="mt-5 rounded-[22px] border border-line/80 bg-gradient-to-br from-white to-field/80 p-4 shadow-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-lg font-black text-ink">Historico de valores</h3>
+          <p className="text-sm font-semibold text-slate-500">
+            {data.length} pontos registrados
+          </p>
+        </div>
+        <span
+          className={`rounded-full border border-line/70 bg-white/80 px-3 py-1.5 text-xs font-black ${latestTone}`}
+        >
+          {latestChange >= 0 ? "Subiu" : "Caiu"}{" "}
+          {formatBrl(Math.abs(latestChange))}
+        </span>
+      </div>
+
+      <div className="mt-4 overflow-hidden rounded-2xl border border-line/70 bg-white/70 p-3">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          className="h-40 w-full"
+          role="img"
+          aria-label="Grafico do historico de valores"
+        >
+          <line
+            x1={paddingX}
+            y1={paddingY}
+            x2={paddingX}
+            y2={height - paddingY}
+            stroke="#d8deec"
+            strokeWidth="1"
+          />
+          <line
+            x1={paddingX}
+            y1={height - paddingY}
+            x2={width - paddingX}
+            y2={height - paddingY}
+            stroke="#d8deec"
+            strokeWidth="1"
+          />
+          <polyline
+            points={polyline}
+            fill="none"
+            stroke={latestChange >= 0 ? "#059669" : "#dc2626"}
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="4"
+          />
+          {points.map((point, index) => (
+            <circle
+              key={`${point.changedAt}-${index}`}
+              cx={point.x}
+              cy={point.y}
+              r="4.5"
+              fill="#ffffff"
+              stroke={latestChange >= 0 ? "#059669" : "#dc2626"}
+              strokeWidth="3"
+            />
+          ))}
+        </svg>
+        <div className="mt-2 flex items-center justify-between gap-3 text-xs font-black text-slate-500">
+          <span>{formatBrl(min)}</span>
+          <span>{formatBrl(max)}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Detail({
+  icon,
+  label,
+  value,
+}: {
+  icon: ReactNode;
+  label: string;
+  value: string;
+}) {
   return (
     <div className="flex gap-3 rounded-[18px] border border-line/80 bg-white/70 p-3 shadow-sm">
       <div className="mt-1 text-lilac">{icon}</div>
       <div className="min-w-0">
-        <dt className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">{label}</dt>
-        <dd className="mt-1 break-words text-sm font-black text-ink">{value}</dd>
+        <dt className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+          {label}
+        </dt>
+        <dd className="mt-1 break-words text-sm font-black text-ink">
+          {value}
+        </dd>
       </div>
     </div>
   );

@@ -238,6 +238,8 @@ export function PublicCollectionPage({ shareToken }: Props) {
                     <option value="oldest">Mais antiga</option>
                     <option value="value-desc">Maior valor</option>
                     <option value="value-asc">Menor valor</option>
+                    <option value="price-change-desc">Maior alta</option>
+                    <option value="price-change-asc">Maior queda</option>
                   </select>
                 </label>
               </div>
@@ -344,6 +346,14 @@ function sortItems(
     return [...items].sort(
       (left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0),
     );
+  if (sort === "price-change-desc")
+    return [...items].sort(
+      (left, right) => latestPriceChange(right) - latestPriceChange(left),
+    );
+  if (sort === "price-change-asc")
+    return [...items].sort(
+      (left, right) => latestPriceChange(left) - latestPriceChange(right),
+    );
   if (sort === "oldest")
     return [...items].sort(
       (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
@@ -351,4 +361,10 @@ function sortItems(
   return [...items].sort(
     (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
   );
+}
+
+function latestPriceChange(item: CollectionItem): number {
+  const history = item.price?.history ?? [];
+  const latest = history[history.length - 1];
+  return latest ? latest.amount - latest.previousAmount : 0;
 }

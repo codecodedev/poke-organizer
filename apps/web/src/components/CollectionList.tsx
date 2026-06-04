@@ -4,7 +4,7 @@ import {
   formatCardNumber,
   normalizeSearchText,
   type CollectionItem,
-  type CollectionFolderSort
+  type CollectionFolderSort,
 } from "@poke-organizer/shared";
 import { api, type Session } from "../lib/api";
 import { withAuthRetry } from "../lib/authRetry";
@@ -41,7 +41,7 @@ export function CollectionList({
   description = "Inventario das cartas que voce possui.",
   modalItemId,
   onModalItemChange,
-  showCounts = true
+  showCounts = true,
 }: Props) {
   const [items, setItems] = useState<CollectionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,9 +54,19 @@ export function CollectionList({
   const [page, setPage] = useState(1);
 
   const showFilters = !limit;
-  const typeOptions = useMemo(() => unique(items.flatMap((item) => item.card.types)), [items]);
-  const rarityOptions = useMemo(() => unique(items.map((item) => item.card.rarity).filter(Boolean) as string[]), [items]);
-  const variantOptions = useMemo(() => unique(items.map((item) => item.variant)), [items]);
+  const typeOptions = useMemo(
+    () => unique(items.flatMap((item) => item.card.types)),
+    [items],
+  );
+  const rarityOptions = useMemo(
+    () =>
+      unique(items.map((item) => item.card.rarity).filter(Boolean) as string[]),
+    [items],
+  );
+  const variantOptions = useMemo(
+    () => unique(items.map((item) => item.variant)),
+    [items],
+  );
   const visibleItems = useMemo(() => {
     const filtered = items.filter((item) => {
       if (!matchesInventorySearch(item, searchTerm)) return false;
@@ -68,26 +78,37 @@ export function CollectionList({
 
     return sortItems(filtered, sort);
   }, [items, rarityFilter, searchTerm, sort, typeFilter, variantFilter]);
-  const totalCards = useMemo(() => visibleItems.reduce((sum, item) => sum + item.quantity, 0), [visibleItems]);
+  const totalCards = useMemo(
+    () => visibleItems.reduce((sum, item) => sum + item.quantity, 0),
+    [visibleItems],
+  );
   const totalValue = useMemo(
     () =>
       visibleItems.reduce((sum, item) => {
         const price = item.price?.amount ?? 0;
         return sum + price * item.quantity;
       }, 0),
-    [visibleItems]
+    [visibleItems],
   );
   const displayedCount = limit ? visibleItems.length : totalCards;
   const pageSize = limit ?? INVENTORY_PAGE_SIZE;
   const paginatedItems = useMemo(
-    () => (limit ? visibleItems : visibleItems.slice((page - 1) * pageSize, page * pageSize)),
-    [limit, page, pageSize, visibleItems]
+    () =>
+      limit
+        ? visibleItems
+        : visibleItems.slice((page - 1) * pageSize, page * pageSize),
+    [limit, page, pageSize, visibleItems],
   );
 
   async function load() {
     setLoading(true);
     try {
-      const nextItems = await withAuthRetry(session, onSession, onUnauthorized, (token) => api.listCollection(token, { limit }));
+      const nextItems = await withAuthRetry(
+        session,
+        onSession,
+        onUnauthorized,
+        (token) => api.listCollection(token, { limit }),
+      );
       setItems(nextItems);
     } finally {
       setLoading(false);
@@ -95,15 +116,22 @@ export function CollectionList({
   }
 
   async function remove(item: CollectionItem) {
-    await withAuthRetry(session, onSession, onUnauthorized, (token) => api.deleteCollection(token, item.id));
+    await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.deleteCollection(token, item.id),
+    );
     setItems((current) => current.filter((entry) => entry.id !== item.id));
   }
 
   async function updateItemDetails(itemId: string, details: UpdateCardDetails) {
-    const updated = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-      api.updateCollection(token, itemId, details)
+    const updated = await withAuthRetry(
+      session,
+      onSession,
+      onUnauthorized,
+      (token) => api.updateCollection(token, itemId, details),
     );
-    setItems((current) => current.map((entry) => (entry.id === itemId ? updated : entry)));
+    setItems((current) =>
+      current.map((entry) => (entry.id === itemId ? updated : entry)),
+    );
     setSelectedItem(updated);
   }
 
@@ -144,14 +172,22 @@ export function CollectionList({
         <div>
           <h2 className="section-title">{title}</h2>
           <p className="section-copy mt-1">{description}</p>
-          {
-            showCounts && (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <StatCard label={limit ? "Itens exibidos" : "Cartas totais"} value={String(displayedCount)} tone="aqua" icon={<Layers3 size={18} />} />
-                <StatCard label={limit ? "Valor exibido" : "Valor total"} value={formatBrl(totalValue)} tone="leaf" icon={<Coins size={18} />} />
-              </div>
-            )
-          }
+          {showCounts && (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <StatCard
+                label={limit ? "Itens exibidos" : "Cartas totais"}
+                value={String(displayedCount)}
+                tone="aqua"
+                icon={<Layers3 size={18} />}
+              />
+              <StatCard
+                label={limit ? "Valor exibido" : "Valor total"}
+                value={formatBrl(totalValue)}
+                tone="leaf"
+                icon={<Coins size={18} />}
+              />
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap gap-2 lg:justify-end">
           <Button
@@ -168,7 +204,10 @@ export function CollectionList({
         <div className="mb-5 grid gap-3 rounded-[24px] border border-line/70 bg-field/45 p-4 sm:grid-cols-2 lg:grid-cols-5">
           <FilterField label="Busca">
             <div className="relative">
-              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
+              <Search
+                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                size={17}
+              />
               <input
                 className="premium-input w-full pl-11"
                 value={searchTerm}
@@ -178,40 +217,72 @@ export function CollectionList({
             </div>
           </FilterField>
           <FilterField label="Tipo">
-            <select className="premium-select" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+            <select
+              className="premium-select"
+              value={typeFilter}
+              onChange={(event) => setTypeFilter(event.target.value)}
+            >
               <option value="">Todos os tipos</option>
-              {typeOptions.map((value) => <option key={value}>{value}</option>)}
+              {typeOptions.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
             </select>
           </FilterField>
           <FilterField label="Raridade">
-            <select className="premium-select" value={rarityFilter} onChange={(event) => setRarityFilter(event.target.value)}>
+            <select
+              className="premium-select"
+              value={rarityFilter}
+              onChange={(event) => setRarityFilter(event.target.value)}
+            >
               <option value="">Todas as raridades</option>
-              {rarityOptions.map((value) => <option key={value}>{value}</option>)}
+              {rarityOptions.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
             </select>
           </FilterField>
           <FilterField label="Variante">
-            <select className="premium-select" value={variantFilter} onChange={(event) => setVariantFilter(event.target.value)}>
+            <select
+              className="premium-select"
+              value={variantFilter}
+              onChange={(event) => setVariantFilter(event.target.value)}
+            >
               <option value="">Todas as variantes</option>
-              {variantOptions.map((value) => <option key={value}>{value}</option>)}
+              {variantOptions.map((value) => (
+                <option key={value}>{value}</option>
+              ))}
             </select>
           </FilterField>
           <FilterField label="Ordenacao">
-            <select className="premium-select" value={sort} onChange={(event) => setSort(event.target.value as CollectionFolderSort)}>
+            <select
+              className="premium-select"
+              value={sort}
+              onChange={(event) =>
+                setSort(event.target.value as CollectionFolderSort)
+              }
+            >
               <option value="newest">Ultima adicionada</option>
               <option value="oldest">Mais antiga</option>
               <option value="value-desc">Maior valor</option>
               <option value="value-asc">Menor valor</option>
+              <option value="price-change-desc">Maior alta</option>
+              <option value="price-change-asc">Maior queda</option>
             </select>
           </FilterField>
         </div>
       )}
 
       {loading ? (
-        <p className="rounded-2xl border border-line/80 bg-white/60 p-4 text-sm font-semibold text-slate-600">Carregando colecao</p>
+        <p className="rounded-2xl border border-line/80 bg-white/60 p-4 text-sm font-semibold text-slate-600">
+          Carregando colecao
+        </p>
       ) : items.length === 0 ? (
-        <p className="rounded-2xl border border-line/80 bg-white/60 p-4 text-sm font-semibold text-slate-600">Nenhuma carta cadastrada.</p>
+        <p className="rounded-2xl border border-line/80 bg-white/60 p-4 text-sm font-semibold text-slate-600">
+          Nenhuma carta cadastrada.
+        </p>
       ) : visibleItems.length === 0 ? (
-        <p className="rounded-2xl border border-line/80 bg-white/60 p-4 text-sm font-semibold text-slate-600">Nenhuma carta aparece com a busca ou filtros atuais.</p>
+        <p className="rounded-2xl border border-line/80 bg-white/60 p-4 text-sm font-semibold text-slate-600">
+          Nenhuma carta aparece com a busca ou filtros atuais.
+        </p>
       ) : (
         <>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
@@ -251,14 +322,44 @@ export function CollectionList({
 }
 
 function unique(values: string[]): string[] {
-  return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right));
+  return Array.from(new Set(values)).sort((left, right) =>
+    left.localeCompare(right),
+  );
 }
 
-function sortItems(items: CollectionItem[], sort: CollectionFolderSort): CollectionItem[] {
-  if (sort === "value-desc") return [...items].sort((left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0));
-  if (sort === "value-asc") return [...items].sort((left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0));
-  if (sort === "oldest") return [...items].sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
-  return [...items].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+function sortItems(
+  items: CollectionItem[],
+  sort: CollectionFolderSort,
+): CollectionItem[] {
+  if (sort === "value-desc")
+    return [...items].sort(
+      (left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0),
+    );
+  if (sort === "value-asc")
+    return [...items].sort(
+      (left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0),
+    );
+  if (sort === "price-change-desc")
+    return [...items].sort(
+      (left, right) => latestPriceChange(right) - latestPriceChange(left),
+    );
+  if (sort === "price-change-asc")
+    return [...items].sort(
+      (left, right) => latestPriceChange(left) - latestPriceChange(right),
+    );
+  if (sort === "oldest")
+    return [...items].sort(
+      (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
+    );
+  return [...items].sort(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
+}
+
+function latestPriceChange(item: CollectionItem): number {
+  const history = item.price?.history ?? [];
+  const latest = history[history.length - 1];
+  return latest ? latest.amount - latest.previousAmount : 0;
 }
 
 function matchesInventorySearch(item: CollectionItem, term: string): boolean {
@@ -267,9 +368,10 @@ function matchesInventorySearch(item: CollectionItem, term: string): boolean {
 
   const cardNumber = formatCardNumber(item.card.number, item.card.printedTotal);
   const numericCardNumber = Number.parseInt(item.card.number, 10);
-  const normalizedNumericCardNumber = Number.isFinite(numericCardNumber) && item.card.printedTotal
-    ? `${numericCardNumber}/${item.card.printedTotal}`
-    : "";
+  const normalizedNumericCardNumber =
+    Number.isFinite(numericCardNumber) && item.card.printedTotal
+      ? `${numericCardNumber}/${item.card.printedTotal}`
+      : "";
   const searchableText = normalizeSearchText(
     [
       item.card.name,
@@ -277,8 +379,8 @@ function matchesInventorySearch(item: CollectionItem, term: string): boolean {
       cardNumber,
       normalizedNumericCardNumber,
       item.card.setName ?? "",
-      item.card.setCode ?? ""
-    ].join(" ")
+      item.card.setCode ?? "",
+    ].join(" "),
   );
   const compactSearchableText = searchableText.replace(/\s+/g, "");
   const compactTerm = normalizedTerm.replace(/\s+/g, "");
@@ -291,10 +393,18 @@ function matchesInventorySearch(item: CollectionItem, term: string): boolean {
   );
 }
 
-function FilterField({ label, children }: { label: string; children: ReactNode }) {
+function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <label className="grid gap-2">
-      <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
+      <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+        {label}
+      </span>
       {children}
     </label>
   );

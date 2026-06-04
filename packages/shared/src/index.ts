@@ -15,7 +15,7 @@ export const PRICE_SOURCES = [
   "tcgdex",
   "ligapokemon",
   "mypcards",
-  "converted-international"
+  "converted-international",
 ] as const;
 export type PriceSource = (typeof PRICE_SOURCES)[number];
 
@@ -54,9 +54,16 @@ export type PriceEstimate = {
   currency: "BRL" | "USD" | "EUR";
   amount: number | null;
   label: string;
+  history?: PriceHistoryPoint[];
   updatedAt?: string | null;
   isFallback: boolean;
   status?: "fresh" | "stale" | "pending" | "unavailable";
+};
+
+export type PriceHistoryPoint = {
+  previousAmount: number;
+  amount: number;
+  changedAt: string;
 };
 
 export type CollectionItem = {
@@ -80,7 +87,13 @@ export type CollectionAddResult = {
   action: CollectionAddAction;
 };
 
-export type CollectionFolderSort = "value-desc" | "value-asc" | "newest" | "oldest";
+export type CollectionFolderSort =
+  | "value-desc"
+  | "value-asc"
+  | "price-change-desc"
+  | "price-change-asc"
+  | "newest"
+  | "oldest";
 
 export type CollectionFolderSummary = {
   id: string;
@@ -120,7 +133,12 @@ export type PriceLookupKey = {
 };
 
 export type PriceJobStatus = "queued" | "running" | "completed" | "failed";
-export type PriceJobItemStatus = "queued" | "fetching" | "updated" | "no-price" | "failed";
+export type PriceJobItemStatus =
+  | "queued"
+  | "fetching"
+  | "updated"
+  | "no-price"
+  | "failed";
 
 export type PriceJobItemResult = {
   itemId?: string;
@@ -153,18 +171,24 @@ export function normalizeCardNumberForSearch(value: string): string {
   return normalizeNumericCardPart(compact.split("/")[0] || compact);
 }
 
-export function parseCardNumberParts(value: string): { number: string; printedTotal?: number } {
+export function parseCardNumberParts(value: string): {
+  number: string;
+  printedTotal?: number;
+} {
   const compact = normalizeCardNumber(value);
   const [number, total] = compact.split("/");
   const printedTotal = total ? Number.parseInt(total, 10) : undefined;
 
   return {
     number: normalizeNumericCardPart(number || compact),
-    printedTotal: Number.isFinite(printedTotal) ? printedTotal : undefined
+    printedTotal: Number.isFinite(printedTotal) ? printedTotal : undefined,
   };
 }
 
-export function formatCardNumber(number: string, printedTotal?: number | null): string {
+export function formatCardNumber(
+  number: string,
+  printedTotal?: number | null,
+): string {
   return printedTotal ? `${number}/${printedTotal}` : number;
 }
 
@@ -182,7 +206,7 @@ export function formatCardVariant(variant: string): string {
     masterBallHolo: "Master Ball Holo",
     firstEditionHolofoil: "1st Edition Holo",
     firstEditionNormal: "1st Edition Normal",
-    unlimitedHolofoil: "Unlimited Holo"
+    unlimitedHolofoil: "Unlimited Holo",
   };
 
   return (
@@ -220,6 +244,9 @@ export function parseOcrNameHint(text: string): string | null {
     .map((line) => line.trim())
     .filter(Boolean);
 
-  const candidate = lines.find((line) => /[A-Za-z\u00C0-\u00FF]{3,}/.test(line) && !/\d+\s*\/\s*\d+/.test(line));
+  const candidate = lines.find(
+    (line) =>
+      /[A-Za-z\u00C0-\u00FF]{3,}/.test(line) && !/\d+\s*\/\s*\d+/.test(line),
+  );
   return candidate ?? null;
 }

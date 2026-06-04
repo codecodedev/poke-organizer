@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import {
   CollectionAddResult,
@@ -7,11 +11,16 @@ import {
   CollectionItem,
   DEFAULT_CARD_VARIANT,
   PriceEstimate,
-  PublicCollectionDetail
+  PublicCollectionDetail,
 } from "@poke-organizer/shared";
 import { Prisma } from "@prisma/client";
 import { CatalogService } from "../cards/catalog.service";
-import { fromPrismaLanguage, toCardSummary, toPrismaCondition, toPrismaLanguage } from "../common/mappers";
+import {
+  fromPrismaLanguage,
+  toCardSummary,
+  toPrismaCondition,
+  toPrismaLanguage,
+} from "../common/mappers";
 import { PrismaService } from "../prisma/prisma.service";
 import {
   AddCollectionItemDto,
@@ -19,28 +28,39 @@ import {
   CreateCollectionFolderDto,
   UpdateCollectionFolderDto,
   UpdateCollectionItemDto,
-  UpdateCollectionSharingDto
+  UpdateCollectionSharingDto,
 } from "./dto";
 import type { CollectionFolderSort } from "./dto";
 
-type CollectionItemWithCard = Prisma.CollectionItemGetPayload<{ include: { card: true; price: true } }>;
+const collectionItemInclude = {
+  card: true,
+  price: { include: { history: { orderBy: { changedAt: "asc" as const } } } },
+} satisfies Prisma.CollectionItemInclude;
+
+type CollectionItemWithCard = Prisma.CollectionItemGetPayload<{
+  include: typeof collectionItemInclude;
+}>;
 type FolderWithItems = Prisma.CollectionFolderGetPayload<{
-  include: { items: { include: { collectionItem: { include: { card: true; price: true } } } } };
+  include: {
+    items: {
+      include: { collectionItem: { include: typeof collectionItemInclude } };
+    };
+  };
 }>;
 
 @Injectable()
 export class CollectionService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly catalog: CatalogService
+    private readonly catalog: CatalogService,
   ) {}
 
   async list(userId: string, limit?: number): Promise<CollectionItem[]> {
     const items = await this.prisma.collectionItem.findMany({
       where: { userId },
-      include: { card: true, price: true },
+      include: collectionItemInclude,
       orderBy: { updatedAt: "desc" },
-      take: limit
+      take: limit,
     });
 
     return items.map((item) => this.mapItem(item));
@@ -49,14 +69,21 @@ export class CollectionService {
   async listFolders(userId: string): Promise<CollectionFolderSummary[]> {
     const folders = await this.prisma.collectionFolder.findMany({
       where: { userId },
-      include: { items: { include: { collectionItem: { include: { card: true, price: true } } } } },
-      orderBy: { updatedAt: "desc" }
+      include: {
+        items: {
+          include: { collectionItem: { include: collectionItemInclude } },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
     });
 
     return Promise.all(folders.map((folder) => this.mapFolderSummary(folder)));
   }
 
-  async createFolder(userId: string, dto: CreateCollectionFolderDto): Promise<CollectionFolderDetail> {
+  async createFolder(
+    userId: string,
+    dto: CreateCollectionFolderDto,
+  ): Promise<CollectionFolderDetail> {
     const name = dto.name.trim();
     if (!name) {
       throw new BadRequestException("Collection name is required");
@@ -64,22 +91,30 @@ export class CollectionService {
 
     const folder = await this.prisma.collectionFolder.create({
       data: { userId, name },
-      include: { items: { include: { collectionItem: { include: { card: true, price: true } } } } }
+      include: {
+        items: {
+          include: { collectionItem: { include: collectionItemInclude } },
+        },
+      },
     });
 
     return this.mapFolderDetail(folder);
   }
 
-  async getFolder(userId: string, id: string, query: CollectionFolderQueryDto = {}): Promise<CollectionFolderDetail> {
+  async getFolder(
+    userId: string,
+    id: string,
+    query: CollectionFolderQueryDto = {},
+  ): Promise<CollectionFolderDetail> {
     const folder = await this.prisma.collectionFolder.findFirst({
       where: { id, userId },
       include: {
         items: {
           where: this.folderItemWhere(userId, query),
-          include: { collectionItem: { include: { card: true, price: true } } },
-          orderBy: this.folderItemOrderBy(query.sort)
-        }
-      }
+          include: { collectionItem: { include: collectionItemInclude } },
+          orderBy: this.folderItemOrderBy(query.sort),
+        },
+      },
     });
 
     if (!folder) {
@@ -89,7 +124,11 @@ export class CollectionService {
     return this.mapFolderDetail(folder, query.sort);
   }
 
-  async updateFolder(userId: string, id: string, dto: UpdateCollectionFolderDto): Promise<CollectionFolderDetail> {
+  async updateFolder(
+    userId: string,
+    id: string,
+    dto: UpdateCollectionFolderDto,
+  ): Promise<CollectionFolderDetail> {
     await this.assertOwnsFolder(userId, id);
 
     if (dto.itemIds) {
@@ -101,14 +140,23 @@ export class CollectionService {
       if (!name) {
         throw new BadRequestException("Collection name is required");
       }
-      await this.prisma.collectionFolder.update({ where: { id }, data: { name } });
+      await this.prisma.collectionFolder.update({
+        where: { id },
+        data: { name },
+      });
     }
 
     return this.getFolder(userId, id);
   }
 
-  async updateFolderSharing(userId: string, id: string, dto: UpdateCollectionSharingDto): Promise<CollectionFolderDetail> {
-    const folder = await this.prisma.collectionFolder.findFirst({ where: { id, userId } });
+  async updateFolderSharing(
+    userId: string,
+    id: string,
+    dto: UpdateCollectionSharingDto,
+  ): Promise<CollectionFolderDetail> {
+    const folder = await this.prisma.collectionFolder.findFirst({
+      where: { id, userId },
+    });
     if (!folder) {
       throw new NotFoundException("Collection not found");
     }
@@ -118,24 +166,30 @@ export class CollectionService {
       where: { id },
       data: {
         isPublic: dto.isPublic,
-        shareToken: shouldEnsureToken && !folder.shareToken ? await this.createShareToken() : undefined
-      }
+        shareToken:
+          shouldEnsureToken && !folder.shareToken
+            ? await this.createShareToken()
+            : undefined,
+      },
     });
 
     return this.getFolder(userId, id);
   }
 
-  async getPublicFolder(shareToken: string, query: CollectionFolderQueryDto = {}): Promise<PublicCollectionDetail> {
+  async getPublicFolder(
+    shareToken: string,
+    query: CollectionFolderQueryDto = {},
+  ): Promise<PublicCollectionDetail> {
     const folder = await this.prisma.collectionFolder.findFirst({
       where: { shareToken, isPublic: true },
       include: {
         user: true,
         items: {
           where: this.publicFolderItemWhere(query),
-          include: { collectionItem: { include: { card: true, price: true } } },
-          orderBy: this.folderItemOrderBy(query.sort)
-        }
-      }
+          include: { collectionItem: { include: collectionItemInclude } },
+          orderBy: this.folderItemOrderBy(query.sort),
+        },
+      },
     });
 
     if (!folder) {
@@ -145,7 +199,7 @@ export class CollectionService {
     return {
       ...(await this.mapFolderDetail(folder, query.sort)),
       isPublic: true,
-      ownerName: folder.user.name?.trim() || "Colecionador"
+      ownerName: folder.user.name?.trim() || "Colecionador",
     };
   }
 
@@ -155,13 +209,18 @@ export class CollectionService {
     return { ok: true };
   }
 
-  async add(userId: string, dto: AddCollectionItemDto): Promise<CollectionAddResult> {
+  async add(
+    userId: string,
+    dto: AddCollectionItemDto,
+  ): Promise<CollectionAddResult> {
     let card = await this.prisma.card.findFirst({
-      where: { OR: [{ id: dto.cardId }, { externalId: dto.cardId }] }
+      where: { OR: [{ id: dto.cardId }, { externalId: dto.cardId }] },
     });
     if (!card) {
       const ensured = await this.catalog.ensureCardByExternalId(dto.cardId);
-      card = await this.prisma.card.findUniqueOrThrow({ where: { id: ensured.id } });
+      card = await this.prisma.card.findUniqueOrThrow({
+        where: { id: ensured.id },
+      });
     }
 
     const condition = toPrismaCondition(dto.condition);
@@ -179,9 +238,9 @@ export class CollectionService {
           condition,
           variant,
           foil,
-          language
-        }
-      }
+          language,
+        },
+      },
     });
 
     const item = await this.prisma.collectionItem.upsert({
@@ -192,8 +251,8 @@ export class CollectionService {
           condition,
           variant,
           foil,
-          language
-        }
+          language,
+        },
       },
       create: {
         userId,
@@ -204,26 +263,33 @@ export class CollectionService {
         foil,
         language,
         cardPriceId,
-        notes: dto.notes ?? null
+        notes: dto.notes ?? null,
       },
       update: {
         quantity: { increment: dto.quantity ?? 1 },
         cardPriceId: existing?.cardPriceId ?? cardPriceId,
-        notes: dto.notes ?? undefined
+        notes: dto.notes ?? undefined,
       },
-      include: { card: true, price: true }
+      include: collectionItemInclude,
     });
 
     return {
       item: this.mapItem(item),
-      action: existing ? "incremented" : "created"
+      action: existing ? "incremented" : "created",
     };
   }
 
-  async update(userId: string, id: string, dto: UpdateCollectionItemDto): Promise<CollectionItem> {
+  async update(
+    userId: string,
+    id: string,
+    dto: UpdateCollectionItemDto,
+  ): Promise<CollectionItem> {
     await this.assertOwnsItem(userId, id);
     if (dto.variant) {
-      const current = await this.prisma.collectionItem.findUnique({ where: { id }, include: { card: true } });
+      const current = await this.prisma.collectionItem.findUnique({
+        where: { id },
+        include: { card: true },
+      });
       this.assertValidVariant(current?.card.variants ?? [], dto.variant);
     }
 
@@ -235,9 +301,9 @@ export class CollectionService {
         variant: dto.variant,
         foil: dto.foil,
         language: dto.language ? toPrismaLanguage(dto.language) : undefined,
-        notes: dto.notes
+        notes: dto.notes,
       },
-      include: { card: true, price: true }
+      include: collectionItemInclude,
     });
 
     return this.mapItem(item);
@@ -250,39 +316,55 @@ export class CollectionService {
   }
 
   private async assertOwnsItem(userId: string, id: string) {
-    const item = await this.prisma.collectionItem.findFirst({ where: { id, userId } });
+    const item = await this.prisma.collectionItem.findFirst({
+      where: { id, userId },
+    });
     if (!item) {
       throw new NotFoundException("Collection item not found");
     }
   }
 
   private async assertOwnsFolder(userId: string, id: string) {
-    const folder = await this.prisma.collectionFolder.findFirst({ where: { id, userId } });
+    const folder = await this.prisma.collectionFolder.findFirst({
+      where: { id, userId },
+    });
     if (!folder) {
       throw new NotFoundException("Collection not found");
     }
   }
 
-  private async replaceFolderItems(userId: string, folderId: string, itemIds: string[]) {
+  private async replaceFolderItems(
+    userId: string,
+    folderId: string,
+    itemIds: string[],
+  ) {
     const uniqueItemIds = Array.from(new Set(itemIds));
     const ownedCount = await this.prisma.collectionItem.count({
-      where: { userId, id: { in: uniqueItemIds } }
+      where: { userId, id: { in: uniqueItemIds } },
     });
 
     if (ownedCount !== uniqueItemIds.length) {
-      throw new BadRequestException("Some selected cards do not belong to this user");
+      throw new BadRequestException(
+        "Some selected cards do not belong to this user",
+      );
     }
 
     await this.prisma.$transaction([
       this.prisma.collectionFolderItem.deleteMany({ where: { folderId } }),
       this.prisma.collectionFolderItem.createMany({
-        data: uniqueItemIds.map((collectionItemId) => ({ folderId, collectionItemId })),
-        skipDuplicates: true
-      })
+        data: uniqueItemIds.map((collectionItemId) => ({
+          folderId,
+          collectionItemId,
+        })),
+        skipDuplicates: true,
+      }),
     ]);
   }
 
-  private folderItemWhere(userId: string, query: CollectionFolderQueryDto): Prisma.CollectionFolderItemWhereInput {
+  private folderItemWhere(
+    userId: string,
+    query: CollectionFolderQueryDto,
+  ): Prisma.CollectionFolderItemWhereInput {
     const cardFilter: Prisma.CardWhereInput = {};
     if (query.type) {
       cardFilter.types = { has: query.type };
@@ -295,12 +377,14 @@ export class CollectionService {
       collectionItem: {
         userId,
         variant: query.variant || undefined,
-        card: Object.keys(cardFilter).length ? cardFilter : undefined
-      }
+        card: Object.keys(cardFilter).length ? cardFilter : undefined,
+      },
     };
   }
 
-  private publicFolderItemWhere(query: CollectionFolderQueryDto): Prisma.CollectionFolderItemWhereInput {
+  private publicFolderItemWhere(
+    query: CollectionFolderQueryDto,
+  ): Prisma.CollectionFolderItemWhereInput {
     const cardFilter: Prisma.CardWhereInput = {};
     if (query.type) {
       cardFilter.types = { has: query.type };
@@ -312,12 +396,14 @@ export class CollectionService {
     return {
       collectionItem: {
         variant: query.variant || undefined,
-        card: Object.keys(cardFilter).length ? cardFilter : undefined
-      }
+        card: Object.keys(cardFilter).length ? cardFilter : undefined,
+      },
     };
   }
 
-  private folderItemOrderBy(sort?: CollectionFolderSort): Prisma.CollectionFolderItemOrderByWithRelationInput {
+  private folderItemOrderBy(
+    sort?: CollectionFolderSort,
+  ): Prisma.CollectionFolderItemOrderByWithRelationInput {
     if (sort === "oldest") {
       return { createdAt: "asc" };
     }
@@ -325,13 +411,22 @@ export class CollectionService {
   }
 
   private assertValidVariant(validVariants: string[], variant: string) {
-    const allowed = validVariants.length ? validVariants : [DEFAULT_CARD_VARIANT];
+    const allowed = validVariants.length
+      ? validVariants
+      : [DEFAULT_CARD_VARIANT];
     if (!allowed.includes(variant)) {
-      throw new BadRequestException(`Invalid variant. Allowed variants: ${allowed.join(", ")}`);
+      throw new BadRequestException(
+        `Invalid variant. Allowed variants: ${allowed.join(", ")}`,
+      );
     }
   }
 
-  private async findCardPriceId(card: { number: string; printedTotal: number | null; setCode?: string | null; raw?: unknown }): Promise<string | null> {
+  private async findCardPriceId(card: {
+    number: string;
+    printedTotal: number | null;
+    setCode?: string | null;
+    raw?: unknown;
+  }): Promise<string | null> {
     const setCode = this.cardSetCode(card);
     if (!setCode || !card.printedTotal) return null;
 
@@ -339,9 +434,9 @@ export class CollectionService {
       where: {
         setCode,
         number: normalizeCardNumber(card.number),
-        printedTotal: card.printedTotal
+        printedTotal: card.printedTotal,
       },
-      orderBy: [{ provider: "asc" }, { lastCheckedAt: "desc" }]
+      orderBy: [{ provider: "asc" }, { lastCheckedAt: "desc" }],
     });
 
     return price?.id ?? null;
@@ -359,13 +454,19 @@ export class CollectionService {
       notes: item.notes,
       price: this.mapCardPrice(item.price),
       createdAt: item.createdAt.toISOString(),
-      updatedAt: item.updatedAt.toISOString()
+      updatedAt: item.updatedAt.toISOString(),
     };
   }
 
-  private async mapFolderSummary(folder: FolderWithItems): Promise<CollectionFolderSummary> {
+  private async mapFolderSummary(
+    folder: FolderWithItems,
+  ): Promise<CollectionFolderSummary> {
     const items = folder.items.map((entry) => entry.collectionItem);
-    const totalValue = items.reduce((sum, item) => sum + (this.mapCardPrice(item.price)?.amount ?? 0) * item.quantity, 0);
+    const totalValue = items.reduce(
+      (sum, item) =>
+        sum + (this.mapCardPrice(item.price)?.amount ?? 0) * item.quantity,
+      0,
+    );
 
     return {
       id: folder.id,
@@ -375,15 +476,21 @@ export class CollectionService {
       itemCount: folder.items.length,
       totalValue,
       createdAt: folder.createdAt.toISOString(),
-      updatedAt: folder.updatedAt.toISOString()
+      updatedAt: folder.updatedAt.toISOString(),
     };
   }
 
-  private async mapFolderDetail(folder: FolderWithItems, sort?: CollectionFolderSort): Promise<CollectionFolderDetail> {
+  private async mapFolderDetail(
+    folder: FolderWithItems,
+    sort?: CollectionFolderSort,
+  ): Promise<CollectionFolderDetail> {
     const sourceItems = folder.items.map((entry) => entry.collectionItem);
     const items = sourceItems.map((item) => this.mapItem(item));
     const sortedItems = this.sortFolderItems(items, sort);
-    const totalValue = items.reduce((sum, item) => sum + (item.price?.amount ?? 0) * item.quantity, 0);
+    const totalValue = items.reduce(
+      (sum, item) => sum + (item.price?.amount ?? 0) * item.quantity,
+      0,
+    );
 
     return {
       id: folder.id,
@@ -394,24 +501,48 @@ export class CollectionService {
       totalValue,
       items: sortedItems,
       createdAt: folder.createdAt.toISOString(),
-      updatedAt: folder.updatedAt.toISOString()
+      updatedAt: folder.updatedAt.toISOString(),
     };
   }
 
-  private sortFolderItems(items: CollectionItem[], sort?: CollectionFolderSort): CollectionItem[] {
+  private sortFolderItems(
+    items: CollectionItem[],
+    sort?: CollectionFolderSort,
+  ): CollectionItem[] {
     if (sort === "value-desc") {
-      return [...items].sort((left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0));
+      return [...items].sort(
+        (left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0),
+      );
     }
     if (sort === "value-asc") {
-      return [...items].sort((left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0));
+      return [...items].sort(
+        (left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0),
+      );
+    }
+    if (sort === "price-change-desc") {
+      return [...items].sort(
+        (left, right) => latestPriceChange(right) - latestPriceChange(left),
+      );
+    }
+    if (sort === "price-change-asc") {
+      return [...items].sort(
+        (left, right) => latestPriceChange(left) - latestPriceChange(right),
+      );
     }
     if (sort === "oldest") {
-      return [...items].sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
+      return [...items].sort(
+        (left, right) =>
+          Date.parse(left.createdAt) - Date.parse(right.createdAt),
+      );
     }
-    return [...items].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+    return [...items].sort(
+      (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+    );
   }
 
-  private mapCardPrice(price: CollectionItemWithCard["price"]): PriceEstimate | null {
+  private mapCardPrice(
+    price: CollectionItemWithCard["price"],
+  ): PriceEstimate | null {
     if (!price) return null;
 
     return {
@@ -419,13 +550,21 @@ export class CollectionService {
       currency: "BRL",
       amount: Number(price.amountBrl),
       label: price.label,
+      history: price.history.map((entry) => ({
+        previousAmount: Number(entry.previousAmountBrl),
+        amount: Number(entry.newAmountBrl),
+        changedAt: entry.changedAt.toISOString(),
+      })),
       updatedAt: price.lastCheckedAt.toISOString(),
       isFallback: false,
-      status: "fresh"
+      status: "fresh",
     };
   }
 
-  private cardSetCode(card: { setCode?: string | null; raw?: unknown }): string | null {
+  private cardSetCode(card: {
+    setCode?: string | null;
+    raw?: unknown;
+  }): string | null {
     const raw = card.raw as { set?: { ptcgoCode?: string | null } } | null;
     const code = card.setCode ?? raw?.set?.ptcgoCode ?? null;
     return code ? code.trim().toUpperCase() : null;
@@ -434,7 +573,9 @@ export class CollectionService {
   private async createShareToken(): Promise<string> {
     for (let attempt = 0; attempt < 5; attempt += 1) {
       const token = randomBytes(18).toString("base64url");
-      const existing = await this.prisma.collectionFolder.findUnique({ where: { shareToken: token } });
+      const existing = await this.prisma.collectionFolder.findUnique({
+        where: { shareToken: token },
+      });
       if (!existing) {
         return token;
       }
@@ -446,4 +587,10 @@ export class CollectionService {
 
 function normalizeCardNumber(number: string): string {
   return number.trim().replace(/^0+(?=\d)/, "");
+}
+
+function latestPriceChange(item: CollectionItem): number {
+  const history = item.price?.history ?? [];
+  const latest = history[history.length - 1];
+  return latest ? latest.amount - latest.previousAmount : 0;
 }

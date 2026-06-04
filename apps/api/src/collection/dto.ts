@@ -1,7 +1,22 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { CARD_CONDITIONS, CARD_LANGUAGES, CardCondition, CardLanguage, DEFAULT_CARD_VARIANT } from "@poke-organizer/shared";
+import {
+  CARD_CONDITIONS,
+  CARD_LANGUAGES,
+  CardCondition,
+  CardLanguage,
+  DEFAULT_CARD_VARIANT,
+} from "@poke-organizer/shared";
 import { Transform } from "class-transformer";
-import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Min, Max } from "class-validator";
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  Max,
+} from "class-validator";
 
 export class AddCollectionItemDto {
   @ApiProperty({ description: "Local card id or external provider id" })
@@ -39,7 +54,6 @@ export class AddCollectionItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
-
 }
 
 export class UpdateCollectionItemDto {
@@ -73,7 +87,6 @@ export class UpdateCollectionItemDto {
   @IsOptional()
   @IsString()
   notes?: string | null;
-
 }
 
 export class ListCollectionQueryDto {
@@ -119,7 +132,14 @@ export class UpdateCollectionSharingDto {
   ensureToken?: boolean;
 }
 
-export const COLLECTION_FOLDER_SORTS = ["value-desc", "value-asc", "newest", "oldest"] as const;
+export const COLLECTION_FOLDER_SORTS = [
+  "value-desc",
+  "value-asc",
+  "price-change-desc",
+  "price-change-asc",
+  "newest",
+  "oldest",
+] as const;
 export type CollectionFolderSort = (typeof COLLECTION_FOLDER_SORTS)[number];
 
 export class CollectionFolderQueryDto {

@@ -1,6 +1,23 @@
 import { FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Copy, Eye, FolderPlus, Layers3, Lock, Plus, Save, Search, Share2, Trash2 } from "lucide-react";
-import type { CollectionFolderDetail, CollectionFolderSort, CollectionFolderSummary, CollectionItem } from "@poke-organizer/shared";
+import {
+  ArrowLeft,
+  Copy,
+  Eye,
+  FolderPlus,
+  Layers3,
+  Lock,
+  Plus,
+  Save,
+  Search,
+  Share2,
+  Trash2,
+} from "lucide-react";
+import type {
+  CollectionFolderDetail,
+  CollectionFolderSort,
+  CollectionFolderSummary,
+  CollectionItem,
+} from "@poke-organizer/shared";
 import { api, type Session } from "../../lib/api";
 import { withAuthRetry } from "../../lib/authRetry";
 import { formatBrl } from "../../lib/format";
@@ -24,12 +41,21 @@ const FOLDERS_PAGE_SIZE = 12;
 const COLLECTION_DETAIL_PAGE_SIZE = 24;
 const PICKER_PAGE_SIZE = 21;
 
-export function CollectionsPage({ session, onSession, onUnauthorized, collectionRoute = null, onCollectionRouteChange }: Props) {
+export function CollectionsPage({
+  session,
+  onSession,
+  onUnauthorized,
+  collectionRoute = null,
+  onCollectionRouteChange,
+}: Props) {
   const [screen, setScreen] = useState<Screen>("list");
   const [folders, setFolders] = useState<CollectionFolderSummary[]>([]);
-  const [activeFolder, setActiveFolder] = useState<CollectionFolderDetail | null>(null);
+  const [activeFolder, setActiveFolder] =
+    useState<CollectionFolderDetail | null>(null);
   const [inventory, setInventory] = useState<CollectionItem[]>([]);
-  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(() => new Set());
+  const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const [selectedItem, setSelectedItem] = useState<CollectionItem | null>(null);
   const [newName, setNewName] = useState("");
   const [activeName, setActiveName] = useState("");
@@ -50,14 +76,24 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
     setLoading(true);
     setError(null);
     try {
-      const [nextInventory, nextFolders] = await withAuthRetry(session, onSession, onUnauthorized, async (token) => {
-        const [items, folderList] = await Promise.all([api.listCollection(token), api.listCollectionFolders(token)]);
-        return [items, folderList] as const;
-      });
+      const [nextInventory, nextFolders] = await withAuthRetry(
+        session,
+        onSession,
+        onUnauthorized,
+        async (token) => {
+          const [items, folderList] = await Promise.all([
+            api.listCollection(token),
+            api.listCollectionFolders(token),
+          ]);
+          return [items, folderList] as const;
+        },
+      );
       setInventory(nextInventory);
       setFolders(nextFolders);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao carregar colecoes");
+      setError(
+        err instanceof Error ? err.message : "Falha ao carregar colecoes",
+      );
     } finally {
       setLoading(false);
     }
@@ -65,7 +101,12 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
 
   async function loadFolder(folderId: string) {
     try {
-      const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) => api.getCollectionFolder(token, folderId));
+      const detail = await withAuthRetry(
+        session,
+        onSession,
+        onUnauthorized,
+        (token) => api.getCollectionFolder(token, folderId),
+      );
       setActiveFolder(detail);
       setActiveName(detail.name);
       setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
@@ -73,7 +114,9 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
       resetPicker();
       setScreen("detail");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao carregar colecao");
+      setError(
+        err instanceof Error ? err.message : "Falha ao carregar colecao",
+      );
       showList();
     }
   }
@@ -121,14 +164,19 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
     setError(null);
     setMessage(null);
     try {
-      const folder = await withAuthRetry(session, onSession, onUnauthorized, async (token) => {
-        const created = await api.createCollectionFolder(token, name);
-        if (selectedItemIds.size === 0) return created;
-        return api.updateCollectionFolder(token, created.id, {
-          name,
-          itemIds: Array.from(selectedItemIds)
-        });
-      });
+      const folder = await withAuthRetry(
+        session,
+        onSession,
+        onUnauthorized,
+        async (token) => {
+          const created = await api.createCollectionFolder(token, name);
+          if (selectedItemIds.size === 0) return created;
+          return api.updateCollectionFolder(token, created.id, {
+            name,
+            itemIds: Array.from(selectedItemIds),
+          });
+        },
+      );
       setActiveFolder(folder);
       setActiveName(folder.name);
       setSelectedItemIds(new Set(folder.items.map((item) => item.id)));
@@ -150,11 +198,15 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
     setError(null);
     setMessage(null);
     try {
-      const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-        api.updateCollectionFolder(token, activeFolder.id, {
-          name: activeName.trim(),
-          itemIds: Array.from(selectedItemIds)
-        })
+      const detail = await withAuthRetry(
+        session,
+        onSession,
+        onUnauthorized,
+        (token) =>
+          api.updateCollectionFolder(token, activeFolder.id, {
+            name: activeName.trim(),
+            itemIds: Array.from(selectedItemIds),
+          }),
       );
       setActiveFolder(detail);
       setActiveName(detail.name);
@@ -171,7 +223,9 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
     setError(null);
     setMessage(null);
     try {
-      await withAuthRetry(session, onSession, onUnauthorized, (token) => api.deleteCollectionFolder(token, activeFolder.id));
+      await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.deleteCollectionFolder(token, activeFolder.id),
+      );
       await refreshFolders();
       showList();
       onCollectionRouteChange?.(null);
@@ -186,11 +240,15 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
     setError(null);
     setMessage(null);
     try {
-      const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-        api.updateCollectionFolderSharing(token, activeFolder.id, {
-          isPublic,
-          ensureToken: isPublic
-        })
+      const detail = await withAuthRetry(
+        session,
+        onSession,
+        onUnauthorized,
+        (token) =>
+          api.updateCollectionFolderSharing(token, activeFolder.id, {
+            isPublic,
+            ensureToken: isPublic,
+          }),
       );
       setActiveFolder(detail);
       setActiveName(detail.name);
@@ -198,7 +256,11 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
       await refreshFolders();
       setMessage(isPublic ? "Colecao publica." : "Colecao privada.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao atualizar compartilhamento");
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Falha ao atualizar compartilhamento",
+      );
     }
   }
 
@@ -211,7 +273,9 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
       const detail = activeFolder.shareToken
         ? activeFolder
         : await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-            api.updateCollectionFolderSharing(token, activeFolder.id, { ensureToken: true })
+            api.updateCollectionFolderSharing(token, activeFolder.id, {
+              ensureToken: true,
+            }),
           );
 
       setActiveFolder(detail);
@@ -229,9 +293,17 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
           throw new Error("Clipboard unavailable");
         }
         await navigator.clipboard.writeText(url);
-        setMessage(detail.isPublic ? "Link copiado." : "Link copiado. A colecao ainda esta privada.");
+        setMessage(
+          detail.isPublic
+            ? "Link copiado."
+            : "Link copiado. A colecao ainda esta privada.",
+        );
       } catch {
-        setMessage(detail.isPublic ? `Link gerado: ${url}` : `Link gerado: ${url}. A colecao ainda esta privada.`);
+        setMessage(
+          detail.isPublic
+            ? `Link gerado: ${url}`
+            : `Link gerado: ${url}. A colecao ainda esta privada.`,
+        );
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao copiar link");
@@ -239,13 +311,25 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
   }
 
   async function refreshFolders() {
-    const nextFolders = await withAuthRetry(session, onSession, onUnauthorized, (token) => api.listCollectionFolders(token));
+    const nextFolders = await withAuthRetry(
+      session,
+      onSession,
+      onUnauthorized,
+      (token) => api.listCollectionFolders(token),
+    );
     setFolders(nextFolders);
   }
 
   async function updateItemDetails(itemId: string, details: UpdateCardDetails) {
-    const updated = await withAuthRetry(session, onSession, onUnauthorized, (token) => api.updateCollection(token, itemId, details));
-    setInventory((current) => current.map((item) => (item.id === itemId ? updated : item)));
+    const updated = await withAuthRetry(
+      session,
+      onSession,
+      onUnauthorized,
+      (token) => api.updateCollection(token, itemId, details),
+    );
+    setInventory((current) =>
+      current.map((item) => (item.id === itemId ? updated : item)),
+    );
     setSelectedItem(updated);
   }
 
@@ -277,11 +361,25 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
 
   const selectedItems = useMemo(
     () => inventory.filter((item) => selectedItemIds.has(item.id)),
-    [inventory, selectedItemIds]
+    [inventory, selectedItemIds],
   );
-  const typeOptions = useMemo(() => unique(selectedItems.flatMap((item) => item.card.types)), [selectedItems]);
-  const rarityOptions = useMemo(() => unique(selectedItems.map((item) => item.card.rarity).filter(Boolean) as string[]), [selectedItems]);
-  const variantOptions = useMemo(() => unique(selectedItems.map((item) => item.variant)), [selectedItems]);
+  const typeOptions = useMemo(
+    () => unique(selectedItems.flatMap((item) => item.card.types)),
+    [selectedItems],
+  );
+  const rarityOptions = useMemo(
+    () =>
+      unique(
+        selectedItems
+          .map((item) => item.card.rarity)
+          .filter(Boolean) as string[],
+      ),
+    [selectedItems],
+  );
+  const variantOptions = useMemo(
+    () => unique(selectedItems.map((item) => item.variant)),
+    [selectedItems],
+  );
   const visibleItems = useMemo(() => {
     const filtered = selectedItems.filter((item) => {
       if (typeFilter && !item.card.types.includes(typeFilter)) return false;
@@ -298,19 +396,24 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
 
     return inventory.filter((item) => {
       if (!query) return true;
-      const searchable = normalizeText([
-        item.card.name,
-        item.card.number,
-        item.card.printedTotal,
-        item.card.setName,
-        item.variant,
-        item.condition,
-        item.language
-      ].join(" "));
+      const searchable = normalizeText(
+        [
+          item.card.name,
+          item.card.number,
+          item.card.printedTotal,
+          item.card.setName,
+          item.variant,
+          item.condition,
+          item.language,
+        ].join(" "),
+      );
       return searchable.includes(query);
     });
   }, [inventory, pickerQuery, showAllPickerItems]);
-  const selectedTotalValue = selectedItems.reduce((sum, item) => sum + (item.price?.amount ?? 0) * item.quantity, 0);
+  const selectedTotalValue = selectedItems.reduce(
+    (sum, item) => sum + (item.price?.amount ?? 0) * item.quantity,
+    0,
+  );
 
   useEffect(() => {
     void load();
@@ -330,7 +433,10 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
   }, [collectionRoute, loading]);
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(folders.length / FOLDERS_PAGE_SIZE));
+    const totalPages = Math.max(
+      1,
+      Math.ceil(folders.length / FOLDERS_PAGE_SIZE),
+    );
     setFoldersPage((current) => Math.min(current, totalPages));
   }, [folders.length]);
 
@@ -339,7 +445,10 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
   }, [rarityFilter, sort, typeFilter, variantFilter]);
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(visibleItems.length / COLLECTION_DETAIL_PAGE_SIZE));
+    const totalPages = Math.max(
+      1,
+      Math.ceil(visibleItems.length / COLLECTION_DETAIL_PAGE_SIZE),
+    );
     setDetailPage((current) => Math.min(current, totalPages));
   }, [visibleItems.length]);
 
@@ -348,7 +457,10 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
   }, [pickerQuery, showAllPickerItems, screen]);
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(pickerItems.length / PICKER_PAGE_SIZE));
+    const totalPages = Math.max(
+      1,
+      Math.ceil(pickerItems.length / PICKER_PAGE_SIZE),
+    );
     setPickerPage((current) => Math.min(current, totalPages));
   }, [pickerItems.length]);
 
@@ -413,7 +525,11 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
           pickerPage={pickerPage}
           selectedItemIds={selectedItemIds}
           isPublic={activeFolder.isPublic}
-          shareUrl={activeFolder.shareToken ? publicCollectionUrl(activeFolder.shareToken) : null}
+          shareUrl={
+            activeFolder.shareToken
+              ? publicCollectionUrl(activeFolder.shareToken)
+              : null
+          }
           onBack={backToList}
           onNameChange={setActiveName}
           onSave={() => void saveFolder()}
@@ -454,7 +570,7 @@ function CollectionsListScreen({
   loading,
   onCreate,
   onPageChange,
-  onOpen
+  onOpen,
 }: {
   folders: CollectionFolderSummary[];
   inventoryCount: number;
@@ -465,8 +581,9 @@ function CollectionsListScreen({
   onOpen: (folderId: string) => void;
 }) {
   const paginatedFolders = useMemo(
-    () => folders.slice((page - 1) * FOLDERS_PAGE_SIZE, page * FOLDERS_PAGE_SIZE),
-    [folders, page]
+    () =>
+      folders.slice((page - 1) * FOLDERS_PAGE_SIZE, page * FOLDERS_PAGE_SIZE),
+    [folders, page],
   );
 
   return (
@@ -475,19 +592,29 @@ function CollectionsListScreen({
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h2 className="section-title">Colecoes</h2>
-            <p className="section-copy mt-1">Organize seu inventario em pastas separadas.</p>
+            <p className="section-copy mt-1">
+              Organize seu inventario em pastas separadas.
+            </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <InfoPill label="Colecoes" value={folders.length.toString()} />
               <InfoPill label="Inventario" value={`${inventoryCount} cartas`} />
             </div>
           </div>
-          <Button type="button" variant="brand" icon={<FolderPlus size={16} />} onClick={onCreate}>
+          <Button
+            type="button"
+            variant="brand"
+            icon={<FolderPlus size={16} />}
+            onClick={onCreate}
+          >
             Nova colecao
           </Button>
         </div>
       </Panel>
 
-      <Panel title="Minhas colecoes" description="Clique em uma colecao para abrir detalhes, editar cartas e ajustar o nome.">
+      <Panel
+        title="Minhas colecoes"
+        description="Clique em uma colecao para abrir detalhes, editar cartas e ajustar o nome."
+      >
         {folders.length ? (
           <>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -501,15 +628,19 @@ function CollectionsListScreen({
                   <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-lilac/20 to-aqua/20 text-violet-800">
                     <Layers3 size={20} />
                   </span>
-                  <span className="mt-5 block truncate text-xl font-black text-ink">{folder.name}</span>
+                  <span className="mt-5 block truncate text-xl font-black text-ink">
+                    {folder.name}
+                  </span>
                   <span className="mt-1 block text-sm font-semibold text-slate-500">
                     {folder.itemCount} cartas - {formatBrl(folder.totalValue)}
                   </span>
-                  <span className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
-                    folder.isPublic
-                      ? "border-leaf/25 bg-leaf/10 text-emerald-800"
-                      : "border-line/70 bg-white/70 text-slate-500"
-                  }`}>
+                  <span
+                    className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
+                      folder.isPublic
+                        ? "border-leaf/25 bg-leaf/10 text-emerald-800"
+                        : "border-line/70 bg-white/70 text-slate-500"
+                    }`}
+                  >
                     {folder.isPublic ? <Eye size={14} /> : <Lock size={14} />}
                     {folder.isPublic ? "Publica" : "Privada"}
                   </span>
@@ -525,7 +656,12 @@ function CollectionsListScreen({
             />
           </>
         ) : (
-          !loading && <EmptyState>Nenhuma colecao criada ainda. Use o botao Nova colecao para comecar.</EmptyState>
+          !loading && (
+            <EmptyState>
+              Nenhuma colecao criada ainda. Use o botao Nova colecao para
+              comecar.
+            </EmptyState>
+          )
         )}
       </Panel>
     </>
@@ -548,7 +684,7 @@ function CollectionCreateScreen({
   onPickerPageChange,
   onToggleItem,
   onOpenCard,
-  onSubmit
+  onSubmit,
 }: {
   name: string;
   selectedCount: number;
@@ -577,7 +713,12 @@ function CollectionCreateScreen({
             description="Defina um nome, busque cartas do inventario e salve a nova pasta."
             onBack={onBack}
             action={
-              <Button type="submit" variant="primary" icon={<Save size={16} />} disabled={!name.trim()}>
+              <Button
+                type="submit"
+                variant="primary"
+                icon={<Save size={16} />}
+                disabled={!name.trim()}
+              >
                 Criar colecao
               </Button>
             }
@@ -585,8 +726,15 @@ function CollectionCreateScreen({
 
           <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">
             <label className="grid gap-2">
-              <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">Nome da colecao</span>
-              <input className="premium-input" value={name} onChange={(event) => onNameChange(event.target.value)} placeholder="Ex: Binder principal" />
+              <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                Nome da colecao
+              </span>
+              <input
+                className="premium-input"
+                value={name}
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="Ex: Binder principal"
+              />
             </label>
             <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
               {selectedCount} cartas - {formatBrl(selectedTotalValue)}
@@ -648,7 +796,7 @@ function CollectionDetailScreen({
   onShowAllChange,
   onPickerPageChange,
   onToggleItem,
-  onOpenCard
+  onOpenCard,
 }: {
   activeName: string;
   selectedItems: CollectionItem[];
@@ -687,8 +835,12 @@ function CollectionDetailScreen({
   onOpenCard: (item: CollectionItem) => void;
 }) {
   const paginatedVisibleItems = useMemo(
-    () => visibleItems.slice((detailPage - 1) * COLLECTION_DETAIL_PAGE_SIZE, detailPage * COLLECTION_DETAIL_PAGE_SIZE),
-    [detailPage, visibleItems]
+    () =>
+      visibleItems.slice(
+        (detailPage - 1) * COLLECTION_DETAIL_PAGE_SIZE,
+        detailPage * COLLECTION_DETAIL_PAGE_SIZE,
+      ),
+    [detailPage, visibleItems],
   );
 
   return (
@@ -702,10 +854,19 @@ function CollectionDetailScreen({
             onBack={onBack}
             action={
               <div className="flex flex-wrap gap-2">
-                <Button type="button" variant="primary" icon={<Save size={16} />} onClick={onSave}>
+                <Button
+                  type="button"
+                  variant="primary"
+                  icon={<Save size={16} />}
+                  onClick={onSave}
+                >
                   Salvar alteracoes
                 </Button>
-                <Button type="button" icon={<Trash2 size={16} />} onClick={onRemove}>
+                <Button
+                  type="button"
+                  icon={<Trash2 size={16} />}
+                  onClick={onRemove}
+                >
                   Excluir
                 </Button>
               </div>
@@ -713,7 +874,9 @@ function CollectionDetailScreen({
           />
 
           <label className="grid gap-2 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm">
-            <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">Nome da colecao</span>
+            <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+              Nome da colecao
+            </span>
             <input
               className="w-full rounded-none border-0 bg-transparent p-0 text-3xl font-black text-ink outline-none placeholder:text-slate-300"
               value={activeName}
@@ -725,11 +888,13 @@ function CollectionDetailScreen({
           <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-3">
-                <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
-                  isPublic
-                    ? "border-leaf/25 bg-leaf/10 text-emerald-800"
-                    : "border-line/70 bg-white/70 text-slate-500"
-                }`}>
+                <span
+                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
+                    isPublic
+                      ? "border-leaf/25 bg-leaf/10 text-emerald-800"
+                      : "border-line/70 bg-white/70 text-slate-500"
+                  }`}
+                >
                   {isPublic ? <Eye size={14} /> : <Lock size={14} />}
                   {isPublic ? "Publica" : "Privada"}
                 </span>
@@ -750,36 +915,66 @@ function CollectionDetailScreen({
               </p>
             </div>
 
-            <Button type="button" icon={shareUrl ? <Copy size={16} /> : <Share2 size={16} />} onClick={onCopyShareLink}>
+            <Button
+              type="button"
+              icon={shareUrl ? <Copy size={16} /> : <Share2 size={16} />}
+              onClick={onCopyShareLink}
+            >
               {shareUrl ? "Copiar link" : "Gerar link"}
             </Button>
           </div>
 
           <div className="grid gap-3 rounded-[24px] border border-line/70 bg-field/45 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <FilterField label="Tipo">
-              <select className="premium-select" value={typeFilter} onChange={(event) => onTypeFilter(event.target.value)}>
+              <select
+                className="premium-select"
+                value={typeFilter}
+                onChange={(event) => onTypeFilter(event.target.value)}
+              >
                 <option value="">Todos os tipos</option>
-                {typeOptions.map((value) => <option key={value}>{value}</option>)}
+                {typeOptions.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
               </select>
             </FilterField>
             <FilterField label="Raridade">
-              <select className="premium-select" value={rarityFilter} onChange={(event) => onRarityFilter(event.target.value)}>
+              <select
+                className="premium-select"
+                value={rarityFilter}
+                onChange={(event) => onRarityFilter(event.target.value)}
+              >
                 <option value="">Todas as raridades</option>
-                {rarityOptions.map((value) => <option key={value}>{value}</option>)}
+                {rarityOptions.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
               </select>
             </FilterField>
             <FilterField label="Variante">
-              <select className="premium-select" value={variantFilter} onChange={(event) => onVariantFilter(event.target.value)}>
+              <select
+                className="premium-select"
+                value={variantFilter}
+                onChange={(event) => onVariantFilter(event.target.value)}
+              >
                 <option value="">Todas as variantes</option>
-                {variantOptions.map((value) => <option key={value}>{value}</option>)}
+                {variantOptions.map((value) => (
+                  <option key={value}>{value}</option>
+                ))}
               </select>
             </FilterField>
             <FilterField label="Ordenacao">
-              <select className="premium-select" value={sort} onChange={(event) => onSort(event.target.value as CollectionFolderSort)}>
+              <select
+                className="premium-select"
+                value={sort}
+                onChange={(event) =>
+                  onSort(event.target.value as CollectionFolderSort)
+                }
+              >
                 <option value="newest">Ultima adicionada</option>
                 <option value="oldest">Mais antiga</option>
                 <option value="value-desc">Maior valor</option>
                 <option value="value-asc">Menor valor</option>
+                <option value="price-change-desc">Maior alta</option>
+                <option value="price-change-asc">Maior queda</option>
               </select>
             </FilterField>
           </div>
@@ -811,7 +1006,9 @@ function CollectionDetailScreen({
               />
             </>
           ) : (
-            <EmptyState>Nenhuma carta aparece com os filtros atuais.</EmptyState>
+            <EmptyState>
+              Nenhuma carta aparece com os filtros atuais.
+            </EmptyState>
           )}
         </div>
       </Panel>
@@ -830,7 +1027,12 @@ function CollectionDetailScreen({
         onToggleItem={onToggleItem}
         onOpenCard={onOpenCard}
         action={
-          <Button type="button" variant="primary" icon={<Save size={16} />} onClick={onSave}>
+          <Button
+            type="button"
+            variant="primary"
+            icon={<Save size={16} />}
+            onClick={onSave}
+          >
             Salvar selecao
           </Button>
         }
@@ -852,7 +1054,7 @@ function CardPickerPanel({
   onPickerPageChange,
   onToggleItem,
   onOpenCard,
-  action
+  action,
 }: {
   title: string;
   description: string;
@@ -869,8 +1071,12 @@ function CardPickerPanel({
   action?: ReactNode;
 }) {
   const paginatedPickerItems = useMemo(
-    () => pickerItems.slice((pickerPage - 1) * PICKER_PAGE_SIZE, pickerPage * PICKER_PAGE_SIZE),
-    [pickerItems, pickerPage]
+    () =>
+      pickerItems.slice(
+        (pickerPage - 1) * PICKER_PAGE_SIZE,
+        pickerPage * PICKER_PAGE_SIZE,
+      ),
+    [pickerItems, pickerPage],
   );
 
   return (
@@ -885,7 +1091,10 @@ function CardPickerPanel({
 
       <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
         <label className="relative block">
-          <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+          <Search
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+            size={18}
+          />
           <input
             className="premium-input w-full pl-11"
             value={pickerQuery}
@@ -928,7 +1137,9 @@ function CardPickerPanel({
           />
         </>
       ) : (
-        <EmptyState>Digite na busca ou use Mostrar todas para ver o inventario.</EmptyState>
+        <EmptyState>
+          Digite na busca ou use Mostrar todas para ver o inventario.
+        </EmptyState>
       )}
     </Panel>
   );
@@ -939,7 +1150,7 @@ function ScreenHeader({
   title,
   description,
   onBack,
-  action
+  action,
 }: {
   eyebrow: string;
   title: string;
@@ -959,7 +1170,9 @@ function ScreenHeader({
           <ArrowLeft size={18} />
         </button>
         <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">{eyebrow}</p>
+          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+            {eyebrow}
+          </p>
           <h2 className="section-title truncate">{title}</h2>
           <p className="section-copy mt-1">{description}</p>
         </div>
@@ -970,7 +1183,9 @@ function ScreenHeader({
 }
 
 function unique(values: string[]): string[] {
-  return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right));
+  return Array.from(new Set(values)).sort((left, right) =>
+    left.localeCompare(right),
+  );
 }
 
 function normalizeText(value: string): string {
@@ -981,11 +1196,39 @@ function normalizeText(value: string): string {
     .trim();
 }
 
-function sortItems(items: CollectionItem[], sort: CollectionFolderSort): CollectionItem[] {
-  if (sort === "value-desc") return [...items].sort((left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0));
-  if (sort === "value-asc") return [...items].sort((left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0));
-  if (sort === "oldest") return [...items].sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
-  return [...items].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+function sortItems(
+  items: CollectionItem[],
+  sort: CollectionFolderSort,
+): CollectionItem[] {
+  if (sort === "value-desc")
+    return [...items].sort(
+      (left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0),
+    );
+  if (sort === "value-asc")
+    return [...items].sort(
+      (left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0),
+    );
+  if (sort === "price-change-desc")
+    return [...items].sort(
+      (left, right) => latestPriceChange(right) - latestPriceChange(left),
+    );
+  if (sort === "price-change-asc")
+    return [...items].sort(
+      (left, right) => latestPriceChange(left) - latestPriceChange(right),
+    );
+  if (sort === "oldest")
+    return [...items].sort(
+      (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
+    );
+  return [...items].sort(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
+}
+
+function latestPriceChange(item: CollectionItem): number {
+  const history = item.price?.history ?? [];
+  const latest = history[history.length - 1];
+  return latest ? latest.amount - latest.previousAmount : 0;
 }
 
 function publicCollectionUrl(shareToken: string): string {
@@ -1001,10 +1244,18 @@ function InfoPill({ label, value }: { label: string; value: string }) {
   );
 }
 
-function FilterField({ label, children }: { label: string; children: ReactNode }) {
+function FilterField({
+  label,
+  children,
+}: {
+  label: string;
+  children: ReactNode;
+}) {
   return (
     <label className="grid gap-2">
-      <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
+      <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+        {label}
+      </span>
       {children}
     </label>
   );
