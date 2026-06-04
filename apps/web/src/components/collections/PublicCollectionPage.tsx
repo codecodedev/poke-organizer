@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { FolderOpen, Lock, Search } from "lucide-react";
-import type { CollectionFolderSort, CollectionItem, PublicCollectionDetail } from "@poke-organizer/shared";
+import type {
+  CollectionFolderSort,
+  CollectionItem,
+  PublicCollectionDetail,
+} from "@poke-organizer/shared";
 import { api } from "../../lib/api";
 import { formatBrl } from "../../lib/format";
 import { CollectionItemCard } from "../collection/CollectionItemCard";
@@ -15,7 +19,9 @@ type Props = {
 };
 
 export function PublicCollectionPage({ shareToken }: Props) {
-  const [collection, setCollection] = useState<PublicCollectionDetail | null>(null);
+  const [collection, setCollection] = useState<PublicCollectionDetail | null>(
+    null,
+  );
   const [selectedItem, setSelectedItem] = useState<CollectionItem | null>(null);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
@@ -55,9 +61,19 @@ export function PublicCollectionPage({ shareToken }: Props) {
   }, [shareToken]);
 
   const items = collection?.items ?? [];
-  const typeOptions = useMemo(() => unique(items.flatMap((item) => item.card.types)), [items]);
-  const rarityOptions = useMemo(() => unique(items.map((item) => item.card.rarity).filter(Boolean) as string[]), [items]);
-  const variantOptions = useMemo(() => unique(items.map((item) => item.variant)), [items]);
+  const typeOptions = useMemo(
+    () => unique(items.flatMap((item) => item.card.types)),
+    [items],
+  );
+  const rarityOptions = useMemo(
+    () =>
+      unique(items.map((item) => item.card.rarity).filter(Boolean) as string[]),
+    [items],
+  );
+  const variantOptions = useMemo(
+    () => unique(items.map((item) => item.variant)),
+    [items],
+  );
   const visibleItems = useMemo(() => {
     const normalizedQuery = normalizeText(query);
     const filtered = items.filter((item) => {
@@ -66,15 +82,17 @@ export function PublicCollectionPage({ shareToken }: Props) {
       if (variantFilter && item.variant !== variantFilter) return false;
       if (!normalizedQuery) return true;
 
-      const searchable = normalizeText([
-        item.card.name,
-        item.card.number,
-        item.card.printedTotal,
-        item.card.setName,
-        item.variant,
-        item.condition,
-        item.language
-      ].join(" "));
+      const searchable = normalizeText(
+        [
+          item.card.name,
+          item.card.number,
+          item.card.printedTotal,
+          item.card.setName,
+          item.variant,
+          item.condition,
+          item.language,
+        ].join(" "),
+      );
 
       return searchable.includes(normalizedQuery);
     });
@@ -87,12 +105,21 @@ export function PublicCollectionPage({ shareToken }: Props) {
   }, [query, rarityFilter, sort, typeFilter, variantFilter]);
 
   useEffect(() => {
-    const totalPages = Math.max(1, Math.ceil(visibleItems.length / PUBLIC_COLLECTION_PAGE_SIZE));
+    const totalPages = Math.max(
+      1,
+      Math.ceil(visibleItems.length / PUBLIC_COLLECTION_PAGE_SIZE),
+    );
     setPage((current) => Math.min(current, totalPages));
   }, [visibleItems.length]);
 
-  const totalValue = items.reduce((sum, item) => sum + (item.price?.amount ?? 0) * item.quantity, 0);
-  const paginatedItems = visibleItems.slice((page - 1) * PUBLIC_COLLECTION_PAGE_SIZE, page * PUBLIC_COLLECTION_PAGE_SIZE);
+  const totalValue = items.reduce(
+    (sum, item) => sum + (item.price?.amount ?? 0) * item.quantity,
+    0,
+  );
+  const paginatedItems = visibleItems.slice(
+    (page - 1) * PUBLIC_COLLECTION_PAGE_SIZE,
+    page * PUBLIC_COLLECTION_PAGE_SIZE,
+  );
 
   return (
     <main className="app-shell">
@@ -102,8 +129,12 @@ export function PublicCollectionPage({ shareToken }: Props) {
             CC
           </div>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-black text-ink">Coleciona cards</h1>
-            <p className="truncate text-sm font-medium text-slate-600">Colecao compartilhada</p>
+            <h1 className="truncate text-xl font-black text-ink">
+              Coleciona cards
+            </h1>
+            <p className="truncate text-sm font-medium text-slate-600">
+              Colecao compartilhada
+            </p>
           </div>
         </div>
       </header>
@@ -123,7 +154,9 @@ export function PublicCollectionPage({ shareToken }: Props) {
               </span>
               <div>
                 <h2 className="section-title">Colecao indisponivel</h2>
-                <p className="section-copy mt-1">Este link nao esta publico ou nao existe mais.</p>
+                <p className="section-copy mt-1">
+                  Este link nao esta publico ou nao existe mais.
+                </p>
               </div>
             </div>
           </Panel>
@@ -134,10 +167,13 @@ export function PublicCollectionPage({ shareToken }: Props) {
             <Panel>
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Visualizacao publica</p>
+                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+                    Visualizacao publica
+                  </p>
                   <h2 className="section-title truncate">{collection.name}</h2>
                   <p className="section-copy mt-1">
-                    {items.length} cartas - {formatBrl(totalValue)}
+                    Por {collection.ownerName} - {items.length} cartas -{" "}
+                    {formatBrl(totalValue)}
                   </p>
                 </div>
                 <span className="inline-flex items-center gap-2 rounded-full border border-leaf/25 bg-leaf/10 px-3 py-1.5 text-xs font-black text-emerald-800">
@@ -148,22 +184,56 @@ export function PublicCollectionPage({ shareToken }: Props) {
             </Panel>
 
             <Panel>
-              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_repeat(4,minmax(160px,220px))]">
-                <label className="relative block">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input
-                    className="premium-input w-full pl-11"
-                    value={query}
-                    onChange={(event) => setQuery(event.target.value)}
-                    placeholder="Buscar por nome, numero, colecao..."
-                  />
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(360px,1.45fr)_repeat(4,minmax(150px,1fr))]">
+                <label className="grid gap-2 md:col-span-2 xl:col-span-1">
+                  <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                    Busca
+                  </span>
+                  <span className="relative block">
+                    <Search
+                      className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                      size={18}
+                    />
+                    <input
+                      className="premium-input w-full pl-11"
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                      placeholder="Buscar por nome, numero, colecao..."
+                    />
+                  </span>
                 </label>
-                <FilterSelect label="Tipo" value={typeFilter} onChange={setTypeFilter} options={typeOptions} emptyLabel="Todos" />
-                <FilterSelect label="Raridade" value={rarityFilter} onChange={setRarityFilter} options={rarityOptions} emptyLabel="Todas" />
-                <FilterSelect label="Variante" value={variantFilter} onChange={setVariantFilter} options={variantOptions} emptyLabel="Todas" />
+                <FilterSelect
+                  label="Tipo"
+                  value={typeFilter}
+                  onChange={setTypeFilter}
+                  options={typeOptions}
+                  emptyLabel="Todos"
+                />
+                <FilterSelect
+                  label="Raridade"
+                  value={rarityFilter}
+                  onChange={setRarityFilter}
+                  options={rarityOptions}
+                  emptyLabel="Todas"
+                />
+                <FilterSelect
+                  label="Variante"
+                  value={variantFilter}
+                  onChange={setVariantFilter}
+                  options={variantOptions}
+                  emptyLabel="Todas"
+                />
                 <label className="grid gap-2">
-                  <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">Ordenacao</span>
-                  <select className="premium-select" value={sort} onChange={(event) => setSort(event.target.value as CollectionFolderSort)}>
+                  <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                    Ordenacao
+                  </span>
+                  <select
+                    className="premium-select"
+                    value={sort}
+                    onChange={(event) =>
+                      setSort(event.target.value as CollectionFolderSort)
+                    }
+                  >
                     <option value="newest">Ultima adicionada</option>
                     <option value="oldest">Mais antiga</option>
                     <option value="value-desc">Maior valor</option>
@@ -221,7 +291,7 @@ function FilterSelect({
   value,
   onChange,
   options,
-  emptyLabel
+  emptyLabel,
 }: {
   label: string;
   value: string;
@@ -231,8 +301,14 @@ function FilterSelect({
 }) {
   return (
     <label className="grid gap-2">
-      <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">{label}</span>
-      <select className="premium-select" value={value} onChange={(event) => onChange(event.target.value)}>
+      <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+        {label}
+      </span>
+      <select
+        className="premium-select"
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+      >
         <option value="">{emptyLabel}</option>
         {options.map((option) => (
           <option key={option}>{option}</option>
@@ -243,7 +319,9 @@ function FilterSelect({
 }
 
 function unique(values: string[]): string[] {
-  return Array.from(new Set(values)).sort((left, right) => left.localeCompare(right));
+  return Array.from(new Set(values)).sort((left, right) =>
+    left.localeCompare(right),
+  );
 }
 
 function normalizeText(value: string): string {
@@ -254,9 +332,23 @@ function normalizeText(value: string): string {
     .trim();
 }
 
-function sortItems(items: CollectionItem[], sort: CollectionFolderSort): CollectionItem[] {
-  if (sort === "value-desc") return [...items].sort((left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0));
-  if (sort === "value-asc") return [...items].sort((left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0));
-  if (sort === "oldest") return [...items].sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
-  return [...items].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+function sortItems(
+  items: CollectionItem[],
+  sort: CollectionFolderSort,
+): CollectionItem[] {
+  if (sort === "value-desc")
+    return [...items].sort(
+      (left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0),
+    );
+  if (sort === "value-asc")
+    return [...items].sort(
+      (left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0),
+    );
+  if (sort === "oldest")
+    return [...items].sort(
+      (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
+    );
+  return [...items].sort(
+    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+  );
 }

@@ -99,6 +99,7 @@ export type CollectionFolderDetail = CollectionFolderSummary & {
 
 export type PublicCollectionDetail = CollectionFolderDetail & {
   isPublic: true;
+  ownerName: string;
 };
 
 export type PriceLookupCard = {

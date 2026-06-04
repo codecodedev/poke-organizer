@@ -129,6 +129,7 @@ export class CollectionService {
     const folder = await this.prisma.collectionFolder.findFirst({
       where: { shareToken, isPublic: true },
       include: {
+        user: true,
         items: {
           where: this.publicFolderItemWhere(query),
           include: { collectionItem: { include: { card: true, price: true } } },
@@ -143,7 +144,8 @@ export class CollectionService {
 
     return {
       ...(await this.mapFolderDetail(folder, query.sort)),
-      isPublic: true
+      isPublic: true,
+      ownerName: folder.user.name?.trim() || "Colecionador"
     };
   }
 

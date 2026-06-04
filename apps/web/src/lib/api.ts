@@ -10,10 +10,11 @@ import type {
   CollectionItem,
   PriceEstimate,
   PublicCollectionDetail,
-  RecognitionCandidate
+  RecognitionCandidate,
 } from "@poke-organizer/shared";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "https://poke-organizer-api.onrender.com";
+const API_URL =
+  import.meta.env.VITE_API_URL ?? "https://poke-organizer-api.onrender.com";
 
 export type Session = {
   user: { id: string; email: string; name?: string | null };
@@ -28,50 +29,148 @@ export type ApiError = {
 export class HttpError extends Error {
   constructor(
     message: string,
-    readonly status: number
+    readonly status: number,
   ) {
     super(message);
   }
 }
 
-async function request<T>(path: string, options: RequestInit & { token?: string } = {}): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
-      ...options.headers
-    }
-  });
+type ApiFeedbackListener = (event: ApiFeedbackEvent) => void;
+type ApiFeedbackEvent =
+  | { type: "pending"; pending: number }
+  | { type: "error"; id: number; message: string };
 
-  if (!response.ok) {
-    const error = (await response.json().catch(() => ({ message: response.statusText }))) as ApiError;
-    throw new HttpError(Array.isArray(error.message) ? error.message.join(", ") : error.message, response.status);
+let pendingRequests = 0;
+let feedbackEventId = 0;
+const feedbackListeners = new Set<ApiFeedbackListener>();
+
+export const apiFeedback = {
+  subscribe(listener: ApiFeedbackListener) {
+    feedbackListeners.add(listener);
+    listener({ type: "pending", pending: pendingRequests });
+    return () => {
+      feedbackListeners.delete(listener);
+    };
+  },
+  getPendingCount() {
+    return pendingRequests;
+  },
+};
+
+type RequestOptions = RequestInit & {
+  token?: string;
+  silentError?: boolean;
+};
+
+async function request<T>(
+  path: string,
+  options: RequestOptions = {},
+): Promise<T> {
+  const { token, silentError, ...fetchOptions } = options;
+  startRequest();
+
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...fetchOptions,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...fetchOptions.headers,
+      },
+    });
+
+    if (!response.ok) {
+      const error = (await response
+        .json()
+        .catch(() => ({ message: response.statusText }))) as ApiError;
+      throw new HttpError(
+        Array.isArray(error.message) ? error.message.join(", ") : error.message,
+        response.status,
+      );
+    }
+
+    return response.json() as Promise<T>;
+  } catch (err) {
+    if (!silentError && shouldNotifyError(err)) {
+      emitFeedback({
+        type: "error",
+        id: ++feedbackEventId,
+        message: friendlyErrorMessage(err),
+      });
+    }
+    throw err;
+  } finally {
+    finishRequest();
+  }
+}
+
+function startRequest() {
+  pendingRequests += 1;
+  emitFeedback({ type: "pending", pending: pendingRequests });
+}
+
+function finishRequest() {
+  pendingRequests = Math.max(0, pendingRequests - 1);
+  emitFeedback({ type: "pending", pending: pendingRequests });
+}
+
+function emitFeedback(event: ApiFeedbackEvent) {
+  feedbackListeners.forEach((listener) => listener(event));
+}
+
+function shouldNotifyError(err: unknown): boolean {
+  return !(err instanceof HttpError && err.status === 401);
+}
+
+function friendlyErrorMessage(err: unknown): string {
+  if (err instanceof HttpError) {
+    if (err.status >= 500) {
+      return "A API encontrou um problema. Tente novamente em instantes.";
+    }
+    if (err.status === 403) {
+      return "Voce nao tem permissao para fazer essa acao.";
+    }
+    if (err.status === 404) {
+      return "Nao encontramos essas informacoes. Confira se o link ou item ainda existe.";
+    }
+    return err.message || "Nao foi possivel concluir a acao.";
   }
 
-  return response.json() as Promise<T>;
+  if (err instanceof TypeError) {
+    return "A API demorou ou nao respondeu. Tente novamente em instantes.";
+  }
+
+  return err instanceof Error
+    ? err.message
+    : "Nao foi possivel concluir a acao.";
 }
 
 export const api = {
   login(email: string, password: string) {
     return request<Session>("/auth/login", {
       method: "POST",
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
     });
   },
   register(email: string, password: string, name?: string) {
     return request<Session>("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, name })
+      body: JSON.stringify({ email, password, name }),
     });
   },
   refresh(refreshToken: string) {
     return request<Session>("/auth/refresh", {
       method: "POST",
-      body: JSON.stringify({ refreshToken })
+      silentError: true,
+      body: JSON.stringify({ refreshToken }),
     });
   },
-  searchCards(params: { query?: string; number?: string; set?: string; language?: string }) {
+  searchCards(params: {
+    query?: string;
+    number?: string;
+    set?: string;
+    language?: string;
+  }) {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value) search.set(key, value);
@@ -81,13 +180,23 @@ export const api = {
   listCardSets() {
     return request<CardSetSummary[]>("/cards/sets");
   },
-  getPrice(cardId: string, params: { variant?: string; language?: CardLanguage; condition?: CardCondition } = {}) {
+  getPrice(
+    cardId: string,
+    params: {
+      variant?: string;
+      language?: CardLanguage;
+      condition?: CardCondition;
+    } = {},
+  ) {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value) search.set(key, value);
     });
     const suffix = search.toString() ? `?${search.toString()}` : "";
-    return request<PriceEstimate>(`/prices/${encodeURIComponent(cardId)}${suffix}`);
+    return request<PriceEstimate>(
+      `/prices/${encodeURIComponent(cardId)}${suffix}`,
+      { silentError: true },
+    );
   },
   listCollection(token: string, params: { limit?: number } = {}) {
     const search = new URLSearchParams();
@@ -99,20 +208,24 @@ export const api = {
     return request<CollectionAddResult>("/collection", {
       method: "POST",
       token,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
   },
-  updateCollection(token: string, id: string, payload: Record<string, unknown>) {
+  updateCollection(
+    token: string,
+    id: string,
+    payload: Record<string, unknown>,
+  ) {
     return request<CollectionItem>(`/collection/${id}`, {
       method: "PATCH",
       token,
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
   },
   deleteCollection(token: string, id: string) {
     return request<{ ok: true }>(`/collection/${id}`, {
       method: "DELETE",
-      token
+      token,
     });
   },
   listCollectionFolders(token: string) {
@@ -122,56 +235,92 @@ export const api = {
     return request<CollectionFolderDetail>("/collection/folders", {
       method: "POST",
       token,
-      body: JSON.stringify({ name })
+      body: JSON.stringify({ name }),
     });
   },
   getCollectionFolder(
     token: string,
     id: string,
-    params: { type?: string; rarity?: string; variant?: string; sort?: CollectionFolderSort } = {}
+    params: {
+      type?: string;
+      rarity?: string;
+      variant?: string;
+      sort?: CollectionFolderSort;
+    } = {},
   ) {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value) search.set(key, value);
     });
     const suffix = search.toString() ? `?${search.toString()}` : "";
-    return request<CollectionFolderDetail>(`/collection/folders/${encodeURIComponent(id)}${suffix}`, { token });
+    return request<CollectionFolderDetail>(
+      `/collection/folders/${encodeURIComponent(id)}${suffix}`,
+      { token },
+    );
   },
-  updateCollectionFolder(token: string, id: string, payload: { name?: string; itemIds?: string[] }) {
-    return request<CollectionFolderDetail>(`/collection/folders/${encodeURIComponent(id)}`, {
-      method: "PATCH",
-      token,
-      body: JSON.stringify(payload)
-    });
+  updateCollectionFolder(
+    token: string,
+    id: string,
+    payload: { name?: string; itemIds?: string[] },
+  ) {
+    return request<CollectionFolderDetail>(
+      `/collection/folders/${encodeURIComponent(id)}`,
+      {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(payload),
+      },
+    );
   },
-  updateCollectionFolderSharing(token: string, id: string, payload: { isPublic?: boolean; ensureToken?: boolean }) {
-    return request<CollectionFolderDetail>(`/collection/folders/${encodeURIComponent(id)}/sharing`, {
-      method: "PATCH",
-      token,
-      body: JSON.stringify(payload)
-    });
+  updateCollectionFolderSharing(
+    token: string,
+    id: string,
+    payload: { isPublic?: boolean; ensureToken?: boolean },
+  ) {
+    return request<CollectionFolderDetail>(
+      `/collection/folders/${encodeURIComponent(id)}/sharing`,
+      {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(payload),
+      },
+    );
   },
   deleteCollectionFolder(token: string, id: string) {
-    return request<{ ok: true }>(`/collection/folders/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      token
-    });
+    return request<{ ok: true }>(
+      `/collection/folders/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+        token,
+      },
+    );
   },
   getPublicCollection(
     shareToken: string,
-    params: { type?: string; rarity?: string; variant?: string; sort?: CollectionFolderSort } = {}
+    params: {
+      type?: string;
+      rarity?: string;
+      variant?: string;
+      sort?: CollectionFolderSort;
+    } = {},
   ) {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value) search.set(key, value);
     });
     const suffix = search.toString() ? `?${search.toString()}` : "";
-    return request<PublicCollectionDetail>(`/public/collections/${encodeURIComponent(shareToken)}${suffix}`);
+    return request<PublicCollectionDetail>(
+      `/public/collections/${encodeURIComponent(shareToken)}${suffix}`,
+    );
   },
-  recognitionCandidates(payload: { text: string; nameHint?: string; numberHint?: string }) {
+  recognitionCandidates(payload: {
+    text: string;
+    nameHint?: string;
+    numberHint?: string;
+  }) {
     return request<RecognitionCandidate[]>("/recognition/candidates", {
       method: "POST",
-      body: JSON.stringify(payload)
+      body: JSON.stringify(payload),
     });
-  }
+  },
 };
