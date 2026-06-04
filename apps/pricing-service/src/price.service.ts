@@ -23,6 +23,44 @@ type UpsertManyCardPriceResult = {
   changed: number;
 };
 
+type PriceBackupRow = {
+  rowType: string;
+  setCode: string;
+  number: string;
+  printedTotal: string;
+  provider: string;
+  name: string;
+  setName: string;
+  amountBrl: string;
+  label: string;
+  sourceUrl: string;
+  firstSeenAt: string;
+  lastCheckedAt: string;
+  updatedAt: string;
+  previousAmountBrl: string;
+  newAmountBrl: string;
+  changedAt: string;
+};
+
+const PRICE_BACKUP_HEADERS: Array<keyof PriceBackupRow> = [
+  "rowType",
+  "setCode",
+  "number",
+  "printedTotal",
+  "provider",
+  "name",
+  "setName",
+  "amountBrl",
+  "label",
+  "sourceUrl",
+  "firstSeenAt",
+  "lastCheckedAt",
+  "updatedAt",
+  "previousAmountBrl",
+  "newAmountBrl",
+  "changedAt"
+];
+
 export class PriceService {
   private readonly jobs = new Map<string, PriceJob>();
 
@@ -249,6 +287,162 @@ export class PriceService {
     });
   }
 
+  async exportPricesCsv(): Promise<string> {
+    const prices = await this.prisma.cardPrice.findMany({
+      orderBy: [{ setCode: "asc" }, { printedTotal: "asc" }, { number: "asc" }, { provider: "asc" }],
+      include: { history: { orderBy: { changedAt: "asc" } } }
+    });
+
+    const rows: Array<Array<string | number | null>> = [PRICE_BACKUP_HEADERS];
+    for (const price of prices) {
+      rows.push([
+        "current",
+        price.setCode,
+        price.number,
+        price.printedTotal,
+        price.provider,
+        price.name,
+        price.setName,
+        price.amountBrl.toString(),
+        price.label,
+        price.sourceUrl,
+        price.firstSeenAt.toISOString(),
+        price.lastCheckedAt.toISOString(),
+        price.updatedAt.toISOString(),
+        "",
+        "",
+        ""
+      ]);
+
+      for (const history of price.history) {
+        rows.push([
+          "history",
+          price.setCode,
+          price.number,
+          price.printedTotal,
+          price.provider,
+          price.name,
+          price.setName,
+          "",
+          price.label,
+          price.sourceUrl,
+          "",
+          "",
+          "",
+          history.previousAmountBrl.toString(),
+          history.newAmountBrl.toString(),
+          history.changedAt.toISOString()
+        ]);
+      }
+    }
+
+    return toCsv(rows);
+  }
+
+  async importPricesCsv(csv: string): Promise<{ prices: number; history: number }> {
+    const parsedRows = parsePriceBackupCsv(csv);
+    const groups = new Map<string, PriceBackupRow[]>();
+    for (const row of parsedRows) {
+      const printedTotal = Number.parseInt(row.printedTotal, 10);
+      if (!row.setCode || !row.number || !Number.isFinite(printedTotal)) continue;
+      const provider = normalizeProvider(row.provider);
+      const key = [normalizeSetCode(row.setCode), normalizeCardNumber(row.number), printedTotal, provider].join("|");
+      groups.set(key, [...(groups.get(key) ?? []), { ...row, provider }]);
+    }
+
+    let prices = 0;
+    let history = 0;
+
+    for (const rows of groups.values()) {
+      const current = rows.find((row) => row.rowType === "current") ?? rows[0];
+      const printedTotal = Number.parseInt(current.printedTotal, 10);
+      const provider = normalizeProvider(current.provider);
+      const candidates = rows
+        .flatMap((row) => {
+          if (row.rowType === "history") {
+            const amount = parseDecimalNumber(row.newAmountBrl);
+            const date = parseDate(row.changedAt);
+            return amount !== null && date ? [{ amount, date }] : [];
+          }
+
+          const amount = parseDecimalNumber(row.amountBrl);
+          const date = parseDate(row.lastCheckedAt) ?? parseDate(row.updatedAt) ?? new Date();
+          return amount !== null ? [{ amount, date }] : [];
+        })
+        .sort((left, right) => right.date.getTime() - left.date.getTime());
+      const latest = candidates[0];
+      if (!latest) continue;
+
+      const data = {
+        setCode: normalizeSetCode(current.setCode),
+        number: normalizeCardNumber(current.number),
+        printedTotal,
+        provider,
+        name: current.name || null,
+        setName: current.setName || null,
+        amountBrl: new Prisma.Decimal(latest.amount),
+        label: current.label || "Backup CSV",
+        sourceUrl: current.sourceUrl || null,
+        lastCheckedAt: latest.date
+      };
+
+      const price = await this.prisma.cardPrice.upsert({
+        where: {
+          setCode_number_printedTotal_provider: {
+            setCode: data.setCode,
+            number: data.number,
+            printedTotal: data.printedTotal,
+            provider: data.provider
+          }
+        },
+        create: data,
+        update: {
+          name: data.name,
+          setName: data.setName,
+          amountBrl: data.amountBrl,
+          label: data.label,
+          sourceUrl: data.sourceUrl,
+          lastCheckedAt: data.lastCheckedAt
+        }
+      });
+      prices += 1;
+
+      const existingHistory = await this.prisma.cardPriceHistory.findMany({
+        where: { cardPriceId: price.id }
+      });
+      const existingKeys = new Set(
+        existingHistory.map((entry) =>
+          historyKey(entry.changedAt, Number(entry.previousAmountBrl), Number(entry.newAmountBrl))
+        )
+      );
+
+      for (const row of rows.filter((entry) => entry.rowType === "history")) {
+        const previousAmount = parseDecimalNumber(row.previousAmountBrl);
+        const newAmount = parseDecimalNumber(row.newAmountBrl);
+        const changedAt = parseDate(row.changedAt);
+        if (previousAmount === null || newAmount === null || !changedAt) continue;
+
+        const key = historyKey(changedAt, previousAmount, newAmount);
+        if (existingKeys.has(key)) continue;
+
+        await this.prisma.cardPriceHistory.create({
+          data: {
+            cardPriceId: price.id,
+            previousAmountBrl: new Prisma.Decimal(previousAmount),
+            newAmountBrl: new Prisma.Decimal(newAmount),
+            changedAt
+          }
+        });
+        existingKeys.add(key);
+        history += 1;
+      }
+
+      await this.linkCollectionItemsToPrice(price);
+    }
+
+    return { prices, history };
+  }
+
   async upsertCurrentPrice(input: UpsertCardPriceInput): Promise<{ changed: boolean; price: CardPrice }> {
     const setCode = normalizeSetCode(input.setCode);
     const number = normalizeCardNumber(input.number);
@@ -452,4 +646,103 @@ function normalizeSetCode(value: string): string {
 
 function normalizeCardNumber(value: string): string {
   return /^0*\d+$/.test(value.trim()) ? String(Number.parseInt(value, 10)) : value.trim().toUpperCase();
+}
+
+function normalizeProvider(value: string): PriceProvider {
+  return value.trim().toUpperCase() === PriceProvider.MYPCARDS ? PriceProvider.MYPCARDS : PriceProvider.LIGAPOKEMON;
+}
+
+function parseDecimalNumber(value: string): number | null {
+  const trimmed = value.trim();
+  const normalized = trimmed.includes(",") ? trimmed.replace(/\./g, "").replace(",", ".") : trimmed;
+  const parsed = Number.parseFloat(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseDate(value: string): Date | null {
+  if (!value.trim()) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function historyKey(changedAt: Date, previousAmount: number, newAmount: number): string {
+  return [changedAt.getTime(), previousAmount.toFixed(2), newAmount.toFixed(2)].join("|");
+}
+
+function parsePriceBackupCsv(csv: string): PriceBackupRow[] {
+  const rows = parseCsv(csv);
+  const [headers, ...body] = rows;
+  if (!headers?.length) return [];
+
+  return body
+    .filter((row) => row.some((value) => value.trim()))
+    .map((row) => {
+      const record = Object.fromEntries(
+        PRICE_BACKUP_HEADERS.map((header) => [header, ""])
+      ) as PriceBackupRow;
+      headers.forEach((header, index) => {
+        const key = header.trim() as keyof PriceBackupRow;
+        if (PRICE_BACKUP_HEADERS.includes(key)) {
+          record[key] = row[index] ?? "";
+        }
+      });
+      record.rowType = record.rowType || "current";
+      return record;
+    });
+}
+
+function parseCsv(csv: string): string[][] {
+  const rows: string[][] = [];
+  let current = "";
+  let row: string[] = [];
+  let quoted = false;
+
+  for (let index = 0; index < csv.length; index += 1) {
+    const char = csv[index];
+    const next = csv[index + 1];
+
+    if (char === '"') {
+      if (quoted && next === '"') {
+        current += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+      continue;
+    }
+
+    if (char === "," && !quoted) {
+      row.push(current);
+      current = "";
+      continue;
+    }
+
+    if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(current);
+      rows.push(row);
+      row = [];
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  row.push(current);
+  rows.push(row);
+  return rows;
+}
+
+function toCsv(rows: Array<Array<string | number | null | undefined>>): string {
+  return rows
+    .map((row) =>
+      row
+        .map((value) => {
+          const text = String(value ?? "");
+          return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        })
+        .join(",")
+    )
+    .join("\n");
 }

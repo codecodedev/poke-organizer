@@ -43,6 +43,7 @@ export type CardSummary = {
 
 export type CardSetSummary = {
   id: string;
+  code?: string | null;
   name: string;
   printedTotal: number;
   total?: number | null;

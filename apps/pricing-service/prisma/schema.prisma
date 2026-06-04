@@ -88,3 +88,20 @@ model LigaSyncJobEdition {
   @@index([code])
   @@schema("pricing")
 }
+
+model LigaEditionCache {
+  id          String   @id @default(cuid())
+  edid        String
+  code        String
+  name        String
+  year        Int?
+  searchUrl   String
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([edid, code])
+  @@index([year])
+  @@index([code])
+  @@schema("pricing")
+}

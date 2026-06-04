@@ -18,6 +18,18 @@ describe("spoken number parsing", () => {
   it("accepts numeric speech transcripts", () => {
     expect(parseGeneralSpokenCardNumber("127 barra 217")).toEqual({ number: 127, printedTotal: 217 });
     expect(parseGeneralSpokenCardNumber("127/217")).toEqual({ number: 127, printedTotal: 217 });
+    expect(parseGeneralSpokenCardNumber("258 217")).toEqual({ number: 258, printedTotal: 217 });
+    expect(parseGeneralSpokenCardNumber("6586")).toEqual({ number: 65, printedTotal: 86 });
+    expect(parseGeneralSpokenCardNumber("258 217 ascended heroes")).toEqual({ number: 258, printedTotal: 217 });
+  });
+
+  it("uses the spoken set printed total when only the card number is spoken", () => {
+    expect(parseGeneralSpokenCardNumber("65 cri", { printedTotal: 86 })).toEqual({ number: 65, printedTotal: 86 });
+    expect(parseGeneralSpokenCardNumber("6586 cri", { printedTotal: 86 })).toEqual({ number: 65, printedTotal: 86 });
+    expect(parseGeneralSpokenCardNumber("sessenta e cinco caos rising", { printedTotal: 86 })).toEqual({
+      number: 65,
+      printedTotal: 86
+    });
   });
 
   it("returns null when there is no usable number", () => {

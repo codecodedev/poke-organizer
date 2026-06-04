@@ -10,14 +10,20 @@ const priceService = new PriceService(prisma);
 const ligaSyncService = new LigaSyncService(prisma);
 const app = Fastify({ logger: true });
 
+app.addContentTypeParser(["text/csv", "text/plain"], { parseAs: "string" }, (_request, body, done) => {
+  done(null, body);
+});
+
 app.get("/health", async () => ({ ok: true }));
 
 app.get("/liga-sync", async (_request, reply) => {
   return reply.type("text/html; charset=utf-8").send(renderLigaSyncPage());
 });
 
-app.get("/liga-sync/editions", async () => ({
-  editions: await ligaSyncService.listEditions()
+app.get("/liga-sync/editions", async (request) => ({
+  editions: await ligaSyncService.listEditions({
+    refresh: (request.query as { refresh?: string }).refresh === "true"
+  })
 }));
 
 app.get("/liga-sync/jobs", async () => ({
@@ -85,6 +91,23 @@ app.get("/prices", async (request, reply) => {
   return {
     prices
   };
+});
+
+app.get("/prices/backup.csv", async (_request, reply) => {
+  const csv = await priceService.exportPricesCsv();
+  return reply
+    .header("Content-Disposition", `attachment; filename="poke-organizer-precos-${new Date().toISOString().slice(0, 10)}.csv"`)
+    .type("text/csv; charset=utf-8")
+    .send(csv);
+});
+
+app.post("/prices/backup.csv", async (request, reply) => {
+  const body = typeof request.body === "string" ? request.body : "";
+  if (!body.trim()) {
+    return reply.status(400).send({ message: "Arquivo CSV vazio" });
+  }
+
+  return priceService.importPricesCsv(body);
 });
 
 const port = Number.parseInt(process.env.PRICING_SERVICE_PORT ?? "3344", 10);

@@ -15,7 +15,8 @@ import {
   Search,
   Sparkles,
   X
-} from "lucide-react";import {
+} from "lucide-react";
+import {
   DEFAULT_CARD_VARIANT,
   FOIL_CARD_VARIANT,
   HOLOFOIL_CARD_VARIANT,
@@ -49,6 +50,8 @@ type MicState = "closed" | "listening" | "processing";
 type VoiceCommand = {
   cardNumber: { number: number; printedTotal: number; fullNumber: string };
   setId?: string;
+  setCode?: string | null;
+  setName?: string | null;
   requestedVariant: string | null;
   confirm: boolean;
 };
@@ -113,10 +116,10 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
 
   const selectedSet = useMemo(() => sets.find((set) => set.id === selectedSetId) ?? null, [selectedSetId, sets]);
   const speechSupported = Boolean(getSpeechRecognitionConstructor());
-  const canStart = speechSupported && micState === "closed" && (mode === "general" || Boolean(selectedSet));
+  const canStart = speechSupported && micState === "closed" && (mode === "general" ? !setsLoading : Boolean(selectedSet));
 
   useEffect(() => {
-    if (mode !== "set" || sets.length > 0 || setsLoading) return;
+    if (sets.length > 0 || setsLoading) return;
 
     setSetsLoading(true);
     setFeedback(null);
@@ -225,7 +228,7 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
       setFeedback(
         mode === "set"
           ? "Nao entendi um numero inteiro. Exemplo: 123."
-          : "Nao entendi o numero completo. Exemplo: cento e vinte e sete barra duzentos e dezessete."
+          : "Nao entendi a carta. Exemplo: 65 CRI, 65 Chaos Rising ou 65 86."
       );
       return;
     }
@@ -238,9 +241,16 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
 
       const results = await api.searchCards({
         number: command.cardNumber.fullNumber,
-        set: command.setId
+        set: command.setId ?? command.setCode ?? undefined
       });
-      const card = pickBestCard(results, command.cardNumber.number, command.cardNumber.printedTotal, command.setId);
+      const card = pickBestCard(
+        results,
+        command.cardNumber.number,
+        command.cardNumber.printedTotal,
+        command.setId,
+        command.setCode,
+        command.setName
+      );
 
       if (!card) {
         setFeedback(`Nenhuma carta encontrada para ${command.cardNumber.fullNumber}`);
@@ -260,25 +270,33 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
   }
 
   function buildVoiceCommand(value: string): VoiceCommand | null {
-    const cardNumber = buildCardNumber(value);
+    const spokenSet = mode === "general" ? resolveSpokenSet(value, sets) : null;
+    const cardNumber = buildCardNumber(value, spokenSet);
     if (!cardNumber) return null;
 
     return {
       cardNumber,
-      setId: mode === "set" ? selectedSet?.id : undefined,
+      setId: mode === "set" ? selectedSet?.id : spokenSet?.id,
+      setCode: mode === "general" ? spokenSet?.code : undefined,
+      setName: mode === "general" ? spokenSet?.name : undefined,
       requestedVariant: parseSpokenVariant(value),
       confirm: hasFinalOk(value)
     };
   }
 
-  function buildCardNumber(value: string): { number: number; printedTotal: number; fullNumber: string } | null {
+  function buildCardNumber(
+    value: string,
+    spokenSet?: CardSetSummary | null,
+  ): { number: number; printedTotal: number; fullNumber: string } | null {
     if (mode === "set") {
       if (!selectedSet) return null;
       const number = parseSpecificSpokenNumber(value);
       return number !== null ? { number, printedTotal: selectedSet.printedTotal, fullNumber: `${number}/${selectedSet.printedTotal}` } : null;
     }
 
-    const parsed = parseGeneralSpokenCardNumber(value);
+    const parsed = parseGeneralSpokenCardNumber(value, {
+      printedTotal: spokenSet?.printedTotal
+    });
     return parsed ? { ...parsed, fullNumber: `${parsed.number}/${parsed.printedTotal}` } : null;
   }
 
@@ -340,9 +358,16 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
         try {
           const results = await api.searchCards({
             number: item.command.cardNumber.fullNumber,
-            set: item.command.setId
+            set: item.command.setId ?? item.command.setCode ?? undefined
           });
-          const card = pickBestCard(results, item.command.cardNumber.number, item.command.cardNumber.printedTotal, item.command.setId);
+          const card = pickBestCard(
+            results,
+            item.command.cardNumber.number,
+            item.command.cardNumber.printedTotal,
+            item.command.setId,
+            item.command.setCode,
+            item.command.setName
+          );
 
           if (!card) {
             updateVoiceQueueItem(item.id, {
@@ -596,8 +621,8 @@ function VoiceHelpOverlay({ onClose }: { onClose: () => void }) {
         <VoiceTip
           icon={<Globe2 size={16} />}
           title="Todas as coleções"
-          description="Fale o número completo."
-          example={["150 barra 217"]}
+          description="Fale o número completo e, se precisar, a coleção."
+          example={["65 CRI", "65 Chaos Rising", "65 86"]}
         />
 
         <VoiceTip
@@ -765,7 +790,15 @@ function createLocalId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 }
 
-function pickBestCard(cards: CardSummary[], number: number, printedTotal: number, setId?: string): CardSummary | null {
+function pickBestCard(
+  cards: CardSummary[],
+  number: number,
+  printedTotal: number,
+  setId?: string,
+  setCode?: string | null,
+  setName?: string | null
+): CardSummary | null {
+  const normalizedSetName = setName ? normalizeVoiceText(setName) : "";
   return (
     cards.find(
       (card) =>
@@ -773,11 +806,62 @@ function pickBestCard(cards: CardSummary[], number: number, printedTotal: number
         card.printedTotal === printedTotal &&
         (!setId || card.setId === setId)
     ) ??
+    cards.find(
+      (card) =>
+        Number.parseInt(card.number, 10) === number &&
+        card.printedTotal === printedTotal &&
+        Boolean(setCode) &&
+        card.setCode?.toUpperCase() === setCode?.toUpperCase()
+    ) ??
+    cards.find(
+      (card) =>
+        Number.parseInt(card.number, 10) === number &&
+        card.printedTotal === printedTotal &&
+        Boolean(normalizedSetName) &&
+        normalizeVoiceText(card.setName ?? "").includes(normalizedSetName)
+    ) ??
     cards.find((card) => Number.parseInt(card.number, 10) === number && card.printedTotal === printedTotal) ??
     cards[0] ??
     null
   );
 }
+
+function resolveSpokenSet(transcript: string, sets: CardSetSummary[]): CardSetSummary | null {
+  const normalized = ` ${normalizeVoiceText(transcript)} `;
+  const candidates = sets
+    .flatMap((set) =>
+      setAliases(set).map((alias) => ({
+        set,
+        alias: normalizeVoiceText(alias)
+      }))
+    )
+    .filter((candidate) => candidate.alias.length >= 2 && normalized.includes(` ${candidate.alias} `))
+    .sort((left, right) => right.alias.length - left.alias.length);
+
+  return candidates[0]?.set ?? null;
+}
+
+function setAliases(set: CardSetSummary): string[] {
+  const base = [set.id, set.code, set.name].filter(Boolean) as string[];
+  const normalizedName = normalizeVoiceText(set.name);
+  return [...base, ...(SET_NAME_ALIASES[normalizedName] ?? [])];
+}
+
+const SET_NAME_ALIASES: Record<string, string[]> = {
+  "ascended heroes": ["herois ascendidos", "herois ascensos"],
+  "black bolt": ["raio negro"],
+  "white flare": ["chama branca", "explosao branca"],
+  "chaos rising": ["caos rising", "caos crescente", "caos ascendente", "ascensao do caos"],
+  "prismatic evolutions": ["evolucoes prismaticas"],
+  "mega evolution": ["mega evolucao"],
+  "journey together": ["jornada juntos", "juntos na jornada"],
+  "surging sparks": ["faiscas impulsivas", "faiscas crescentes"],
+  "twilight masquerade": ["mascarada crepuscular"],
+  "temporal forces": ["forcas temporais"],
+  "paldean fates": ["destinos de paldea"],
+  "obsidian flames": ["chamas obsidianas"],
+  "paldea evolved": ["paldea evoluida"]
+};
 
 function parseSpokenVariant(transcript: string): string | null {
   const normalized = normalizeVoiceText(transcript);

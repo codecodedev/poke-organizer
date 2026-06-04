@@ -41,7 +41,7 @@ export function renderLigaSyncPage(): string {
     input { padding: 0 12px; width: 100%; }
     .toolbar {
       display: grid;
-      grid-template-columns: minmax(220px, 1fr) 140px auto auto auto;
+      grid-template-columns: minmax(200px, 1fr) 130px 160px auto auto auto;
       gap: 12px;
       align-items: end;
       padding: 16px;
@@ -50,6 +50,14 @@ export function renderLigaSyncPage(): string {
       border-radius: 8px;
       margin-bottom: 16px;
       box-shadow: 0 1px 2px rgba(21, 31, 51, .06);
+    }
+    .backupbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+      justify-content: flex-end;
+      margin-bottom: 16px;
     }
     .status {
       padding: 12px 14px;
@@ -130,9 +138,18 @@ export function renderLigaSyncPage(): string {
       <label>Delay entre edições
         <input id="delayMs" type="number" min="0" step="1000" value="15000" />
       </label>
-      <button id="loadEditions">Buscar edições</button>
+      <label>Anos para sync
+        <input id="years" placeholder="2024, 2025" />
+      </label>
+      <button id="loadEditions">Atualizar edições</button>
       <button id="selectAll">Selecionar todas</button>
       <button id="startSync" class="primary" disabled>Iniciar sync</button>
+    </div>
+
+    <div class="backupbar">
+      <button id="downloadPrices">Baixar backup de preços</button>
+      <button id="uploadPrices">Restaurar backup de preços</button>
+      <input id="priceBackupFile" type="file" accept=".csv,text/csv" hidden />
     </div>
 
     <div id="status" class="status">Nenhuma leitura em andamento.</div>
@@ -154,10 +171,14 @@ export function renderLigaSyncPage(): string {
     const els = {
       filter: document.getElementById("filter"),
       delayMs: document.getElementById("delayMs"),
+      years: document.getElementById("years"),
       loadEditions: document.getElementById("loadEditions"),
       selectAll: document.getElementById("selectAll"),
       startSync: document.getElementById("startSync"),
       refreshJobs: document.getElementById("refreshJobs"),
+      downloadPrices: document.getElementById("downloadPrices"),
+      uploadPrices: document.getElementById("uploadPrices"),
+      priceBackupFile: document.getElementById("priceBackupFile"),
       editions: document.getElementById("editions"),
       jobs: document.getElementById("jobs"),
       status: document.getElementById("status")
@@ -178,6 +199,24 @@ export function renderLigaSyncPage(): string {
       return data;
     }
 
+    function selectedYears() {
+      return els.years.value
+        .split(/[ ,;]+/)
+        .map((year) => Number.parseInt(year, 10))
+        .filter((year) => Number.isFinite(year));
+    }
+
+    function selectedEditionsForSync() {
+      const years = new Set(selectedYears());
+      return state.editions.filter((edition) =>
+        state.selected.has(editionKey(edition)) || (edition.year && years.has(Number(edition.year)))
+      );
+    }
+
+    function updateStartState() {
+      els.startSync.disabled = selectedEditionsForSync().length === 0;
+    }
+
     function renderEditions() {
       const filter = els.filter.value.trim().toLowerCase();
       const filtered = state.editions.filter((edition) => {
@@ -192,7 +231,7 @@ export function renderLigaSyncPage(): string {
           '<span class="pill">' + escapeHtml(edition.code) + '</span>' +
         '</label>';
       }).join("") || '<div class="job-row"><span class="meta">Nenhuma edição carregada.</span></div>';
-      els.startSync.disabled = state.selected.size === 0;
+      updateStartState();
     }
 
     function renderJobs(jobs) {
@@ -210,15 +249,22 @@ export function renderLigaSyncPage(): string {
       }).join("") || '<div class="job-row"><span class="meta">Nenhum job criado.</span></div>';
     }
 
-    async function loadEditions() {
-      setStatus("Abrindo navegador local para ler edições da LigaPokemon...");
+    async function loadEditions(refresh) {
+      setStatus(refresh ? "Abrindo navegador local para atualizar edições da LigaPokemon..." : "Carregando edições salvas...");
       els.loadEditions.disabled = true;
       try {
-        const data = await api("/liga-sync/editions");
+        const data = await api("/liga-sync/editions" + (refresh ? "?refresh=true" : ""));
         state.editions = data.editions;
-        state.selected.clear();
+        if (refresh) state.selected.clear();
         renderEditions();
-        setStatus("Edições carregadas: " + data.editions.length, "ok");
+        setStatus(
+          data.editions.length
+            ? "Edições carregadas: " + data.editions.length
+            : refresh
+              ? "Nenhuma edição encontrada na LigaPokemon."
+              : "Nenhuma edição salva ainda. Clique em Atualizar edições para buscar na LigaPokemon.",
+          data.editions.length || !refresh ? "ok" : "error"
+        );
       } catch (err) {
         setStatus(err.message, "error");
       } finally {
@@ -227,7 +273,7 @@ export function renderLigaSyncPage(): string {
     }
 
     async function startSync() {
-      const selected = state.editions.filter((edition) => state.selected.has(editionKey(edition)));
+      const selected = selectedEditionsForSync();
       if (!selected.length) return;
       els.startSync.disabled = true;
       try {
@@ -241,7 +287,27 @@ export function renderLigaSyncPage(): string {
       } catch (err) {
         setStatus(err.message, "error");
       } finally {
-        els.startSync.disabled = state.selected.size === 0;
+        updateStartState();
+      }
+    }
+
+    async function uploadPriceBackup(file) {
+      if (!file) return;
+      els.uploadPrices.disabled = true;
+      try {
+        const response = await fetch("/prices/backup.csv", {
+          method: "POST",
+          headers: { "Content-Type": "text/csv" },
+          body: await file.text()
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || "Falha ao restaurar backup");
+        setStatus("Backup restaurado: " + data.prices + " preços e " + data.history + " históricos importados.", "ok");
+      } catch (err) {
+        setStatus(err.message, "error");
+      } finally {
+        els.uploadPrices.disabled = false;
+        els.priceBackupFile.value = "";
       }
     }
 
@@ -274,10 +340,18 @@ export function renderLigaSyncPage(): string {
       }[char]));
     }
 
-    els.loadEditions.addEventListener("click", loadEditions);
+    els.loadEditions.addEventListener("click", () => loadEditions(true));
     els.refreshJobs.addEventListener("click", loadJobs);
     els.startSync.addEventListener("click", startSync);
     els.filter.addEventListener("input", renderEditions);
+    els.years.addEventListener("input", updateStartState);
+    els.downloadPrices.addEventListener("click", () => {
+      window.location.href = "/prices/backup.csv";
+    });
+    els.uploadPrices.addEventListener("click", () => els.priceBackupFile.click());
+    els.priceBackupFile.addEventListener("change", (event) => {
+      uploadPriceBackup(event.target.files && event.target.files[0]);
+    });
     els.selectAll.addEventListener("click", () => {
       const visible = state.editions.filter((edition) => {
         const filter = els.filter.value.trim().toLowerCase();
@@ -296,9 +370,10 @@ export function renderLigaSyncPage(): string {
       if (!event.target.dataset.key) return;
       if (event.target.checked) state.selected.add(event.target.dataset.key);
       else state.selected.delete(event.target.dataset.key);
-      els.startSync.disabled = state.selected.size === 0;
+      updateStartState();
     });
 
+    loadEditions(false).catch((err) => setStatus(err.message, "error"));
     loadJobs().then(startPolling).catch((err) => setStatus(err.message, "error"));
   </script>
 </body>

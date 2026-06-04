@@ -68,9 +68,16 @@ export function parseSpecificSpokenNumber(transcript: string): number | null {
   return parseSpokenInteger(normalizeSpeechTokens(transcript));
 }
 
-export function parseGeneralSpokenCardNumber(transcript: string): { number: number; printedTotal: number } | null {
+export function parseGeneralSpokenCardNumber(
+  transcript: string,
+  options: { printedTotal?: number | null } = {},
+): { number: number; printedTotal: number } | null {
   const normalizedText = normalizeSpeechText(transcript);
   const normalized = normalizedText.split(/\s+/).filter(Boolean);
+  const preferredPrintedTotal =
+    typeof options.printedTotal === "number" && Number.isFinite(options.printedTotal)
+      ? options.printedTotal
+      : null;
   const numericMatch = normalizedText.match(/\b(\d{1,4})\s*(?:\/|barra)\s*(\d{1,4})\b/);
   if (numericMatch) {
     return {
@@ -81,6 +88,55 @@ export function parseGeneralSpokenCardNumber(transcript: string): { number: numb
 
   const separatorIndex = normalized.findIndex((token) => token === "barra");
   if (separatorIndex === -1) {
+    const numericPair = normalizedText.match(/\b(\d{1,4})\s+(\d{1,4})\b/);
+    if (numericPair) {
+      return {
+        number: Number.parseInt(numericPair[1], 10),
+        printedTotal: Number.parseInt(numericPair[2], 10)
+      };
+    }
+
+    if (preferredPrintedTotal) {
+      const totalText = String(preferredPrintedTotal);
+      for (const token of normalized) {
+        if (!/^\d{1,8}$/.test(token)) continue;
+
+        if (token.length > totalText.length && token.endsWith(totalText)) {
+          const number = Number.parseInt(token.slice(0, -totalText.length), 10);
+          if (Number.isFinite(number)) {
+            return { number, printedTotal: preferredPrintedTotal };
+          }
+        }
+
+        const number = Number.parseInt(token, 10);
+        if (Number.isFinite(number)) {
+          return { number, printedTotal: preferredPrintedTotal };
+        }
+      }
+
+      const number = parseSpokenInteger(normalized);
+      if (number !== null) {
+        return { number, printedTotal: preferredPrintedTotal };
+      }
+    }
+
+    const digitTokens = normalized.filter((token) => /^\d{1,4}$/.test(token));
+    if (digitTokens.length >= 2) {
+      return {
+        number: Number.parseInt(digitTokens[0], 10),
+        printedTotal: Number.parseInt(digitTokens[1], 10)
+      };
+    }
+
+    const compactDigits = normalized.find((token) => /^\d{4}$|^\d{6}$/.test(token));
+    if (compactDigits) {
+      const split = compactDigits.length / 2;
+      return {
+        number: Number.parseInt(compactDigits.slice(0, split), 10),
+        printedTotal: Number.parseInt(compactDigits.slice(split), 10)
+      };
+    }
+
     return null;
   }
 

@@ -76,6 +76,7 @@ export class CatalogService {
   }
 
   async listSets(): Promise<CardSetSummary[]> {
+    const localSets = await this.listLocalSets();
     const url = new URL("https://api.pokemontcg.io/v2/sets");
     url.searchParams.set("orderBy", "-releaseDate");
 
@@ -87,18 +88,20 @@ export class CatalogService {
 
     if (response.ok) {
       const payload = (await response.json()) as { data?: PokemonTcgSet[] };
-      return (payload.data ?? [])
+      const remoteSets = (payload.data ?? [])
         .filter((set): set is PokemonTcgSet & { printedTotal: number } => typeof set.printedTotal === "number")
         .map((set) => ({
           id: set.id,
+          code: set.ptcgoCode ?? null,
           name: set.name,
           printedTotal: set.printedTotal,
           total: set.total ?? null,
           releaseDate: set.releaseDate ?? null
         }));
+      return mergeCardSets(localSets, remoteSets);
     }
 
-    return this.listLocalSets();
+    return localSets;
   }
 
   async ensureCardByExternalId(externalId: string): Promise<CardSummary> {
@@ -122,6 +125,7 @@ export class CatalogService {
       orderBy: [{ releaseDate: "desc" }, { setName: "asc" }],
       select: {
         setId: true,
+        setCode: true,
         setName: true,
         printedTotal: true,
         setTotal: true,
@@ -135,6 +139,7 @@ export class CatalogService {
       )
       .map((set) => ({
         id: set.setId,
+        code: set.setCode,
         name: set.setName,
         printedTotal: set.printedTotal,
         total: set.setTotal,
@@ -151,7 +156,15 @@ export class CatalogService {
         ...(normalizedQuery ? { normalizedName: { contains: normalizedQuery } } : {}),
         ...(numberParts ? { number: { equals: numberParts.number, mode: "insensitive" } } : {}),
         ...(numberParts?.printedTotal ? { printedTotal: numberParts.printedTotal } : {}),
-        ...(dto.set ? { OR: [{ setId: dto.set }, { setName: { contains: dto.set, mode: "insensitive" } }] } : {})
+        ...(dto.set
+          ? {
+              OR: [
+                { setId: dto.set },
+                { setCode: { equals: dto.set, mode: "insensitive" } },
+                { setName: { contains: dto.set, mode: "insensitive" } }
+              ]
+            }
+          : {})
       },
       orderBy: [{ updatedAt: "desc" }],
       take: 24
@@ -403,4 +416,26 @@ export class CatalogService {
   private toJson(value: unknown): Prisma.InputJsonValue {
     return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
   }
+}
+
+function mergeCardSets(
+  localSets: CardSetSummary[],
+  remoteSets: CardSetSummary[],
+): CardSetSummary[] {
+  const byKey = new Map<string, CardSetSummary>();
+  for (const set of [...localSets, ...remoteSets]) {
+    const key = set.code || set.id || `${set.name}:${set.printedTotal}`;
+    if (!byKey.has(key)) {
+      byKey.set(key, set);
+    }
+  }
+
+  return Array.from(byKey.values()).sort((left, right) => {
+    const leftDate = Date.parse(left.releaseDate ?? "");
+    const rightDate = Date.parse(right.releaseDate ?? "");
+    if (Number.isFinite(leftDate) && Number.isFinite(rightDate) && leftDate !== rightDate) {
+      return rightDate - leftDate;
+    }
+    return left.name.localeCompare(right.name, "pt-BR");
+  });
 }

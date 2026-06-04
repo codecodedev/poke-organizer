@@ -73,7 +73,69 @@ export class LigaSyncService {
   constructor(private readonly prisma: PrismaClient) {
     this.priceService = new PriceService(prisma);
   }
-async listEditions(): Promise<LigaEdition[]> {
+  async listEditions(options: { refresh?: boolean } = {}): Promise<LigaEdition[]> {
+    if (!options.refresh) {
+      return this.listCachedEditions();
+    }
+
+    const editions = await this.scrapeEditions();
+    await this.saveEditionCache(editions);
+    return editions;
+  }
+
+  private async listCachedEditions(): Promise<LigaEdition[]> {
+    const editions = await this.prisma.ligaEditionCache
+      .findMany({
+        orderBy: [{ year: "desc" }, { name: "asc" }]
+      })
+      .catch((err) => {
+        if (isMissingEditionCacheError(err)) return [];
+        throw err;
+      });
+
+    return editions.map((edition) => ({
+      edid: edition.edid,
+      code: edition.code,
+      name: edition.name,
+      year: edition.year,
+      searchUrl: edition.searchUrl
+    }));
+  }
+
+  private async saveEditionCache(editions: LigaEdition[]) {
+    if (!editions.length) return;
+
+    await this.prisma.$transaction(
+      editions.map((edition) =>
+        this.prisma.ligaEditionCache.upsert({
+          where: {
+            edid_code: {
+              edid: edition.edid,
+              code: edition.code
+            }
+          },
+          create: {
+            edid: edition.edid,
+            code: edition.code,
+            name: edition.name,
+            year: edition.year ?? null,
+            searchUrl: edition.searchUrl
+          },
+          update: {
+            name: edition.name,
+            year: edition.year ?? null,
+            searchUrl: edition.searchUrl,
+            lastSeenAt: new Date()
+          }
+        })
+      )
+    ).catch((err) => {
+      if (isMissingEditionCacheError(err)) return;
+      throw err;
+    });
+  }
+
+private async scrapeEditions(): Promise<LigaEdition[]> {
   const page = await this.newPage();
 
   try {
@@ -676,4 +738,10 @@ function sanitizeDelay(value: number | undefined): number {
   }
 
   return Math.max(0, Math.min(10 * 60 * 1000, Math.floor(value)));
+}
+
+function isMissingEditionCacheError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const candidate = err as { code?: string; message?: string };
+  return candidate.code === "P2021" && String(candidate.message ?? "").includes("LigaEditionCache");
 }

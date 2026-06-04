@@ -1,5 +1,12 @@
-import { type ReactNode, useEffect, useMemo, useState } from "react";
-import { Coins, Layers3, RefreshCw, Search } from "lucide-react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Coins,
+  Download,
+  Layers3,
+  RefreshCw,
+  Search,
+  Upload,
+} from "lucide-react";
 import {
   formatCardNumber,
   normalizeSearchText,
@@ -11,6 +18,7 @@ import { withAuthRetry } from "../lib/authRetry";
 import { formatBrl } from "../lib/format";
 import { CardDetailModal, type UpdateCardDetails } from "./CardDetailModal";
 import { Button } from "./ui/Button";
+import { Modal } from "./ui/Modal";
 import { Panel } from "./ui/Panel";
 import { StatCard } from "./ui/StatCard";
 import { CollectionItemCard } from "./collection/CollectionItemCard";
@@ -30,6 +38,39 @@ type Props = {
 };
 
 const INVENTORY_PAGE_SIZE = 24;
+const COLLECTION_BACKUP_HEADERS = [
+  "externalId",
+  "cardName",
+  "cardNumber",
+  "printedTotal",
+  "setId",
+  "setCode",
+  "setName",
+  "quantity",
+  "condition",
+  "variant",
+  "foil",
+  "language",
+  "notes",
+] as const;
+
+type CollectionBackupRow = {
+  externalId: string;
+  cardName: string;
+  cardNumber: string;
+  printedTotal: string;
+  setId: string;
+  setCode: string;
+  setName: string;
+  quantity: number;
+  condition: string;
+  variant: string;
+  foil: boolean;
+  language: string;
+  notes: string;
+};
+
+type ImportMode = "ignore" | "increment" | "replace";
 
 export function CollectionList({
   session,
@@ -52,6 +93,9 @@ export function CollectionList({
   const [searchTerm, setSearchTerm] = useState("");
   const [sort, setSort] = useState<CollectionFolderSort>("newest");
   const [page, setPage] = useState(1);
+  const [backupRows, setBackupRows] = useState<CollectionBackupRow[]>([]);
+  const [importing, setImporting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const showFilters = !limit;
   const typeOptions = useMemo(
@@ -135,6 +179,82 @@ export function CollectionList({
     setSelectedItem(updated);
   }
 
+  function exportCsv() {
+    const csv = toCsv([
+      [...COLLECTION_BACKUP_HEADERS],
+      ...items.map((item) => [
+        item.card.externalId,
+        item.card.name,
+        item.card.number,
+        item.card.printedTotal ?? "",
+        item.card.setId ?? "",
+        item.card.setCode ?? "",
+        item.card.setName ?? "",
+        item.quantity,
+        item.condition,
+        item.variant,
+        item.foil ? "true" : "false",
+        item.language,
+        item.notes ?? "",
+      ]),
+    ]);
+    downloadTextFile(
+      `poke-organizer-cartas-${new Date().toISOString().slice(0, 10)}.csv`,
+      csv,
+      "text/csv;charset=utf-8",
+    );
+  }
+
+  async function handleBackupFile(file: File | null) {
+    if (!file) return;
+
+    const text = await file.text();
+    const rows = parseCollectionBackupCsv(text);
+    setBackupRows(rows);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  }
+
+  async function importBackup(mode: ImportMode) {
+    if (!backupRows.length) return;
+
+    setImporting(true);
+    try {
+      await withAuthRetry(session, onSession, onUnauthorized, async (token) => {
+        if (mode === "replace") {
+          await Promise.all(items.map((item) => api.deleteCollection(token, item.id)));
+        }
+
+        const existing = new Set(
+          (mode === "replace" ? [] : items).map(collectionIdentityKey),
+        );
+
+        for (const row of backupRows) {
+          const key = backupRowIdentityKey(row);
+          if (mode === "ignore" && existing.has(key)) {
+            continue;
+          }
+
+          await api.addCollection(token, {
+            cardId: row.externalId,
+            quantity: mode === "increment" && existing.has(key) ? 1 : row.quantity,
+            condition: row.condition,
+            variant: row.variant,
+            foil: row.foil,
+            language: row.language,
+            notes: row.notes || undefined,
+          });
+          existing.add(key);
+        }
+      });
+      setBackupRows([]);
+      await load();
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function openItem(item: CollectionItem) {
     setSelectedItem(item);
     onModalItemChange?.(item.id);
@@ -190,6 +310,32 @@ export function CollectionList({
           )}
         </div>
         <div className="flex flex-wrap gap-2 lg:justify-end">
+          {!limit && (
+            <>
+              <Button
+                type="button"
+                onClick={exportCsv}
+                icon={<Download size={16} />}
+                disabled={items.length === 0}
+              >
+                Baixar CSV
+              </Button>
+              <Button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                icon={<Upload size={16} />}
+              >
+                Restaurar CSV
+              </Button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,text/csv"
+                className="hidden"
+                onChange={(event) => void handleBackupFile(event.target.files?.[0] ?? null)}
+              />
+            </>
+          )}
           <Button
             type="button"
             onClick={() => void load()}
@@ -317,7 +463,71 @@ export function CollectionList({
         onClose={closeItem}
         onUpdate={updateItemDetails}
       />
+
+      {backupRows.length > 0 && (
+        <Modal title="Restaurar backup de cartas" onClose={() => setBackupRows([])}>
+          <div className="grid gap-4 p-5">
+            <p className="section-copy">
+              O arquivo tem {backupRows.length} cartas. Escolha como tratar cartas que ja existem no seu inventario.
+            </p>
+            <div className="grid gap-3 md:grid-cols-3">
+              <ImportChoice
+                title="Ignorar iguais"
+                description="Mantem as cartas atuais e importa somente as que ainda nao existem."
+                disabled={importing}
+                onClick={() => void importBackup("ignore")}
+              />
+              <ImportChoice
+                title="Somar 1"
+                description="Quando uma carta igual existir, adiciona 1 na quantidade dela."
+                disabled={importing}
+                onClick={() => void importBackup("increment")}
+              />
+              <ImportChoice
+                title="Substituir tudo"
+                description="Remove seu inventario atual e recria as cartas usando este backup."
+                disabled={importing}
+                danger
+                onClick={() => void importBackup("replace")}
+              />
+            </div>
+            {importing && <p className="section-copy">Restaurando backup...</p>}
+          </div>
+        </Modal>
+      )}
     </Panel>
+  );
+}
+
+function ImportChoice({
+  title,
+  description,
+  disabled,
+  danger,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  disabled: boolean;
+  danger?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={`rounded-[22px] border p-4 text-left shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${
+        danger
+          ? "border-red-200 bg-red-50 text-red-800"
+          : "border-line/80 bg-white/80 text-ink hover:border-brand/35"
+      }`}
+    >
+      <span className="block text-base font-black">{title}</span>
+      <span className="mt-2 block text-sm font-semibold leading-6 text-slate-600">
+        {description}
+      </span>
+    </button>
   );
 }
 
@@ -391,6 +601,134 @@ function matchesInventorySearch(item: CollectionItem, term: string): boolean {
     compactSearchableText.includes(compactTerm) ||
     compactSearchableText.includes(compactTermWithoutLeadingZeros)
   );
+}
+
+function collectionIdentityKey(item: CollectionItem): string {
+  return [
+    item.card.externalId,
+    item.condition,
+    item.variant,
+    item.foil ? "true" : "false",
+    item.language,
+  ].join("|");
+}
+
+function backupRowIdentityKey(row: CollectionBackupRow): string {
+  return [
+    row.externalId,
+    row.condition,
+    row.variant,
+    row.foil ? "true" : "false",
+    row.language,
+  ].join("|");
+}
+
+function parseCollectionBackupCsv(text: string): CollectionBackupRow[] {
+  const rows = parseCsv(text);
+  const [headers, ...records] = rows;
+  if (!headers?.length) {
+    throw new Error("CSV vazio");
+  }
+
+  const headerIndex = new Map(headers.map((header, index) => [header, index]));
+  for (const header of COLLECTION_BACKUP_HEADERS) {
+    if (!headerIndex.has(header)) {
+      throw new Error(`CSV sem coluna obrigatoria: ${header}`);
+    }
+  }
+
+  return records
+    .filter((record) => record.some((value) => value.trim()))
+    .map((record) => ({
+      externalId: cell(record, headerIndex, "externalId"),
+      cardName: cell(record, headerIndex, "cardName"),
+      cardNumber: cell(record, headerIndex, "cardNumber"),
+      printedTotal: cell(record, headerIndex, "printedTotal"),
+      setId: cell(record, headerIndex, "setId"),
+      setCode: cell(record, headerIndex, "setCode"),
+      setName: cell(record, headerIndex, "setName"),
+      quantity: Math.max(1, Number.parseInt(cell(record, headerIndex, "quantity") || "1", 10) || 1),
+      condition: cell(record, headerIndex, "condition") || "NM",
+      variant: cell(record, headerIndex, "variant") || "normal",
+      foil: cell(record, headerIndex, "foil") === "true",
+      language: cell(record, headerIndex, "language") || "unknown",
+      notes: cell(record, headerIndex, "notes"),
+    }))
+    .filter((row) => row.externalId);
+}
+
+function cell(
+  record: string[],
+  headerIndex: Map<string, number>,
+  header: (typeof COLLECTION_BACKUP_HEADERS)[number],
+): string {
+  return record[headerIndex.get(header) ?? -1]?.trim() ?? "";
+}
+
+function parseCsv(text: string): string[][] {
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cellValue = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (char === '"' && quoted && next === '"') {
+      cellValue += '"';
+      index += 1;
+      continue;
+    }
+    if (char === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (char === "," && !quoted) {
+      row.push(cellValue);
+      cellValue = "";
+      continue;
+    }
+    if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && next === "\n") index += 1;
+      row.push(cellValue);
+      rows.push(row);
+      row = [];
+      cellValue = "";
+      continue;
+    }
+
+    cellValue += char;
+  }
+
+  row.push(cellValue);
+  rows.push(row);
+  return rows;
+}
+
+function toCsv(rows: Array<Array<string | number | boolean | null | undefined>>): string {
+  return rows
+    .map((row) =>
+      row
+        .map((value) => {
+          const text = String(value ?? "");
+          return /[",\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+        })
+        .join(","),
+    )
+    .join("\n");
+}
+
+function downloadTextFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function FilterField({
