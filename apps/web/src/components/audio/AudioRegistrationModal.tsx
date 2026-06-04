@@ -1,7 +1,21 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
-import { Boxes, CircleHelp, Clock3, Globe2, Loader2, Mic, MicOff, Radio, Search, X } from "lucide-react";
 import {
+  BadgeCheck,
+  BookOpenText,
+  Boxes,
+  CircleHelp,
+  Clock3,
+  Globe2,
+  Keyboard,
+  Loader2,
+  Mic,
+  MicOff,
+  Radio,
+  Search,
+  Sparkles,
+  X
+} from "lucide-react";import {
   DEFAULT_CARD_VARIANT,
   FOIL_CARD_VARIANT,
   HOLOFOIL_CARD_VARIANT,
@@ -458,9 +472,9 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
   }
 
   return (
-    <Modal title="Cadastro por voz" subtitle="Escolha o modo, abra o microfone e confirme os detalhes da carta encontrada." onClose={onClose}>
-      <div className="grid gap-4 p-5 md:grid-cols-[260px_1fr]">
-        <div className="rounded-[22px] bg-gradient-to-br from-aqua/15 via-white to-lilac/15 p-4">
+    <Modal title="Cadastro por voz" onClose={onClose}>
+<div className="relative">
+  <div className="grid gap-4 p-5 md:grid-cols-[260px_1fr]">        <div className="rounded-[22px] bg-gradient-to-br from-aqua/15 via-white to-lilac/15 p-4">
           <div className="mb-2 flex justify-end">
             <button
               type="button"
@@ -484,7 +498,6 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
               </Button>
             )}
           </div>
-          {showHelp && <VoiceHelpCard />}
         </div>
 
         <div className="grid content-start gap-4">
@@ -530,21 +543,111 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
           {!speechSupported && <p className="danger-note">Seu navegador nao disponibilizou reconhecimento de fala para esta pagina.</p>}
         </div>
 
-        {lastAddedPreview && <LastAddedPreviewCard preview={lastAddedPreview} />}
-      </div>
+          </div>
+
+          {showHelp && (
+            <>
+              <div
+                className="fixed inset-0 z-[60] bg-slate-950/35 backdrop-blur-[3px]"
+                onClick={() => setShowHelp(false)}
+              />
+
+              <VoiceHelpOverlay onClose={() => setShowHelp(false)} />
+            </>
+          )}
+</div>
 
       <CardDetailModal card={selectedCard} initialVariant={selectedVariant} onClose={() => setSelectedCard(null)} onAdd={addDetailsAndContinue} />
     </Modal>
   );
 }
 
-function VoiceHelpCard() {
+function VoiceHelpOverlay({ onClose }: { onClose: () => void }) {
   return (
-    <div className="mt-4 rounded-[20px] border border-line/80 bg-white/82 p-4 text-sm font-semibold leading-6 text-slate-600 shadow-sm">
-      <p className="font-black text-ink">Comandos de voz</p>
-      <p className="mt-2">Fale o numero e, se quiser, a variante depois dele.</p>
-      <p>Variantes: normal, holo/foil, reverse/reverse foil/holo reverse.</p>
-      <p>Diga ok no final para cadastrar direto com quantidade 1, condicao NM e idioma padrao da carta.</p>
+<div className="fixed left-1/2 top-1/2 z-[70] w-[420px] max-w-[calc(100vw-40px)] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-line/80 bg-white p-4 shadow-2xl">      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <div className="mb-2 grid h-10 w-10 place-items-center rounded-2xl bg-brand/10 text-brand">
+            <BookOpenText size={20} />
+          </div>
+          <h3 className="text-lg font-black text-ink">Comandos de voz</h3>
+          <p className="text-sm font-semibold text-slate-500">
+            Exemplos rápidos para cadastrar cartas.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl border border-line bg-white text-slate-500 shadow-sm transition hover:border-brand/30 hover:text-ink"
+          aria-label="Fechar dicas"
+        >
+          <X size={17} />
+        </button>
+      </div>
+
+      <div className="grid gap-2">
+        <VoiceTip
+          icon={<Boxes size={16} />}
+          title="Coleção específica"
+          description="Fale apenas o número."
+          example={["150"]}
+        />
+
+        <VoiceTip
+          icon={<Globe2 size={16} />}
+          title="Todas as coleções"
+          description="Fale o número completo."
+          example={["150 barra 217"]}
+        />
+
+        <VoiceTip
+          icon={<Sparkles size={16} />}
+          title="Com variante"
+          description="Fale a variante depois do número."
+          example={["150 foil","150 reverse"]}
+        />
+
+        <VoiceTip
+          icon={<BadgeCheck size={16} />}
+          title="Cadastro automático"
+          description='Diga "ok" no final.'
+          example={["150 foil ok"]}
+        />
+      </div>
+    </div>
+  );
+}
+
+function VoiceTip({
+  icon,
+  title,
+  description,
+  example
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  example: string[];
+}) {
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-line/70 bg-field/60 p-3">
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white text-slate-600 shadow-sm">
+        {icon}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-black leading-tight text-ink">{title}</p>
+        <p className="text-xs font-semibold text-slate-500">{description}</p>
+      </div>
+      <div className="flex flex-col items-end gap-2">
+        {
+          example.map((ex, index) => (
+            <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700 shadow-sm">
+              “{ex}”
+            </span>
+          ))
+        }
+      </div>
     </div>
   );
 }
@@ -630,7 +733,7 @@ function LastAddedPreviewCard({ preview }: { preview: AddedPreview }) {
           />
         ) : (
           <div className="grid h-16 w-12 shrink-0 place-items-center rounded-lg border border-white/80 bg-white/70 text-xs font-black text-slate-400">
-            PO
+            CC
           </div>
         )}
         <div className="min-w-0 flex-1">

@@ -188,7 +188,7 @@ export function renderLigaSyncPage(): string {
         const checked = state.selected.has(editionKey(edition)) ? "checked" : "";
         return '<label class="edition">' +
           '<input type="checkbox" data-key="' + escapeHtml(editionKey(edition)) + '" ' + checked + ' />' +
-          '<span><span class="name">' + escapeHtml(edition.name) + '</span><span class="meta">' + escapeHtml(String(edition.year || "")) + ' · edid=' + escapeHtml(edition.edid) + '</span></span>' +
+          '<span><span class="name">' + escapeHtml(edition.name) + '</span><span class="meta"> - ' + escapeHtml(String(edition.code || "")) + ' · ' + escapeHtml(edition.year) + '</span></span>' +
           '<span class="pill">' + escapeHtml(edition.code) + '</span>' +
         '</label>';
       }).join("") || '<div class="job-row"><span class="meta">Nenhuma edição carregada.</span></div>';

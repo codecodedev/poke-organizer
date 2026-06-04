@@ -37,13 +37,13 @@ export function AuthPanel({ onSession }: Props) {
     <section className="app-shell mx-auto grid min-h-screen w-full max-w-6xl items-center gap-8 px-5 py-8 lg:grid-cols-[1fr_420px]">
       <div className="max-w-2xl">
         <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber text-lg font-black text-white shadow-glow">
-          PO
+          CC
         </div>
         <span className="chip mb-4">
           <Sparkles size={14} />
           Colecao premium
         </span>
-        <h1 className="text-4xl font-black tracking-normal text-ink sm:text-6xl">Poke Organizer</h1>
+        <h1 className="text-4xl font-black tracking-normal text-ink sm:text-6xl">Coleciona cards</h1>
         <p className="mt-4 max-w-xl text-lg leading-8 text-slate-600">
           Organize sua colecao, cadastre cartas por busca ou audio e acompanhe valores nacionais com uma interface mais leve.
         </p>

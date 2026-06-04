@@ -124,6 +124,9 @@ textarea {
       0 18px 50px rgba(67, 56, 120, .12),
       0 0 34px var(--variant-glow);
     animation: holo-frame-flow 3.4s linear infinite;
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+
+  mask-image: radial-gradient(white, black);
   }
 
   .variant-card-image--effect-frame::before {
@@ -151,25 +154,6 @@ textarea {
   }
 
   .variant-card-image--effect-frame::after {
-    @apply pointer-events-none absolute inset-0 z-20;
-    content: "";
-    border-radius: inherit;
-    background:
-      repeating-linear-gradient(102deg,
-        rgba(255, 255, 255, .18) 0 1px,
-        rgba(255, 255, 255, 0) 1px 7px),
-      linear-gradient(112deg,
-        transparent 0%,
-        rgba(255, 255, 255, .86) 12%,
-        rgba(255, 255, 255, .12) 18%,
-        transparent 30%,
-        transparent 57%,
-        rgba(255, 255, 255, .7) 66%,
-        transparent 78%);
-    background-size: 100% 100%, 230% 230%;
-    mix-blend-mode: screen;
-    opacity: .42;
-    animation: prismatic-shine 3.8s ease-in-out infinite;
   }
 
   .variant-card-image--foil {
@@ -212,7 +196,25 @@ textarea {
   }
 
   .variant-card-image--reverse.variant-card-image--effect-frame::after {
-    
+    @apply pointer-events-none absolute inset-0 z-20;
+    content: "";
+    border-radius: inherit;
+    background:
+      repeating-linear-gradient(102deg,
+        rgba(255, 255, 255, .18) 0 1px,
+        rgba(255, 255, 255, 0) 1px 7px),
+      linear-gradient(112deg,
+        transparent 0%,
+        rgba(255, 255, 255, .86) 12%,
+        rgba(255, 255, 255, .12) 18%,
+        transparent 30%,
+        transparent 57%,
+        rgba(255, 255, 255, .7) 66%,
+        transparent 78%);
+    background-size: 100% 100%, 230% 230%;
+    mix-blend-mode: screen;
+    opacity: .42;
+    animation: prismatic-shine 3.8s ease-in-out infinite;
   }
 
   .collection-item-card {

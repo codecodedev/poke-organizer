@@ -16,20 +16,18 @@ export function AudioRegistrationPanel(props: Props) {
 
   return (
     <>
-      <div className="w-full rounded-[22px] border border-white/70 bg-white/70 p-4 shadow-soft md:w-[320px]">
         <div className="mb-4 flex items-start gap-3">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-aqua/20 text-cyan-700">
             <Mic size={22} />
           </div>
           <div>
             <p className="text-base font-black text-ink">Cadastro por voz</p>
-            <p className="mt-1 text-sm leading-5 text-slate-600">Abra um fluxo guiado para falar numeros e adicionar cartas.</p>
+            <p className="mt-1 text-sm leading-5 text-slate-600">A maneira mais facil de cadastrar uma grande quantidade de cartas.</p>
           </div>
         </div>
         <Button type="button" variant="brand" icon={<Sparkles size={18} />} className="w-full" onClick={() => setOpen(true)}>
           Cadastrar por voz
         </Button>
-      </div>
 
       {open && <AudioRegistrationModal {...props} onClose={() => setOpen(false)} />}
     </>

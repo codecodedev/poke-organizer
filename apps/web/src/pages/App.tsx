@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
-import { FolderOpen, Home, LibraryBig, LogOut, Sparkles } from "lucide-react";
+import { FolderOpen, Home, LibraryBig, LogOut, Menu, Sparkles, X } from "lucide-react";
 import { AudioRegistrationPanel } from "../components/AudioRegistrationPanel";
 import { CardSearch } from "../components/CardSearch";
 import { CollectionList } from "../components/CollectionList";
@@ -21,6 +21,8 @@ export function App() {
   const [session, setSession] = useState<Session | null>(() => loadSession());
   const [refreshKey, setRefreshKey] = useState(0);
   const [route, setRoute] = useState<AppRoute>(() => parseRoute());
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   const view = route.view;
 
   const handleSession = useCallback((nextSession: Session) => {
@@ -58,12 +60,14 @@ export function App() {
 
   function navigate(nextRoute: AppRoute) {
     setRoute(nextRoute);
+    setMobileMenuOpen(false);
     window.history.pushState(null, "", routeToUrl(nextRoute));
   }
 
   function logout() {
     clearSession();
     setSession(null);
+    setMobileMenuOpen(false);
   }
 
   function refreshCollection() {
@@ -73,37 +77,99 @@ export function App() {
   return (
     <main className="app-shell">
       <header className="sticky top-0 z-30 border-b border-white/70 bg-white/75 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-5 py-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white shadow-glow">
-              PO
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white shadow-glow">
+              CC
             </div>
-            <div>
-              <h1 className="text-xl font-black text-ink">Poke Organizer</h1>
-              <p className="text-sm font-medium text-slate-600">{session.user.email}</p>
+
+            <div className="min-w-0">
+              <h1 className="truncate text-xl font-black text-ink">Coleciona cards</h1>
+              <p className="truncate text-sm font-medium text-slate-600">{session.user.email}</p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+
+          <div className="hidden flex-wrap items-center gap-2 md:flex">
             <NavButton active={view === "home"} icon={<Home size={16} />} onClick={() => navigate({ view: "home" })}>
               Inicio
             </NavButton>
+
             <NavButton active={view === "cards"} icon={<LibraryBig size={16} />} onClick={() => navigate({ view: "cards" })}>
               Cartas
             </NavButton>
+
             <NavButton active={view === "collections"} icon={<FolderOpen size={16} />} onClick={() => navigate({ view: "collections" })}>
               Colecoes
             </NavButton>
+
             <Button type="button" onClick={logout} icon={<LogOut size={16} />}>
               Sair
             </Button>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setMobileMenuOpen(true)}
+            className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-line bg-white/80 text-night shadow-sm md:hidden"
+            aria-label="Abrir menu"
+          >
+            <Menu size={22} />
+          </button>
         </div>
       </header>
+
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <button
+            type="button"
+            className="absolute inset-0 bg-slate-950/40"
+            onClick={() => setMobileMenuOpen(false)}
+            aria-label="Fechar menu"
+          />
+
+          <aside className="absolute right-0 top-0 flex h-full w-72 max-w-[85vw] flex-col bg-white p-5 shadow-2xl">
+            <div className="mb-6 flex items-center justify-between">
+              <div>
+                <strong className="text-lg text-ink">Menu</strong>
+                <p className="text-xs font-medium text-slate-500">{session.user.email}</p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setMobileMenuOpen(false)}
+                className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-night"
+                aria-label="Fechar menu"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <NavButton active={view === "home"} icon={<Home size={16} />} onClick={() => navigate({ view: "home" })}>
+                Inicio
+              </NavButton>
+
+              <NavButton active={view === "cards"} icon={<LibraryBig size={16} />} onClick={() => navigate({ view: "cards" })}>
+                Cartas
+              </NavButton>
+
+              <NavButton active={view === "collections"} icon={<FolderOpen size={16} />} onClick={() => navigate({ view: "collections" })}>
+                Colecoes
+              </NavButton>
+
+              <Button type="button" onClick={logout} icon={<LogOut size={16} />}>
+                Sair
+              </Button>
+            </div>
+          </aside>
+        </div>
+      )}
 
       <div className="mx-auto grid max-w-7xl gap-5 px-5 py-6">
         {view === "home" && (
           <>
-            <HeroPanel session={session} onSession={handleSession} onUnauthorized={handleUnauthorized} onAdded={refreshCollection} />
+            <HeroPanel navigate={navigate} session={session} onSession={handleSession} onUnauthorized={handleUnauthorized} onAdded={refreshCollection} />
+
             <CollectionList
               session={session}
               onSession={handleSession}
@@ -114,6 +180,7 @@ export function App() {
               description="As 10 cartas mais recentes do seu inventario."
               modalItemId={route.card ?? null}
               onModalItemChange={(card) => navigate({ view: "home", card })}
+              showCounts={false}
             />
           </>
         )}
@@ -121,12 +188,15 @@ export function App() {
         {view === "cards" && (
           <>
             <HeroPanel session={session} onSession={handleSession} onUnauthorized={handleUnauthorized} onAdded={refreshCollection} compact />
+
             <CardSearch
+              title="Cadastro manual"
               session={session}
               onSession={handleSession}
               onUnauthorized={handleUnauthorized}
               onAdded={refreshCollection}
             />
+
             <CollectionList
               session={session}
               onSession={handleSession}
@@ -169,7 +239,11 @@ function NavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`btn ${active ? "bg-night text-white shadow-soft" : "border border-line bg-white/80 text-night shadow-sm hover:border-lilac/40"}`}
+      className={`btn ${
+        active
+          ? "bg-night text-white shadow-soft"
+          : "border border-line bg-white/80 text-night shadow-sm hover:border-lilac/40"
+      }`}
     >
       {icon}
       {children}
@@ -182,36 +256,34 @@ function HeroPanel({
   onSession,
   onUnauthorized,
   onAdded,
-  compact = false
+  compact = false,
+  navigate
 }: {
   session: Session;
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
   onAdded: () => void;
   compact?: boolean;
+  navigate?: (route: AppRoute) => void;
 }) {
   return (
     <div className="glass-panel overflow-hidden">
       <div className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center md:p-5">
-        <div>
-          <span className="chip mb-2">
-            <Sparkles size={14} />
-            Colecao viva
-          </span>
-          <h2 className={`${compact ? "max-w-xl text-2xl" : "max-w-2xl text-3xl sm:text-4xl"} font-black leading-tight text-ink`}>
-            Organize cartas e acompanhe valores.
-          </h2>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
-            Busque, cadastre por voz e separe seu inventario em colecoes.
-          </p>
-        </div>
-        <AudioRegistrationPanel
+        {
+          navigate ? (
+        <Button type="button" variant="brand" icon={<Sparkles size={18} />} className="w-full" onClick={() => navigate({ view: "cards" })}>
+          Cadastrar cartas
+        </Button>
+          ): (<AudioRegistrationPanel
           session={session}
           onSession={onSession}
           onUnauthorized={onUnauthorized}
           onAdded={onAdded}
         />
+          )
+        }
       </div>
+
       <div className="holo-strip animate-shimmer h-2" />
     </div>
   );
@@ -221,6 +293,7 @@ function parseRoute(): AppRoute {
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
   const view: View = page === "cards" || page === "collections" ? page : "home";
+
   return {
     view,
     collection: view === "collections" ? params.get("collection") : null,
@@ -230,15 +303,20 @@ function parseRoute(): AppRoute {
 
 function routeToUrl(route: AppRoute): string {
   const params = new URLSearchParams();
+
   if (route.view !== "home") {
     params.set("page", route.view);
   }
+
   if (route.view === "collections" && route.collection) {
     params.set("collection", route.collection);
   }
+
   if (route.card) {
     params.set("card", route.card);
   }
+
   const query = params.toString();
+
   return query ? `/?${query}` : "/";
 }

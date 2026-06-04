@@ -28,7 +28,7 @@ async function bootstrap() {
   );
 
   const swaggerConfig = new DocumentBuilder()
-    .setTitle("Poke Organizer API")
+    .setTitle("Coleciona cards API")
     .setDescription("API para organizar colecoes de cartas Pokemon.")
     .setVersion("0.1.0")
     .addBearerAuth()

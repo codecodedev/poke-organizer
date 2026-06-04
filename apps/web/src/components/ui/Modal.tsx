@@ -28,7 +28,7 @@ export function Modal({ title, subtitle, children, onClose, maxWidthClass = "max
       onMouseDown={onClose}
     >
       <div
-        className={`animate-soft-pop max-h-[92vh] w-full overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card ${maxWidthClass}`}
+        className={`animate-soft-pop max-h-[80vh] w-full overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card ${maxWidthClass}`}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="holo-strip animate-shimmer h-2" />

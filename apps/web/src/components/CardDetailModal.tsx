@@ -193,7 +193,7 @@ export function CardDetailModal({
       onMouseDown={onClose}
     >
       <div
-        className="animate-soft-pop max-h-[92vh] w-full max-w-5xl overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        className="animate-soft-pop max-h-[80vh] w-full max-w-5xl overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="holo-strip animate-shimmer h-2" />
@@ -221,7 +221,7 @@ export function CardDetailModal({
               alt={card.name}
               variant={variant}
               effect="frame"
-              className="aspect-[5/7] rounded-[24px] border border-line/80 bg-gradient-to-br from-aqua/15 to-lilac/15 p-2 shadow-card"
+              className=" rounded-[24px] border border-line/80 bg-gradient-to-br from-aqua/15 to-lilac/15 shadow-card"
               imageClassName="rounded-[18px] object-contain"
             />
           </div>

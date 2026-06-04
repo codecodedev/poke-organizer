@@ -26,6 +26,7 @@ type Props = {
   description?: string;
   modalItemId?: string | null;
   onModalItemChange?: (itemId: string | null) => void;
+  showCounts?: boolean;
 };
 
 const INVENTORY_PAGE_SIZE = 24;
@@ -39,7 +40,8 @@ export function CollectionList({
   title = "Minha colecao",
   description = "Inventario das cartas que voce possui.",
   modalItemId,
-  onModalItemChange
+  onModalItemChange,
+  showCounts = true
 }: Props) {
   const [items, setItems] = useState<CollectionItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -142,10 +144,14 @@ export function CollectionList({
         <div>
           <h2 className="section-title">{title}</h2>
           <p className="section-copy mt-1">{description}</p>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <StatCard label={limit ? "Itens exibidos" : "Cartas totais"} value={String(displayedCount)} tone="aqua" icon={<Layers3 size={18} />} />
-            <StatCard label={limit ? "Valor exibido" : "Valor total"} value={formatBrl(totalValue)} tone="leaf" icon={<Coins size={18} />} />
-          </div>
+          {
+            showCounts && (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <StatCard label={limit ? "Itens exibidos" : "Cartas totais"} value={String(displayedCount)} tone="aqua" icon={<Layers3 size={18} />} />
+                <StatCard label={limit ? "Valor exibido" : "Valor total"} value={formatBrl(totalValue)} tone="leaf" icon={<Coins size={18} />} />
+              </div>
+            )
+          }
         </div>
         <div className="flex flex-wrap gap-2 lg:justify-end">
           <Button

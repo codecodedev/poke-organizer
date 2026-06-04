@@ -18,10 +18,191 @@ type UpsertCardPriceInput = CardNumberLookup & {
   provider?: PriceProvider;
 };
 
+type UpsertManyCardPriceResult = {
+  total: number;
+  changed: number;
+};
+
 export class PriceService {
   private readonly jobs = new Map<string, PriceJob>();
 
   constructor(private readonly prisma: PrismaClient) {}
+  async upsertManyCurrentPrices(inputs: UpsertCardPriceInput[]): Promise<UpsertManyCardPriceResult> {
+    const normalized = inputs
+      .filter((input) => input.printedTotal && Number.isFinite(input.amountBrl))
+      .map((input) => ({
+        setCode: normalizeSetCode(input.setCode),
+        number: normalizeCardNumber(input.number),
+        printedTotal: input.printedTotal,
+        name: input.name ?? null,
+        setName: input.setName ?? null,
+        provider: input.provider ?? PriceProvider.LIGAPOKEMON,
+        amountBrl: new Prisma.Decimal(input.amountBrl),
+        label: input.label,
+        sourceUrl: input.sourceUrl ?? null
+      }));
+
+    if (!normalized.length) {
+      return { total: 0, changed: 0 };
+    }
+
+    const values = Prisma.join(
+      normalized.map((item) =>
+        Prisma.sql`(
+          gen_random_uuid()::text,
+          ${item.number},
+          ${item.printedTotal},
+          ${item.name},
+          ${item.setCode},
+          ${item.setName},
+          ${item.provider}::pricing."PriceProvider",
+          ${item.amountBrl},
+          ${item.label},
+          ${item.sourceUrl},
+          NOW(),
+          NOW(),
+          NOW()
+        )`
+      )
+    );
+
+    const changedRows = await this.prisma.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+      WITH incoming (
+        "id",
+        "number",
+        "printedTotal",
+        "name",
+        "setCode",
+        "setName",
+        "provider",
+        "amountBrl",
+        "label",
+        "sourceUrl",
+        "firstSeenAt",
+        "lastCheckedAt",
+        "updatedAt"
+      ) AS (
+        VALUES ${values}
+      ),
+      changed AS (
+        SELECT
+          existing."id",
+          existing."amountBrl" AS "previousAmountBrl",
+          incoming."amountBrl" AS "newAmountBrl"
+        FROM pricing."CardPrice" existing
+        JOIN incoming
+          ON existing."setCode" = incoming."setCode"
+          AND existing."number" = incoming."number"
+          AND existing."printedTotal" = incoming."printedTotal"
+          AND existing."provider" = incoming."provider"
+        WHERE existing."amountBrl" IS DISTINCT FROM incoming."amountBrl"
+      ),
+      history AS (
+        INSERT INTO pricing."CardPriceHistory" (
+          "id",
+          "cardPriceId",
+          "previousAmountBrl",
+          "newAmountBrl",
+          "changedAt"
+        )
+        SELECT
+          gen_random_uuid()::text,
+          changed."id",
+          changed."previousAmountBrl",
+          changed."newAmountBrl",
+          NOW()
+        FROM changed
+        RETURNING "cardPriceId"
+      ),
+      upserted AS (
+        INSERT INTO pricing."CardPrice" (
+          "id",
+          "number",
+          "printedTotal",
+          "name",
+          "setCode",
+          "setName",
+          "provider",
+          "amountBrl",
+          "label",
+          "sourceUrl",
+          "firstSeenAt",
+          "lastCheckedAt",
+          "updatedAt"
+        )
+        SELECT
+          "id",
+          "number",
+          "printedTotal",
+          "name",
+          "setCode",
+          "setName",
+          "provider",
+          "amountBrl",
+          "label",
+          "sourceUrl",
+          "firstSeenAt",
+          "lastCheckedAt",
+          "updatedAt"
+        FROM incoming
+        ON CONFLICT ("setCode", "number", "printedTotal", "provider")
+        DO UPDATE SET
+          "name" = COALESCE(EXCLUDED."name", pricing."CardPrice"."name"),
+          "setName" = COALESCE(EXCLUDED."setName", pricing."CardPrice"."setName"),
+          "amountBrl" = EXCLUDED."amountBrl",
+          "label" = EXCLUDED."label",
+          "sourceUrl" = COALESCE(EXCLUDED."sourceUrl", pricing."CardPrice"."sourceUrl"),
+          "lastCheckedAt" = NOW(),
+          "updatedAt" = NOW()
+        RETURNING "id"
+      )
+      SELECT "cardPriceId" AS "id" FROM history;
+    `);
+
+    await this.linkCollectionItemsToPrices(normalized);
+
+    return {
+      total: normalized.length,
+      changed: changedRows.length
+    };
+  }
+
+  private async linkCollectionItemsToPrices(
+  prices: Array<{
+    setCode: string;
+    number: string;
+    printedTotal: number;
+    provider: PriceProvider;
+  }>
+    ) {
+      if (!prices.length) return;
+
+      const conditions = Prisma.join(
+        prices.map(
+          (price) =>
+            Prisma.sql`(
+              price."setCode" = ${price.setCode}
+              AND price."number" = ${price.number}
+              AND price."printedTotal" = ${price.printedTotal}
+              AND price."provider" = ${price.provider}::pricing."PriceProvider"
+            )`
+        ),
+        " OR "
+      );
+
+  await this.prisma.$executeRaw(Prisma.sql`
+    UPDATE public."CollectionItem" AS item
+    SET "cardPriceId" = price."id"
+    FROM public."Card" AS card
+    JOIN pricing."CardPrice" AS price
+      ON UPPER(COALESCE(card."setCode", card."raw" #>> '{set,ptcgoCode}')) = price."setCode"
+      AND regexp_replace(card."number", '^0+', '') = price."number"
+      AND card."printedTotal" = price."printedTotal"
+    WHERE item."cardId" = card."id"
+      AND item."cardPriceId" IS DISTINCT FROM price."id"
+      AND (${conditions})
+  `);
+}
 
   async createJob(keys: PriceLookupKey[]): Promise<PriceJobSummary> {
     const jobId = randomUUID();

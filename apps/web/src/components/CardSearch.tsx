@@ -15,9 +15,10 @@ type Props = {
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
   onAdded: () => void;
+  title?: string;
 };
 
-export function CardSearch({ session, onSession, onUnauthorized, onAdded }: Props) {
+export function CardSearch({ session, onSession, onUnauthorized, onAdded, title }: Props) {
   const [query, setQuery] = useState("");
   const [number, setNumber] = useState("");
   const [cards, setCards] = useState<CardSummary[]>([]);
@@ -97,7 +98,7 @@ export function CardSearch({ session, onSession, onUnauthorized, onAdded }: Prop
   }, [cards.length]);
 
   return (
-    <Panel title="Buscar cartas" description="Digite nome, numero ou combine os dois para encontrar sugestoes.">
+    <Panel title={title ?? "Buscar cartas"} description="Digite nome, numero ou combine os dois para encontrar sua carta.">
       <form onSubmit={search} className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
         <input
           className="premium-input"

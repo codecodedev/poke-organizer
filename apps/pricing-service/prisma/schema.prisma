@@ -6,11 +6,14 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("PRICING_DATABASE_URL")
+  schemas  = ["public", "pricing"]
 }
 
 enum PriceProvider {
   LIGAPOKEMON
   MYPCARDS
+
+  @@schema("pricing")
 }
 
 model CardPrice {
@@ -34,17 +37,19 @@ model CardPrice {
   @@index([number, printedTotal])
   @@index([provider])
   @@index([setCode])
+  @@schema("pricing")
 }
 
 model CardPriceHistory {
-  id                String        @id @default(cuid())
+  id                String    @id @default(cuid())
   cardPriceId       String
-  previousAmountBrl Decimal       @db.Decimal(10, 2)
-  newAmountBrl      Decimal       @db.Decimal(10, 2)
-  changedAt         DateTime      @default(now())
-  cardPrice         CardPrice     @relation(fields: [cardPriceId], references: [id], onDelete: Cascade)
+  previousAmountBrl Decimal   @db.Decimal(10, 2)
+  newAmountBrl      Decimal   @db.Decimal(10, 2)
+  changedAt         DateTime  @default(now())
+  cardPrice         CardPrice @relation(fields: [cardPriceId], references: [id], onDelete: Cascade)
 
   @@index([cardPriceId, changedAt])
+  @@schema("pricing")
 }
 
 model LigaSyncJob {
@@ -61,23 +66,25 @@ model LigaSyncJob {
   finishedAt        DateTime?
 
   @@index([status, createdAt])
+  @@schema("pricing")
 }
 
 model LigaSyncJobEdition {
-  id               String      @id @default(cuid())
-  jobId            String
-  edid             String
-  code             String
-  name             String
-  year             Int?
-  status           String
-  cardsFound       Int         @default(0)
-  pricesUpdated    Int         @default(0)
-  message          String?
-  startedAt        DateTime?
-  finishedAt       DateTime?
-  job              LigaSyncJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  id            String      @id @default(cuid())
+  jobId         String
+  edid          String
+  code          String
+  name          String
+  year          Int?
+  status        String
+  cardsFound    Int         @default(0)
+  pricesUpdated Int         @default(0)
+  message       String?
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  job           LigaSyncJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId, status])
   @@index([code])
+  @@schema("pricing")
 }

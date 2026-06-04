@@ -73,85 +73,116 @@ export class LigaSyncService {
   constructor(private readonly prisma: PrismaClient) {
     this.priceService = new PriceService(prisma);
   }
+async listEditions(): Promise<LigaEdition[]> {
+  const page = await this.newPage();
 
-  async listEditions(): Promise<LigaEdition[]> {
-    const page = await this.newPage();
-    try {
-      await page.goto(LIGA_EDITIONS_URL, { waitUntil: "domcontentloaded", timeout: 60_000 });
-      await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined);
-      await this.assertNotBlocked(page);
+  try {
+    await page.goto(LIGA_EDITIONS_URL, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000,
+    });
 
-      const editions = await page.evaluate(() => {
-        type ExtractedEdition = {
-          edid: string;
-          code: string;
-          name: string;
-          year?: number | null;
-          searchUrl: string;
-        };
+    await page
+      .waitForLoadState("networkidle", { timeout: 20_000 })
+      .catch(() => undefined);
 
-        function parseHref(href: string): { edid: string | null; code: string | null } {
-          try {
-            const url = new URL(href, window.location.href);
-            const cardQuery = url.searchParams.get("card") || "";
-            const edid = url.searchParams.get("edid") || cardQuery.match(/(?:^|\s)edid=(\d+)/)?.[1] || null;
-            const code = url.searchParams.get("ed") || cardQuery.match(/(?:^|\s)ed=([A-Za-z0-9]+)/)?.[1] || null;
-            return { edid, code };
-          } catch {
-            return { edid: null, code: null };
-          }
+    await this.assertNotBlocked(page);
+
+    const editions = await page.evaluate(() => {
+      type ExtractedEdition = {
+        edid: string;
+        code: string;
+        name: string;
+        year?: number | null;
+        searchUrl: string;
+      };
+
+      function parseHref(href: string): {
+        edid: string | null;
+        code: string | null;
+      } {
+        try {
+          const url = new URL(href, window.location.href);
+          const cardQuery = url.searchParams.get("card") || "";
+
+          const edid =
+            url.searchParams.get("edid") ||
+            cardQuery.match(/(?:^|\s)edid=(\d+)/)?.[1] ||
+            null;
+
+          const code =
+            url.searchParams.get("ed") ||
+            cardQuery.match(/(?:^|\s)ed=([A-Za-z0-9]+)/)?.[1] ||
+            null;
+
+          return { edid, code };
+        } catch {
+          return { edid: null, code: null };
         }
+      }
 
-        function nearestYear(element: Element): number | null {
-          let node: Element | null = element;
-          for (let depth = 0; node && depth < 8; depth += 1) {
-            const text = node.textContent || "";
-            const match = text.match(/\b(20\d{2}|19\d{2})\b/);
-            if (match) return Number(match[1]);
-            node = node.parentElement;
-          }
-          const documentText = document.body.textContent || "";
-          const offset = Math.max(0, documentText.indexOf(element.textContent || "") - 400);
-          const nearby = documentText.slice(offset, offset + 800);
-          return Number(nearby.match(/\b(20\d{2}|19\d{2})\b/)?.[1] || "") || null;
-        }
+      const seen = new Set<string>();
+      const result: ExtractedEdition[] = [];
 
-        const seen = new Set<string>();
-        const result: ExtractedEdition[] = [];
-        const links = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]"));
+      const editionSections = Array.from(
+        document.querySelectorAll<HTMLDivElement>('div[id^="editions-"]')
+      );
+
+      for (const section of editionSections) {
+        const yearMatch = section.id.match(/^editions-(\d{4})$/);
+        const year = yearMatch ? Number(yearMatch[1]) : null;
+
+        const links = Array.from(
+          section.querySelectorAll<HTMLAnchorElement>("a[href]")
+        );
 
         for (const link of links) {
+          console.log({
+            href: link.href,
+            text: link.textContent,
+            html: link.innerHTML,
+          });
           const href = link.href;
           const parsed = parseHref(href);
+
           if (!parsed.edid || !parsed.code) continue;
 
-          const text = (link.textContent || "").replace(/\s+/g, " ").trim();
-          const name = text.replace(new RegExp("\\\\b" + parsed.code + "\\\\b$"), "").trim() || parsed.code;
-          const key = `${parsed.edid}:${parsed.code}`;
-          if (seen.has(key)) continue;
+        const editionElement = link.closest(".edition");
+        const nameNode = editionElement?.querySelector<HTMLDivElement>(".edc-nm");
+        const name = nameNode?.innerText?.replace(/\s+/g, " ").trim() || "";
+        const key = `${year}:${parsed.edid}:${parsed.code}`;
+        if (seen.has(key)) continue;
+
           seen.add(key);
 
           result.push({
             edid: parsed.edid,
             code: parsed.code,
             name,
-            year: nearestYear(link),
-            searchUrl: new URL(href, window.location.href).toString()
+            year,
+            searchUrl: new URL(href, window.location.href).toString(),
           });
         }
+      }
 
-        return result;
-      });
-
-      return editions.sort((left, right) => {
+      return result.sort((left, right) => {
         const yearDiff = (right.year ?? 0) - (left.year ?? 0);
         if (yearDiff) return yearDiff;
+
         return left.name.localeCompare(right.name, "pt-BR");
       });
-    } finally {
-      await page.close().catch(() => undefined);
-    }
+    });
+
+    return editions.sort((left, right) => {
+      const yearDiff = (right.year ?? 0) - (left.year ?? 0);
+      if (yearDiff) return yearDiff;
+
+      return left.name.localeCompare(right.name, "pt-BR");
+    });
+  } finally {
+    await page.close().catch(() => undefined);
   }
+}
 
   async createJob(input: { editions: LigaEdition[]; delayMs?: number }): Promise<unknown> {
     if (this.runningJobId) {
@@ -249,6 +280,8 @@ export class LigaSyncService {
             }
           });
         } catch (err) {
+          console.error("[LigaSync] Erro ao sincronizar edição:", err);
+
           const blocked = err instanceof LigaSyncBlockedError;
           await this.prisma.ligaSyncJobEdition.update({
             where: { id: edition.id },
@@ -299,47 +332,65 @@ export class LigaSyncService {
     }
   }
 
-  private async syncEdition(edition: LigaEdition): Promise<SyncEditionResult> {
-    const page = await this.newPage();
-    try {
-      await page.goto(edition.searchUrl || buildEditionSearchUrl(edition), {
-        waitUntil: "domcontentloaded",
-        timeout: 60_000
-      });
-      await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => undefined);
-      await this.assertNotBlocked(page);
-      await scrollUntilStable(page);
-      await this.assertNotBlocked(page);
+ private async syncEdition(edition: LigaEdition): Promise<SyncEditionResult> {
+  console.log(`[LigaSync] Iniciando edição ${edition.name} (${edition.code})`);
 
-      const listings = await extractListings(page, edition);
-      let pricesUpdated = 0;
+  const page = await this.newPage();
+  try {
+    const url = edition.searchUrl || buildEditionSearchUrl(edition);
+    console.log(`[LigaSync] Acessando URL: ${url}`);
 
-      for (const listing of listings) {
-        if (!listing.printedTotal) {
-          continue;
-        }
+    await page.goto(url, {
+      waitUntil: "domcontentloaded",
+      timeout: 60_000
+    });
 
-        await this.priceService.upsertCurrentPrice({
-          number: listing.number,
-          printedTotal: listing.printedTotal,
-          name: listing.name,
-          setCode: edition.code,
-          setName: edition.name,
-          amountBrl: listing.amountBrl,
-          label: "LigaPokemon menor preco na listagem da edicao",
-          sourceUrl: listing.href
-        });
-        pricesUpdated += 1;
-      }
+    console.log(`[LigaSync] Página carregou DOM`);
 
-      return {
-        cardsFound: listings.length,
-        pricesUpdated
-      };
-    } finally {
-      await page.close().catch(() => undefined);
-    }
+    await page.waitForLoadState("networkidle", { timeout: 20_000 }).catch(() => {
+      console.log(`[LigaSync] Timeout no networkidle, seguindo mesmo assim`);
+    });
+
+    console.log(`[LigaSync] Verificando bloqueio`);
+    await this.assertNotBlocked(page);
+
+    console.log(`[LigaSync] Iniciando scroll`);
+    await scrollUntilStable(page);
+
+    console.log(`[LigaSync] Scroll finalizado, verificando bloqueio novamente`);
+    await this.assertNotBlocked(page);
+
+    console.log(`[LigaSync] Extraindo listagens`);
+    const listings = await extractListings(page, edition);
+
+    console.log(`[LigaSync] ${listings.length} cartas encontradas`);
+
+    const validListings = listings.filter(
+      (listing): listing is LigaCardListing & { printedTotal: number } => Boolean(listing.printedTotal)
+    );
+
+    const result = await this.priceService.upsertManyCurrentPrices(
+      validListings.map((listing) => ({
+        number: listing.number,
+        printedTotal: listing.printedTotal,
+        name: listing.name,
+        setCode: edition.code,
+        setName: edition.name,
+        amountBrl: listing.amountBrl,
+        label: "LigaPokemon menor preco na listagem da edicao",
+        sourceUrl: listing.href
+      }))
+    );
+
+    return {
+      cardsFound: listings.length,
+      pricesUpdated: result.total
+    };
+  } finally {
+    console.log(`[LigaSync] Fechando página da edição ${edition.name}`);
+    await page.close().catch(() => undefined);
   }
+}
 
   private async newPage(): Promise<Page> {
     const context = await this.getContext();
@@ -459,6 +510,10 @@ async function scrollUntilStable(page: Page) {
       height: document.documentElement.scrollHeight,
       cards: document.querySelectorAll("a.main-link-card").length
     }));
+
+    console.log(
+      `[LigaSync] Scroll tentativa ${attempt + 1}/80 | cards=${state.cards} | height=${state.height} | stable=${stableRounds}`
+    );
 
     if (state.height === previousHeight && state.cards === previousCards) {
       stableRounds += 1;
