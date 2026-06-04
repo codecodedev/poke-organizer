@@ -1,5 +1,5 @@
 import { FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
-import { ArrowLeft, FolderPlus, Layers3, Plus, Save, Search, Trash2 } from "lucide-react";
+import { ArrowLeft, Copy, Eye, FolderPlus, Layers3, Lock, Plus, Save, Search, Share2, Trash2 } from "lucide-react";
 import type { CollectionFolderDetail, CollectionFolderSort, CollectionFolderSummary, CollectionItem } from "@poke-organizer/shared";
 import { api, type Session } from "../../lib/api";
 import { withAuthRetry } from "../../lib/authRetry";
@@ -181,6 +181,63 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
     }
   }
 
+  async function updateFolderSharing(isPublic: boolean) {
+    if (!activeFolder) return;
+    setError(null);
+    setMessage(null);
+    try {
+      const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.updateCollectionFolderSharing(token, activeFolder.id, {
+          isPublic,
+          ensureToken: isPublic
+        })
+      );
+      setActiveFolder(detail);
+      setActiveName(detail.name);
+      setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
+      await refreshFolders();
+      setMessage(isPublic ? "Colecao publica." : "Colecao privada.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao atualizar compartilhamento");
+    }
+  }
+
+  async function copyShareLink() {
+    if (!activeFolder) return;
+    setError(null);
+    setMessage(null);
+
+    try {
+      const detail = activeFolder.shareToken
+        ? activeFolder
+        : await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+            api.updateCollectionFolderSharing(token, activeFolder.id, { ensureToken: true })
+          );
+
+      setActiveFolder(detail);
+      setActiveName(detail.name);
+      setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
+      await refreshFolders();
+
+      if (!detail.shareToken) {
+        throw new Error("Link publico nao foi gerado");
+      }
+
+      const url = publicCollectionUrl(detail.shareToken);
+      try {
+        if (!navigator.clipboard?.writeText) {
+          throw new Error("Clipboard unavailable");
+        }
+        await navigator.clipboard.writeText(url);
+        setMessage(detail.isPublic ? "Link copiado." : "Link copiado. A colecao ainda esta privada.");
+      } catch {
+        setMessage(detail.isPublic ? `Link gerado: ${url}` : `Link gerado: ${url}. A colecao ainda esta privada.`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao copiar link");
+    }
+  }
+
   async function refreshFolders() {
     const nextFolders = await withAuthRetry(session, onSession, onUnauthorized, (token) => api.listCollectionFolders(token));
     setFolders(nextFolders);
@@ -355,10 +412,14 @@ export function CollectionsPage({ session, onSession, onUnauthorized, collection
           pickerItems={pickerItems}
           pickerPage={pickerPage}
           selectedItemIds={selectedItemIds}
+          isPublic={activeFolder.isPublic}
+          shareUrl={activeFolder.shareToken ? publicCollectionUrl(activeFolder.shareToken) : null}
           onBack={backToList}
           onNameChange={setActiveName}
           onSave={() => void saveFolder()}
           onRemove={() => void removeFolder()}
+          onToggleSharing={(isPublic) => void updateFolderSharing(isPublic)}
+          onCopyShareLink={() => void copyShareLink()}
           onTypeFilter={setTypeFilter}
           onRarityFilter={setRarityFilter}
           onVariantFilter={setVariantFilter}
@@ -443,6 +504,14 @@ function CollectionsListScreen({
                   <span className="mt-5 block truncate text-xl font-black text-ink">{folder.name}</span>
                   <span className="mt-1 block text-sm font-semibold text-slate-500">
                     {folder.itemCount} cartas - {formatBrl(folder.totalValue)}
+                  </span>
+                  <span className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
+                    folder.isPublic
+                      ? "border-leaf/25 bg-leaf/10 text-emerald-800"
+                      : "border-line/70 bg-white/70 text-slate-500"
+                  }`}>
+                    {folder.isPublic ? <Eye size={14} /> : <Lock size={14} />}
+                    {folder.isPublic ? "Publica" : "Privada"}
                   </span>
                 </button>
               ))}
@@ -562,10 +631,14 @@ function CollectionDetailScreen({
   pickerItems,
   pickerPage,
   selectedItemIds,
+  isPublic,
+  shareUrl,
   onBack,
   onNameChange,
   onSave,
   onRemove,
+  onToggleSharing,
+  onCopyShareLink,
   onTypeFilter,
   onRarityFilter,
   onVariantFilter,
@@ -594,10 +667,14 @@ function CollectionDetailScreen({
   pickerItems: CollectionItem[];
   pickerPage: number;
   selectedItemIds: Set<string>;
+  isPublic: boolean;
+  shareUrl: string | null;
   onBack: () => void;
   onNameChange: (value: string) => void;
   onSave: () => void;
   onRemove: () => void;
+  onToggleSharing: (isPublic: boolean) => void;
+  onCopyShareLink: () => void;
   onTypeFilter: (value: string) => void;
   onRarityFilter: (value: string) => void;
   onVariantFilter: (value: string) => void;
@@ -644,6 +721,39 @@ function CollectionDetailScreen({
               placeholder="Nome da colecao"
             />
           </label>
+
+          <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-3">
+                <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
+                  isPublic
+                    ? "border-leaf/25 bg-leaf/10 text-emerald-800"
+                    : "border-line/70 bg-white/70 text-slate-500"
+                }`}>
+                  {isPublic ? <Eye size={14} /> : <Lock size={14} />}
+                  {isPublic ? "Publica" : "Privada"}
+                </span>
+                <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700">
+                  <span>Privada</span>
+                  <input
+                    type="checkbox"
+                    className="peer sr-only"
+                    checked={isPublic}
+                    onChange={(event) => onToggleSharing(event.target.checked)}
+                  />
+                  <span className="relative h-7 w-12 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition peer-checked:bg-leaf peer-checked:after:translate-x-5" />
+                  <span>Publica</span>
+                </label>
+              </div>
+              <p className="mt-3 truncate text-sm font-semibold text-slate-500">
+                {shareUrl ?? "Nenhum link gerado"}
+              </p>
+            </div>
+
+            <Button type="button" icon={shareUrl ? <Copy size={16} /> : <Share2 size={16} />} onClick={onCopyShareLink}>
+              {shareUrl ? "Copiar link" : "Gerar link"}
+            </Button>
+          </div>
 
           <div className="grid gap-3 rounded-[24px] border border-line/70 bg-field/45 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <FilterField label="Tipo">
@@ -876,6 +986,10 @@ function sortItems(items: CollectionItem[], sort: CollectionFolderSort): Collect
   if (sort === "value-asc") return [...items].sort((left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0));
   if (sort === "oldest") return [...items].sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt));
   return [...items].sort((left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt));
+}
+
+function publicCollectionUrl(shareToken: string): string {
+  return `${window.location.origin}/public/collections/${encodeURIComponent(shareToken)}`;
 }
 
 function InfoPill({ label, value }: { label: string; value: string }) {

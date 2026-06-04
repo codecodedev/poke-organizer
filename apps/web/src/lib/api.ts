@@ -9,10 +9,11 @@ import type {
   CollectionFolderSummary,
   CollectionItem,
   PriceEstimate,
+  PublicCollectionDetail,
   RecognitionCandidate
 } from "@poke-organizer/shared";
 
-const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
+const API_URL = import.meta.env.VITE_API_URL ?? "https://poke-organizer-api.onrender.com";
 
 export type Session = {
   user: { id: string; email: string; name?: string | null };
@@ -143,11 +144,29 @@ export const api = {
       body: JSON.stringify(payload)
     });
   },
+  updateCollectionFolderSharing(token: string, id: string, payload: { isPublic?: boolean; ensureToken?: boolean }) {
+    return request<CollectionFolderDetail>(`/collection/folders/${encodeURIComponent(id)}/sharing`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload)
+    });
+  },
   deleteCollectionFolder(token: string, id: string) {
     return request<{ ok: true }>(`/collection/folders/${encodeURIComponent(id)}`, {
       method: "DELETE",
       token
     });
+  },
+  getPublicCollection(
+    shareToken: string,
+    params: { type?: string; rarity?: string; variant?: string; sort?: CollectionFolderSort } = {}
+  ) {
+    const search = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) search.set(key, value);
+    });
+    const suffix = search.toString() ? `?${search.toString()}` : "";
+    return request<PublicCollectionDetail>(`/public/collections/${encodeURIComponent(shareToken)}${suffix}`);
   },
   recognitionCandidates(payload: { text: string; nameHint?: string; numberHint?: string }) {
     return request<RecognitionCandidate[]>("/recognition/candidates", {

@@ -9,7 +9,8 @@ import {
   CreateCollectionFolderDto,
   ListCollectionQueryDto,
   UpdateCollectionFolderDto,
-  UpdateCollectionItemDto
+  UpdateCollectionItemDto,
+  UpdateCollectionSharingDto
 } from "./dto";
 
 @ApiTags("collection")
@@ -49,6 +50,11 @@ export class CollectionController {
     return this.collection.updateFolder(user.id, id, dto);
   }
 
+  @Patch("folders/:id/sharing")
+  updateFolderSharing(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateCollectionSharingDto) {
+    return this.collection.updateFolderSharing(user.id, id, dto);
+  }
+
   @Delete("folders/:id")
   removeFolder(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.collection.removeFolder(user.id, id);
@@ -62,5 +68,16 @@ export class CollectionController {
   @Delete(":id")
   remove(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.collection.remove(user.id, id);
+  }
+}
+
+@ApiTags("public-collections")
+@Controller("public/collections")
+export class PublicCollectionController {
+  constructor(private readonly collection: CollectionService) {}
+
+  @Get(":shareToken")
+  getPublicCollection(@Param("shareToken") shareToken: string, @Query() query: CollectionFolderQueryDto) {
+    return this.collection.getPublicFolder(shareToken, query);
   }
 }

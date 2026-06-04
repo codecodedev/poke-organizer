@@ -1,11 +1,13 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { randomBytes } from "node:crypto";
 import {
   CollectionAddResult,
   CollectionFolderDetail,
   CollectionFolderSummary,
   CollectionItem,
   DEFAULT_CARD_VARIANT,
-  PriceEstimate
+  PriceEstimate,
+  PublicCollectionDetail
 } from "@poke-organizer/shared";
 import { Prisma } from "@prisma/client";
 import { CatalogService } from "../cards/catalog.service";
@@ -16,7 +18,8 @@ import {
   CollectionFolderQueryDto,
   CreateCollectionFolderDto,
   UpdateCollectionFolderDto,
-  UpdateCollectionItemDto
+  UpdateCollectionItemDto,
+  UpdateCollectionSharingDto
 } from "./dto";
 import type { CollectionFolderSort } from "./dto";
 
@@ -102,6 +105,46 @@ export class CollectionService {
     }
 
     return this.getFolder(userId, id);
+  }
+
+  async updateFolderSharing(userId: string, id: string, dto: UpdateCollectionSharingDto): Promise<CollectionFolderDetail> {
+    const folder = await this.prisma.collectionFolder.findFirst({ where: { id, userId } });
+    if (!folder) {
+      throw new NotFoundException("Collection not found");
+    }
+
+    const shouldEnsureToken = dto.ensureToken || dto.isPublic === true;
+    await this.prisma.collectionFolder.update({
+      where: { id },
+      data: {
+        isPublic: dto.isPublic,
+        shareToken: shouldEnsureToken && !folder.shareToken ? await this.createShareToken() : undefined
+      }
+    });
+
+    return this.getFolder(userId, id);
+  }
+
+  async getPublicFolder(shareToken: string, query: CollectionFolderQueryDto = {}): Promise<PublicCollectionDetail> {
+    const folder = await this.prisma.collectionFolder.findFirst({
+      where: { shareToken, isPublic: true },
+      include: {
+        items: {
+          where: this.publicFolderItemWhere(query),
+          include: { collectionItem: { include: { card: true, price: true } } },
+          orderBy: this.folderItemOrderBy(query.sort)
+        }
+      }
+    });
+
+    if (!folder) {
+      throw new NotFoundException("Public collection not found");
+    }
+
+    return {
+      ...(await this.mapFolderDetail(folder, query.sort)),
+      isPublic: true
+    };
   }
 
   async removeFolder(userId: string, id: string) {
@@ -255,6 +298,23 @@ export class CollectionService {
     };
   }
 
+  private publicFolderItemWhere(query: CollectionFolderQueryDto): Prisma.CollectionFolderItemWhereInput {
+    const cardFilter: Prisma.CardWhereInput = {};
+    if (query.type) {
+      cardFilter.types = { has: query.type };
+    }
+    if (query.rarity) {
+      cardFilter.rarity = query.rarity;
+    }
+
+    return {
+      collectionItem: {
+        variant: query.variant || undefined,
+        card: Object.keys(cardFilter).length ? cardFilter : undefined
+      }
+    };
+  }
+
   private folderItemOrderBy(sort?: CollectionFolderSort): Prisma.CollectionFolderItemOrderByWithRelationInput {
     if (sort === "oldest") {
       return { createdAt: "asc" };
@@ -308,6 +368,8 @@ export class CollectionService {
     return {
       id: folder.id,
       name: folder.name,
+      isPublic: folder.isPublic,
+      shareToken: folder.shareToken,
       itemCount: folder.items.length,
       totalValue,
       createdAt: folder.createdAt.toISOString(),
@@ -324,6 +386,8 @@ export class CollectionService {
     return {
       id: folder.id,
       name: folder.name,
+      isPublic: folder.isPublic,
+      shareToken: folder.shareToken,
       itemCount: folder.items.length,
       totalValue,
       items: sortedItems,
@@ -363,6 +427,18 @@ export class CollectionService {
     const raw = card.raw as { set?: { ptcgoCode?: string | null } } | null;
     const code = card.setCode ?? raw?.set?.ptcgoCode ?? null;
     return code ? code.trim().toUpperCase() : null;
+  }
+
+  private async createShareToken(): Promise<string> {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const token = randomBytes(18).toString("base64url");
+      const existing = await this.prisma.collectionFolder.findUnique({ where: { shareToken: token } });
+      if (!existing) {
+        return token;
+      }
+    }
+
+    throw new BadRequestException("Unable to create share link");
   }
 }
 

@@ -105,6 +105,20 @@ export class UpdateCollectionFolderDto {
   itemIds?: string[];
 }
 
+export class UpdateCollectionSharingDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  isPublic?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  ensureToken?: boolean;
+}
+
 export const COLLECTION_FOLDER_SORTS = ["value-desc", "value-asc", "newest", "oldest"] as const;
 export type CollectionFolderSort = (typeof COLLECTION_FOLDER_SORTS)[number];
 

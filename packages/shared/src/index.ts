@@ -85,6 +85,8 @@ export type CollectionFolderSort = "value-desc" | "value-asc" | "newest" | "olde
 export type CollectionFolderSummary = {
   id: string;
   name: string;
+  isPublic: boolean;
+  shareToken?: string | null;
   itemCount: number;
   totalValue: number;
   createdAt: string;
@@ -93,6 +95,10 @@ export type CollectionFolderSummary = {
 
 export type CollectionFolderDetail = CollectionFolderSummary & {
   items: CollectionItem[];
+};
+
+export type PublicCollectionDetail = CollectionFolderDetail & {
+  isPublic: true;
 };
 
 export type PriceLookupCard = {

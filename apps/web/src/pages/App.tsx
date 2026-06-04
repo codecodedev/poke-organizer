@@ -5,6 +5,7 @@ import { AudioRegistrationPanel } from "../components/AudioRegistrationPanel";
 import { CardSearch } from "../components/CardSearch";
 import { CollectionList } from "../components/CollectionList";
 import { CollectionsPage } from "../components/collections/CollectionsPage";
+import { PublicCollectionPage } from "../components/collections/PublicCollectionPage";
 import { api, type Session } from "../lib/api";
 import { clearSession, loadSession, saveSession } from "../lib/session";
 import { AuthPanel } from "../components/AuthPanel";
@@ -13,6 +14,7 @@ import { Button } from "../components/ui/Button";
 type View = "home" | "cards" | "collections";
 type AppRoute = {
   view: View;
+  publicCollection?: string | null;
   collection?: string | null;
   card?: string | null;
 };
@@ -53,6 +55,10 @@ export function App() {
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  if (route.publicCollection) {
+    return <PublicCollectionPage shareToken={route.publicCollection} />;
+  }
 
   if (!session) {
     return <AuthPanel onSession={handleSession} />;
@@ -290,18 +296,33 @@ function HeroPanel({
 }
 
 function parseRoute(): AppRoute {
+  const publicCollectionMatch = window.location.pathname.match(/^\/public\/collections\/([^/]+)\/?$/);
+  if (publicCollectionMatch) {
+    return {
+      view: "home",
+      publicCollection: decodeURIComponent(publicCollectionMatch[1]),
+      collection: null,
+      card: null
+    };
+  }
+
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
   const view: View = page === "cards" || page === "collections" ? page : "home";
 
   return {
     view,
+    publicCollection: null,
     collection: view === "collections" ? params.get("collection") : null,
     card: params.get("card")
   };
 }
 
 function routeToUrl(route: AppRoute): string {
+  if (route.publicCollection) {
+    return `/public/collections/${encodeURIComponent(route.publicCollection)}`;
+  }
+
   const params = new URLSearchParams();
 
   if (route.view !== "home") {

@@ -151,12 +151,15 @@ model CollectionFolder {
   id        String                 @id @default(cuid())
   userId    String
   name      String
+  isPublic  Boolean                @default(false)
+  shareToken String?               @unique
   createdAt DateTime               @default(now())
   updatedAt DateTime               @updatedAt
   user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   items     CollectionFolderItem[]
 
   @@index([userId])
+  @@index([shareToken])
   @@unique([userId, name])
   @@schema("public")
 }
