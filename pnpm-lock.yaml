@@ -115,6 +115,9 @@ importers:
       '@poke-organizer/shared':
         specifier: workspace:*
         version: link:../../packages/shared
+      '@vercel/speed-insights':
+        specifier: ^2.0.0
+        version: 2.0.0(react@18.3.1)
       '@vitejs/plugin-react':
         specifier: ^4.3.4
         version: 4.7.0(vite@6.4.3(@types/node@22.19.19)(jiti@1.21.7)(terser@5.48.0))
@@ -1023,6 +1026,32 @@ packages:
 
   '@types/validator@13.15.10':
     resolution: {integrity: sha512-T8L6i7wCuyoK8A/ZeLYt1+q0ty3Zb9+qbSSvrIVitzT3YjZqkTZ40IbRsPanlB4h1QB3JVL1SYCdR6ngtFYcuA==}
+
+  '@vercel/speed-insights@2.0.0':
+    resolution: {integrity: sha512-jwkNcrTeafWxjmWq4AHBaptSqZiJkYU5adLC9QBSqeim0GcqDMgN5Ievh8OG1rJ6W3A4l1oiP7qr9CWxGuzu3w==}
+    peerDependencies:
+      '@sveltejs/kit': ^1 || ^2
+      next: '>= 13'
+      nuxt: '>= 3'
+      react: ^18 || ^19 || ^19.0.0-rc
+      svelte: '>= 4'
+      vue: ^3
+      vue-router: ^4
+    peerDependenciesMeta:
+      '@sveltejs/kit':
+        optional: true
+      next:
+        optional: true
+      nuxt:
+        optional: true
+      react:
+        optional: true
+      svelte:
+        optional: true
+      vue:
+        optional: true
+      vue-router:
+        optional: true
 
   '@vitejs/plugin-react@4.7.0':
     resolution: {integrity: sha512-gUu9hwfWvvEDBBmgtAowQCojwZmJ5mcLn3aufeCsitijs3+f2NsrPtlAWIR6OPiqljl96GVCUbLe0HyqIpVaoA==}
@@ -3755,6 +3784,10 @@ snapshots:
       csstype: 3.2.3
 
   '@types/validator@13.15.10': {}
+
+  '@vercel/speed-insights@2.0.0(react@18.3.1)':
+    optionalDependencies:
+      react: 18.3.1
 
   '@vitejs/plugin-react@4.7.0(vite@6.4.3(@types/node@22.19.19)(jiti@1.21.7)(terser@5.48.0))':
     dependencies:

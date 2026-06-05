@@ -21,6 +21,7 @@ import { clearSession, loadSession, saveSession } from "../lib/session";
 import { AuthPanel } from "../components/AuthPanel";
 import { Button } from "../components/ui/Button";
 import { RequestFeedback } from "../components/ui/RequestFeedback";
+import { SpeedInsights } from "@vercel/speed-insights/react";
 
 type View = "home" | "cards" | "collections";
 type ThemeMode = "light" | "dark";
@@ -323,6 +324,7 @@ export function App() {
           )}
         </div>
       </main>
+      <SpeedInsights />
     </>
   );
 }

@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@poke-organizer/shared": "workspace:*",
+    "@vercel/speed-insights": "^2.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "lucide-react": "^0.468.0",
     "react": "^18.3.1",
