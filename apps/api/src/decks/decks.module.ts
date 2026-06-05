@@ -5,7 +5,7 @@ import { DecksService } from "./decks.service";
 import { JwtModule } from "@nestjs/jwt";
 
 @Module({
-  imports: [PrismaModule,JwtModule.register({})],
+  imports: [PrismaModule, JwtModule.register({})],
   controllers: [DecksController],
   providers: [DecksService]
 })

@@ -271,6 +271,29 @@ export type DeckSuggestion = {
   explanation: string;
 };
 
+export type DeckAiChangeAction = "add" | "remove" | "increase" | "decrease";
+
+export type DeckAiSuggestedChange = {
+  action: DeckAiChangeAction;
+  cardName: string;
+  cardId?: string | null;
+  quantity: number;
+  reason: string;
+  owned: boolean;
+};
+
+export type DeckAiAnalysis = {
+  model: string;
+  generatedAt: string;
+  summary: string;
+  strategy: string[];
+  strengths: string[];
+  weaknesses: string[];
+  improvements: string[];
+  suggestedChanges: DeckAiSuggestedChange[];
+  playTips: string[];
+};
+
 export function normalizeCardNumber(value: string): string {
   return value.trim().replace(/\s+/g, "").toUpperCase();
 }

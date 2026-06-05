@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadGatewayException, BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import {
   DeckCardSource as PrismaDeckCardSource,
   DeckFormat as PrismaDeckFormat,
@@ -7,6 +8,7 @@ import {
 } from "@prisma/client";
 import {
   DeckArchetypeSummary,
+  DeckAiAnalysis,
   DeckCard,
   DeckDetail,
   DeckFormat,
@@ -116,9 +118,53 @@ const CURATED_ARCHETYPES = [
   }
 ] as const;
 
+const deckAiAnalysisSchema = {
+  type: "object",
+  additionalProperties: false,
+  required: ["summary", "strategy", "strengths", "weaknesses", "improvements", "suggestedChanges", "playTips"],
+  properties: {
+    summary: { type: "string" },
+    strategy: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 5 },
+    strengths: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+    weaknesses: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
+    improvements: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 6 },
+    suggestedChanges: {
+      type: "array",
+      maxItems: 10,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["action", "cardName", "cardId", "quantity", "reason", "owned"],
+        properties: {
+          action: { type: "string", enum: ["add", "remove", "increase", "decrease"] },
+          cardName: { type: "string" },
+          cardId: { type: ["string", "null"] },
+          quantity: { type: "integer", minimum: 1, maximum: 4 },
+          reason: { type: "string" },
+          owned: { type: "boolean" }
+        }
+      }
+    },
+    playTips: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 }
+  }
+};
+
+type OpenAiResponsePayload = {
+  output_text?: string;
+  output?: Array<{
+    content?: Array<{
+      type?: string;
+      text?: string;
+    }>;
+  }>;
+};
+
 @Injectable()
 export class DecksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly config: ConfigService
+  ) {}
 
   async list(userId: string): Promise<DeckSummary[]> {
     const decks = await this.prisma.deck.findMany({
@@ -205,6 +251,92 @@ export class DecksService {
     });
 
     return { ...snapshot, id: saved.id, createdAt: saved.createdAt.toISOString() };
+  }
+
+  async analyzeWithAi(userId: string, id: string): Promise<DeckAiAnalysis> {
+    const apiKey = this.config.get<string>("OPENAI_API_KEY");
+    if (!apiKey) {
+      throw new ServiceUnavailableException("Configure OPENAI_API_KEY para usar a analise com IA.");
+    }
+
+    const deck = await this.findDeck(userId, id);
+    const validation = this.validateCards(deck.cards.map((entry) => ({
+      card: entry.card,
+      quantity: entry.quantity,
+      source: fromPrismaDeckCardSource(entry.source)
+    })), fromPrismaDeckFormat(deck.format));
+    const inventory = await this.loadInventory(userId);
+    const model = this.config.get<string>("OPENAI_MODEL") ?? "gpt-5.5";
+    const baseUrl = this.config.get<string>("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
+
+    const response = await fetch(`${baseUrl}/responses`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model,
+        reasoning: { effort: "medium" },
+        max_output_tokens: 2200,
+        input: [
+          {
+            role: "system",
+            content: [
+              {
+                type: "input_text",
+                text: [
+                  "Voce e um especialista em Pokemon TCG competitivo.",
+                  "Analise decks com rigor, mas nao invente cartas fora dos dados recebidos.",
+                  "Se sugerir carta que o usuario nao possui, marque owned=false e explique como carta faltante.",
+                  "A resposta deve ser em portugues do Brasil, objetiva e util para um jogador montar o deck."
+                ].join(" ")
+              }
+            ]
+          },
+          {
+            role: "user",
+            content: [{ type: "input_text", text: JSON.stringify(buildAiDeckContext(deck, validation, inventory)) }]
+          }
+        ],
+        text: {
+          format: {
+            type: "json_schema",
+            name: "deck_ai_analysis",
+            strict: true,
+            schema: deckAiAnalysisSchema
+          }
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const message = await response.text().catch(() => response.statusText);
+      throw new BadGatewayException(`A IA nao conseguiu analisar o deck agora. ${message.slice(0, 240)}`);
+    }
+
+    const payload = await response.json() as OpenAiResponsePayload;
+    const text = extractOpenAiText(payload);
+    if (!text) {
+      throw new BadGatewayException("A IA retornou uma resposta vazia.");
+    }
+
+    try {
+      const parsed = JSON.parse(text) as Omit<DeckAiAnalysis, "model" | "generatedAt">;
+      return {
+        model,
+        generatedAt: new Date().toISOString(),
+        summary: parsed.summary,
+        strategy: parsed.strategy,
+        strengths: parsed.strengths,
+        weaknesses: parsed.weaknesses,
+        improvements: parsed.improvements,
+        suggestedChanges: parsed.suggestedChanges,
+        playTips: parsed.playTips
+      };
+    } catch (err) {
+      throw new BadGatewayException(err instanceof Error ? `Falha ao interpretar resposta da IA: ${err.message}` : "Falha ao interpretar resposta da IA.");
+    }
   }
 
   async listArchetypes(): Promise<DeckArchetypeSummary[]> {
@@ -366,7 +498,7 @@ export class DecksService {
       }
     }
 
-    this.fillDeckFromInventory(selected, inventory, format, mode);
+    this.fillDeckFromInventory(selected, inventory, format);
     if (mode === "allow-missing" && totalSelectedCards(selected) < DECK_SIZE) {
       const remaining = DECK_SIZE - totalSelectedCards(selected);
       missingCards.push({ cardName: "Cartas de consistencia compativeis com o arquetipo", quantity: remaining, role: "filler" });
@@ -381,6 +513,12 @@ export class DecksService {
     const validation = this.validateCards(Array.from(selected.values()), format);
     const preferredBonus = preferredTypes.length && cards.some((item) => item.card.types.some((type) => preferredTypes.includes(type))) ? 5 : 0;
     const compatibility = Math.min(100, Math.round(((weightedOwned / Math.max(1, weightedTotal)) * 100) + preferredBonus));
+    const missingTotal = missingCards.reduce((sum, item) => sum + item.quantity, 0);
+    const explanation = mode === "owned-only" && validation.totalCards < DECK_SIZE
+      ? `Sugestao baseada em ${archetype.name}. Encontrei ${validation.totalCards} cartas validas no seu inventario para este formato, entao a lista ainda nao fecha 60 cartas.`
+      : missingTotal > 0
+        ? `Sugestao baseada em ${archetype.name}. A lista fecha ${validation.totalCards} cartas e marca ${missingTotal} carta(s) que ainda nao estao no seu inventario.`
+        : `Sugestao baseada em ${archetype.name}. A lista fecha ${validation.totalCards} cartas usando apenas cartas disponiveis no seu inventario.`;
 
     return {
       archetype: toArchetypeSummary(archetype),
@@ -390,24 +528,20 @@ export class DecksService {
       cards,
       missingCards,
       validation,
-      explanation:
-        missingCards.length > 0
-          ? `Sugestao baseada em ${archetype.name}. Voce tem parte da estrutura principal, mas ainda faltam ${missingCards.reduce((sum, item) => sum + item.quantity, 0)} cartas para completar a lista ideal.`
-          : `Sugestao baseada em ${archetype.name}. O deck usa apenas cartas disponiveis no seu inventario e foi validado contra as regras do formato.`
+      explanation
     };
   }
 
   private fillDeckFromInventory(
     selected: Map<string, { card: InventoryItem["card"]; quantity: number; source: "owned" | "missing"; role: string }>,
     inventory: InventoryItem[],
-    format: DeckFormat,
-    mode: DeckGenerationMode
+    format: DeckFormat
   ) {
-    if (mode !== "owned-only") return;
     const selectedByCard = new Map<string, number>();
     selected.forEach((item) => selectedByCard.set(item.card.id, item.quantity));
+    const sortedInventory = [...inventory].sort((a, b) => scoreFillerCard(b.card) - scoreFillerCard(a.card));
 
-    for (const item of inventory) {
+    for (const item of sortedInventory) {
       if (totalSelectedCards(selected) >= DECK_SIZE) return;
       if (format === "standard" && !isStandardLegal(item.card)) continue;
       const used = selectedByCard.get(item.cardId) ?? 0;
@@ -566,6 +700,76 @@ function toArchetypeSummary(archetype: { id: string; slug: string; name: string;
   };
 }
 
+function buildAiDeckContext(deck: DeckWithRelations, validation: DeckValidationSnapshot, inventory: InventoryItem[]) {
+  const inventoryByCardId = new Map<string, number>();
+  inventory.forEach((item) => inventoryByCardId.set(item.cardId, (inventoryByCardId.get(item.cardId) ?? 0) + item.quantity));
+  const inventoryCards = inventory.slice(0, 180).map((item) => ({
+    cardId: item.cardId,
+    name: item.card.name,
+    quantity: item.quantity,
+    number: item.card.number,
+    setName: item.card.setName,
+    supertype: item.card.supertype,
+    subtypes: item.card.subtypes,
+    types: item.card.types,
+    regulationMark: item.card.regulationMark,
+    abilities: item.card.abilities,
+    attacks: item.card.attacks,
+    rules: item.card.rules
+  }));
+
+  return {
+    instructions: [
+      "Explique a estrategia do deck atual.",
+      "Sugira melhorias concretas de lista, respeitando 60 cartas, limite de 4 copias por nome e cartas legais do formato.",
+      "Priorize cartas que o usuario possui. Para cartas fora do inventario, use owned=false.",
+      "Nao use cardId para cartas que nao aparecem no inventario ou no deck."
+    ],
+    rules: {
+      deckSize: DECK_SIZE,
+      maxCopiesByName: MAX_COPIES_BY_NAME,
+      standardLegalMarks: Array.from(STANDARD_LEGAL_MARKS),
+      format: fromPrismaDeckFormat(deck.format),
+      basicEnergyException: true
+    },
+    deck: {
+      id: deck.id,
+      name: deck.name,
+      format: fromPrismaDeckFormat(deck.format),
+      generationMode: fromPrismaGenerationMode(deck.generationMode),
+      archetype: deck.archetype?.name ?? null,
+      validation,
+      cards: deck.cards.map((entry) => ({
+        cardId: entry.cardId,
+        name: entry.card.name,
+        quantity: entry.quantity,
+        source: fromPrismaDeckCardSource(entry.source),
+        ownedQuantity: inventoryByCardId.get(entry.cardId) ?? 0,
+        number: entry.card.number,
+        setName: entry.card.setName,
+        supertype: entry.card.supertype,
+        subtypes: entry.card.subtypes,
+        types: entry.card.types,
+        regulationMark: entry.card.regulationMark,
+        abilities: entry.card.abilities,
+        attacks: entry.card.attacks,
+        rules: entry.card.rules
+      }))
+    },
+    inventory: inventoryCards
+  };
+}
+
+function extractOpenAiText(payload: OpenAiResponsePayload): string | null {
+  if (payload.output_text) return payload.output_text;
+  for (const output of payload.output ?? []) {
+    for (const content of output.content ?? []) {
+      if (typeof content.text === "string") return content.text;
+    }
+  }
+  return null;
+}
+
 function addSelected(
   selected: Map<string, { card: InventoryItem["card"]; quantity: number; source: "owned" | "missing"; role: string }>,
   card: InventoryItem["card"],
@@ -592,6 +796,24 @@ function totalSelectedByName(selected: Map<string, { card: InventoryItem["card"]
   return Array.from(selected.values())
     .filter((item) => normalizeSearchText(item.card.name) === normalized)
     .reduce((sum, item) => sum + item.quantity, 0);
+}
+
+function scoreFillerCard(card: InventoryItem["card"]): number {
+  const supertype = card.supertype?.toLowerCase() ?? "";
+  const subtypes = card.subtypes.map((subtype) => subtype.toLowerCase());
+  const name = normalizeSearchText(card.name);
+  let score = 0;
+
+  if (supertype === "trainer") score += 40;
+  if (supertype === "energy") score += 25;
+  if (supertype === "pokémon" || supertype === "pokemon") score += 10;
+  if (subtypes.includes("basic")) score += 8;
+  if (subtypes.includes("item")) score += 10;
+  if (subtypes.includes("supporter")) score += 8;
+  if (name.includes("ball")) score += 6;
+  if (name.includes("energy")) score += 4;
+
+  return score;
 }
 
 function isBasicEnergy(card: InventoryItem["card"]): boolean {

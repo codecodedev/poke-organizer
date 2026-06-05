@@ -47,6 +47,11 @@ export class DecksController {
     return this.decks.validate(user.id, id);
   }
 
+  @Post("decks/:id/ai-analysis")
+  analyzeWithAi(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.decks.analyzeWithAi(user.id, id);
+  }
+
   @Get("deck-archetypes")
   listArchetypes() {
     return this.decks.listArchetypes();

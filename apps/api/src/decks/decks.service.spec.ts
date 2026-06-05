@@ -3,7 +3,7 @@ import type { DeckValidationIssue } from "@poke-organizer/shared";
 import { DecksService } from "./decks.service";
 
 describe("DecksService rules", () => {
-  const service = new DecksService({} as never);
+  const service = new DecksService({} as never, {} as never);
 
   it("requires exactly 60 cards", () => {
     const card = makeCard({ name: "Pikachu ex" });
@@ -64,6 +64,24 @@ describe("DecksService rules", () => {
     );
 
     expect(suggestion.cards.find((item: { card: { id: string }; quantity: number }) => item.card.id === card.id)?.quantity).toBe(1);
+  });
+
+  it("fills owned-only suggestions to 60 cards when inventory has enough cards", () => {
+    const archetypeCard = makeCard({ id: "charizard", name: "Charizard ex" });
+    const energy = makeCard({ id: "fire-energy", name: "Fire Energy", supertype: "Energy", subtypes: ["Basic"] });
+    const suggestion = (service as never as { buildSuggestion: Function }).buildSuggestion(
+      makeArchetype("Charizard ex", 3, archetypeCard),
+      [
+        { id: "item-1", userId: "u", cardId: archetypeCard.id, quantity: 3, condition: "NM", variant: "normal", foil: false, language: "EN", notes: null, cardPriceId: null, createdAt: new Date(), updatedAt: new Date(), card: archetypeCard },
+        { id: "item-2", userId: "u", cardId: energy.id, quantity: 57, condition: "NM", variant: "normal", foil: false, language: "EN", notes: null, cardPriceId: null, createdAt: new Date(), updatedAt: new Date(), card: energy },
+      ],
+      "standard",
+      "owned-only",
+      [],
+    );
+
+    expect(suggestion.validation.totalCards).toBe(60);
+    expect(suggestion.cards.every((item: { source: string }) => item.source === "owned")).toBe(true);
   });
 
   it("lists missing cards in allow-missing suggestions", () => {

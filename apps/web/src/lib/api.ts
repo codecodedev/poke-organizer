@@ -9,6 +9,7 @@ import type {
   CollectionFolderSummary,
   CollectionItem,
   DeckArchetypeSummary,
+  DeckAiAnalysis,
   DeckDetail,
   DeckFormat,
   DeckGenerationMode,
@@ -378,6 +379,15 @@ export const api = {
   validateDeck(token: string, id: string) {
     return request<DeckValidationSnapshot>(
       `/decks/${encodeURIComponent(id)}/validate`,
+      {
+        method: "POST",
+        token,
+      },
+    );
+  },
+  analyzeDeckWithAi(token: string, id: string) {
+    return request<DeckAiAnalysis>(
+      `/decks/${encodeURIComponent(id)}/ai-analysis`,
       {
         method: "POST",
         token,

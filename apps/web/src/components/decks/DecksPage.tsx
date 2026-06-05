@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ArrowLeft,
   Bot,
   CheckCircle2,
   Plus,
@@ -13,6 +14,7 @@ import {
 } from "lucide-react";
 import {
   type CollectionItem,
+  type DeckAiAnalysis,
   type DeckCard,
   type DeckDetail,
   type DeckFormat,
@@ -46,6 +48,8 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
   const [inventory, setInventory] = useState<CollectionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<DeckAiAnalysis | null>(null);
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [showGenerator, setShowGenerator] = useState(false);
@@ -109,12 +113,14 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
   }, [inventory, query, typeFilter]);
 
   const totalCards = draftCards.reduce((sum, item) => sum + item.quantity, 0);
+  const cardsToComplete = Math.max(0, 60 - totalCards);
   const missingCards = draftCards
     .filter((item) => item.source === "missing")
     .reduce((sum, item) => sum + item.quantity, 0);
 
   function selectDeck(deck: DeckDetail) {
     setSelectedDeck(deck);
+    setAiAnalysis(null);
     setDraftCards(
       deck.cards.map((item) => ({
         card: item.card,
@@ -148,7 +154,7 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
   }
 
   async function saveDeck() {
-    if (!selectedDeck) return;
+    if (!selectedDeck) return null;
     setSaving(true);
     try {
       const saved = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
@@ -168,6 +174,7 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
         current.map((deck) => (deck.id === saved.id ? saved : deck)),
       );
       selectDeck(saved);
+      return saved;
     } finally {
       setSaving(false);
     }
@@ -183,6 +190,21 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
       (token) => api.validateDeck(token, selectedDeck.id),
     );
     setSelectedDeck((current) => (current ? { ...current, validation } : current));
+  }
+
+  async function analyzeWithAi() {
+    if (!selectedDeck) return;
+    setAiLoading(true);
+    try {
+      const saved = await saveDeck();
+      const deckId = saved?.id ?? selectedDeck.id;
+      const analysis = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.analyzeDeckWithAi(token, deckId),
+      );
+      setAiAnalysis(analysis);
+    } finally {
+      setAiLoading(false);
+    }
   }
 
   function addInventoryCard(item: CollectionItem) {
@@ -241,70 +263,72 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
 
   return (
     <>
-      <Panel
-        title="Decks de batalha"
-        description="Monte decks de 60 cartas, valide regras e gere sugestoes com base no seu inventario."
-        action={
-          <div className="ml-auto flex flex-wrap gap-2">
-            <Button type="button" icon={<Bot size={16} />} onClick={() => setShowGenerator(true)}>
-              Gerar deck
-            </Button>
-            <Button type="button" icon={<Plus size={16} />} onClick={() => void createDeck()}>
-              Criar deck
-            </Button>
-            <Button type="button" icon={<RefreshCw size={16} />} onClick={() => void load()}>
-              Recarregar
-            </Button>
-          </div>
-        }
-      >
-        {loading && <p className="section-copy">Carregando decks...</p>}
+      {!selectedDeck && (
+        <Panel
+          title="Decks de batalha"
+          description="Monte decks de 60 cartas, valide regras e gere sugestoes com base no seu inventario."
+          action={
+            <div className="ml-auto flex flex-wrap gap-2">
+              <Button type="button" icon={<Bot size={16} />} onClick={() => setShowGenerator(true)}>
+                Gerar deck
+              </Button>
+              <Button type="button" icon={<Plus size={16} />} onClick={() => void createDeck()}>
+                Criar deck
+              </Button>
+              <Button type="button" icon={<RefreshCw size={16} />} onClick={() => void load()}>
+                Recarregar
+              </Button>
+            </div>
+          }
+        >
+          {loading && <p className="section-copy">Carregando decks...</p>}
 
-        {!loading && decks.length === 0 && (
-          <p className="warning-note">
-            Voce ainda nao tem decks. Crie um deck manual ou gere uma sugestao automaticamente.
-          </p>
-        )}
+          {!loading && decks.length === 0 && (
+            <p className="warning-note">
+              Voce ainda nao tem decks. Crie um deck manual ou gere uma sugestao automaticamente.
+            </p>
+          )}
 
-        {decks.length > 0 && (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {decks.map((deck) => (
-              <article
-                key={deck.id}
-                className={`soft-card cursor-pointer p-4 ${selectedDeck?.id === deck.id ? "border-brand/50" : ""}`}
-                onClick={() => selectDeck(deck)}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-lg font-black text-ink">{deck.name}</h3>
-                    <p className="section-copy">
-                      {formatDeckFormat(deck.format)} - {deck.totalCards}/60 cartas
-                    </p>
+          {decks.length > 0 && (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {decks.map((deck) => (
+                <article
+                  key={deck.id}
+                  className="soft-card cursor-pointer p-4"
+                  onClick={() => selectDeck(deck)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-lg font-black text-ink">{deck.name}</h3>
+                      <p className="section-copy">
+                        {formatDeckFormat(deck.format)} - {deck.totalCards}/60 cartas
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className="grid h-9 w-9 place-items-center rounded-2xl border border-line bg-white/80 text-slate-600"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void deleteDeck(deck);
+                      }}
+                      aria-label="Excluir deck"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
-                  <button
-                    type="button"
-                    className="grid h-9 w-9 place-items-center rounded-2xl border border-line bg-white/80 text-slate-600"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      void deleteDeck(deck);
-                    }}
-                    aria-label="Excluir deck"
-                  >
-                    <Trash2 size={16} />
-                  </button>
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <StatusChip valid={deck.validationStatus === "valid"} />
-                  {deck.missingCards > 0 && (
-                    <span className="chip">{deck.missingCards} faltantes</span>
-                  )}
-                  {deck.archetypeName && <span className="chip">{deck.archetypeName}</span>}
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </Panel>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <StatusChip valid={deck.validationStatus === "valid"} />
+                    {deck.missingCards > 0 && (
+                      <span className="chip">{deck.missingCards} fora do inventario</span>
+                    )}
+                    {deck.archetypeName && <span className="chip">{deck.archetypeName}</span>}
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </Panel>
+      )}
 
       {selectedDeck && (
         <Panel
@@ -312,8 +336,21 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
           description="Edite cartas do deck e valide contra as regras do formato."
           action={
             <div className="ml-auto flex flex-wrap gap-2">
+              <Button
+                type="button"
+                icon={<ArrowLeft size={16} />}
+                onClick={() => {
+                  setSelectedDeck(null);
+                  setDraftCards([]);
+                }}
+              >
+                Voltar para decks
+              </Button>
               <Button type="button" icon={<CheckCircle2 size={16} />} onClick={() => void validateDeck()}>
                 Validar
+              </Button>
+              <Button type="button" icon={<Bot size={16} />} disabled={aiLoading || saving} onClick={() => void analyzeWithAi()}>
+                {aiLoading ? "Analisando" : "Analisar com IA"}
               </Button>
               <Button type="button" variant="primary" icon={<Save size={16} />} disabled={saving} onClick={() => void saveDeck()}>
                 {saving ? "Salvando" : "Salvar deck"}
@@ -368,13 +405,15 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
                 </label>
               </div>
 
-              <div className="grid gap-3 rounded-[22px] border border-line/70 bg-field/45 p-4 sm:grid-cols-3">
+              <div className="grid gap-3 rounded-[22px] border border-line/70 bg-field/45 p-4 sm:grid-cols-4">
                 <Stat label="Cartas" value={`${totalCards}/60`} />
-                <Stat label="Faltantes" value={String(missingCards)} />
+                <Stat label="Para 60" value={String(cardsToComplete)} />
+                <Stat label="Fora inventario" value={String(missingCards)} />
                 <Stat label="Status" value={selectedDeck.validation?.isValid ? "Valido" : "Pendente"} />
               </div>
 
               <DeckValidationPanel deck={selectedDeck} />
+              {aiAnalysis && <DeckAiAnalysisPanel analysis={aiAnalysis} />}
 
               <div className="grid gap-2">
                 {draftCards.length === 0 && (
@@ -527,42 +566,61 @@ function DeckGeneratorModal({
         )}
 
         <div className="grid gap-3">
-          {suggestions.map((suggestion) => (
-            <article key={suggestion.archetype.id} className="soft-card p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-xl font-black text-ink">{suggestion.archetype.name}</h3>
-                  <p className="section-copy">{suggestion.explanation}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <span className="chip">{suggestion.compatibility}% compatibilidade</span>
-                  <span className="chip">{suggestion.validation.totalCards}/60 cartas</span>
-                  {suggestion.missingCards.length > 0 && <span className="chip">{suggestion.missingCards.reduce((sum, item) => sum + item.quantity, 0)} faltantes</span>}
-                </div>
-              </div>
+          {suggestions.map((suggestion) => {
+            const suggestionCards = mergeSuggestionCards(suggestion);
+            const totalSuggestionCards = suggestionCards.reduce((sum, item) => sum + item.quantity, 0);
+            const missingSuggestionCards = suggestionCards
+              .filter((item) => item.source === "missing")
+              .reduce((sum, item) => sum + item.quantity, 0);
 
-              {suggestion.missingCards.length > 0 && (
-                <div className="warning-note mt-3">
-                  Faltam: {suggestion.missingCards.map((item) => `${item.quantity}x ${item.cardName}`).join(", ")}
-                </div>
-              )}
-
-              <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                {mergeSuggestionCards(suggestion).slice(0, 12).map((item) => (
-                  <div key={`${item.card.id}-${item.source}`} className="rounded-2xl border border-line/70 bg-white/70 px-3 py-2">
-                    <p className="truncate text-sm font-black text-ink">{item.quantity}x {item.card.name}</p>
-                    <p className="section-copy truncate">{item.source === "missing" ? "Faltante" : "Inventario"}</p>
+            return (
+              <article key={suggestion.archetype.id} className="soft-card p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <h3 className="text-xl font-black text-ink">{suggestion.archetype.name}</h3>
+                    <p className="section-copy">{suggestion.explanation}</p>
                   </div>
-                ))}
-              </div>
+                  <div className="flex flex-wrap gap-2">
+                    <span className="chip">{suggestion.compatibility}% compatibilidade</span>
+                    <span className="chip">{totalSuggestionCards}/60 cartas para salvar</span>
+                    {missingSuggestionCards > 0 && <span className="chip">{missingSuggestionCards} fora do inventario</span>}
+                  </div>
+                </div>
 
-              <div className="mt-4">
-                <Button type="button" variant="primary" icon={<Save size={16} />} onClick={() => void onSaveSuggestion(suggestion)}>
-                  Salvar como deck
-                </Button>
-              </div>
-            </article>
-          ))}
+                {suggestion.missingCards.length > 0 && (
+                  <div className="warning-note mt-3">
+                    Fora do inventario: {suggestion.missingCards.map((item) => `${item.quantity}x ${item.cardName}`).join(", ")}
+                  </div>
+                )}
+
+                <div className="mt-3 max-h-[440px] overflow-auto rounded-[22px] border border-line/70 p-3">
+                  <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                    {suggestionCards.map((item) => (
+                      <div key={`${item.card.id}-${item.source}`} className="grid grid-cols-[44px_minmax(0,1fr)] gap-2 rounded-2xl border border-line/70 bg-field/55 p-2">
+                        {item.card.imageSmall ? (
+                          <img src={item.card.imageSmall} alt={item.card.name} className="h-14 w-10 rounded-lg object-cover" />
+                        ) : (
+                          <div className="h-14 w-10 rounded-lg bg-slate-200" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-black text-ink">{item.quantity}x {item.card.name}</p>
+                          <p className="section-copy truncate text-xs">
+                            {item.source === "missing" ? "Fora do inventario" : "Inventario"}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-4">
+                  <Button type="button" variant="primary" icon={<Save size={16} />} onClick={() => void onSaveSuggestion(suggestion)}>
+                    Salvar {totalSuggestionCards} cartas como deck
+                  </Button>
+                </div>
+              </article>
+            );
+          })}
         </div>
       </div>
     </Modal>
@@ -593,6 +651,74 @@ function DeckValidationPanel({ deck }: { deck: DeckDetail }) {
       ))}
     </div>
   );
+}
+
+function DeckAiAnalysisPanel({ analysis }: { analysis: DeckAiAnalysis }) {
+  return (
+    <section className="soft-card grid gap-4 p-4">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Analise com IA</p>
+        <h3 className="mt-1 text-xl font-black text-ink">Estrategia e melhorias</h3>
+        <p className="section-copy mt-1">{analysis.summary}</p>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <AiList title="Plano de jogo" items={analysis.strategy} />
+        <AiList title="Dicas de partida" items={analysis.playTips} />
+        <AiList title="Pontos fortes" items={analysis.strengths} />
+        <AiList title="Pontos fracos" items={analysis.weaknesses} />
+      </div>
+
+      <AiList title="Melhorias recomendadas" items={analysis.improvements} />
+
+      {analysis.suggestedChanges.length > 0 && (
+        <div>
+          <h4 className="font-black text-ink">Ajustes de lista</h4>
+          <div className="mt-2 grid gap-2">
+            {analysis.suggestedChanges.map((change, index) => (
+              <div key={`${change.cardName}-${change.action}-${index}`} className="rounded-2xl border border-line/70 bg-field/55 p-3">
+                <p className="font-black text-ink">
+                  {formatAiAction(change.action)} {change.quantity}x {change.cardName}
+                  {!change.owned && <span className="ml-2 chip">fora do inventario</span>}
+                </p>
+                <p className="section-copy mt-1">{change.reason}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <p className="section-copy text-xs">
+        Gerado por {analysis.model} em {new Date(analysis.generatedAt).toLocaleString("pt-BR")}. Revise antes de aplicar.
+      </p>
+    </section>
+  );
+}
+
+function AiList({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <h4 className="font-black text-ink">{title}</h4>
+      <ul className="mt-2 grid gap-2">
+        {items.map((item, index) => (
+          <li key={`${title}-${index}`} className="section-copy rounded-2xl border border-line/60 bg-field/45 px-3 py-2">
+            {item}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function formatAiAction(action: DeckAiAnalysis["suggestedChanges"][number]["action"]) {
+  const labels = {
+    add: "Adicionar",
+    remove: "Remover",
+    increase: "Aumentar",
+    decrease: "Reduzir",
+  } satisfies Record<DeckAiAnalysis["suggestedChanges"][number]["action"], string>;
+
+  return labels[action];
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
