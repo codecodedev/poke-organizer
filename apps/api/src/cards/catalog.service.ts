@@ -20,12 +20,18 @@ type PokemonTcgCard = {
   id: string;
   name: string;
   number: string;
+  supertype?: string;
   rarity?: string;
   artist?: string;
+  rules?: string[];
+  abilities?: Array<{ name: string; text?: string; type?: string }>;
+  attacks?: Array<{ name: string; cost?: string[]; convertedEnergyCost?: number; damage?: string; text?: string }>;
   subtypes?: string[];
   nationalPokedexNumbers?: number[];
   types?: string[];
   regulationMark?: string;
+  retreatCost?: string[];
+  convertedRetreatCost?: number;
   set?: { id?: string; ptcgoCode?: string; name?: string; printedTotal?: number; total?: number; releaseDate?: string };
   images?: { small?: string; large?: string };
   tcgplayer?: { url?: string; updatedAt?: string; prices?: Record<string, { market?: number; mid?: number; low?: number }> };
@@ -287,8 +293,15 @@ export class CatalogService {
         artist: card.artist ?? null,
         releaseDate: card.set?.releaseDate ?? null,
         nationalPokedexNumbers: card.nationalPokedexNumbers ?? [],
+        supertype: card.supertype ?? null,
+        subtypes: card.subtypes ?? [],
         types: card.types ?? [],
         regulationMark: card.regulationMark ?? null,
+        rules: card.rules ?? [],
+        abilities: card.abilities ? this.toJson(card.abilities) : Prisma.JsonNull,
+        attacks: card.attacks ? this.toJson(card.attacks) : Prisma.JsonNull,
+        retreatCost: card.retreatCost ?? [],
+        convertedRetreatCost: card.convertedRetreatCost ?? null,
         variants: this.extractPokemonTcgVariants(card),
         language: toPrismaLanguage("en"),
         imageSmall: card.images?.small ?? null,
@@ -308,8 +321,15 @@ export class CatalogService {
         artist: card.artist ?? null,
         releaseDate: card.set?.releaseDate ?? null,
         nationalPokedexNumbers: card.nationalPokedexNumbers ?? [],
+        supertype: card.supertype ?? null,
+        subtypes: card.subtypes ?? [],
         types: card.types ?? [],
         regulationMark: card.regulationMark ?? null,
+        rules: card.rules ?? [],
+        abilities: card.abilities ? this.toJson(card.abilities) : Prisma.JsonNull,
+        attacks: card.attacks ? this.toJson(card.attacks) : Prisma.JsonNull,
+        retreatCost: card.retreatCost ?? [],
+        convertedRetreatCost: card.convertedRetreatCost ?? null,
         variants: this.extractPokemonTcgVariants(card),
         imageSmall: card.images?.small ?? null,
         imageLarge: card.images?.large ?? null,
@@ -333,7 +353,14 @@ export class CatalogService {
         printedTotal: null,
         setTotal: null,
         nationalPokedexNumbers: [],
+        supertype: null,
+        subtypes: [],
         types: [],
+        rules: [],
+        abilities: Prisma.JsonNull,
+        attacks: Prisma.JsonNull,
+        retreatCost: [],
+        convertedRetreatCost: null,
         variants: [DEFAULT_CARD_VARIANT],
         language: toPrismaLanguage(mappedLanguage),
         imageSmall: card.image ? `${card.image}/low.webp` : null,
@@ -347,7 +374,14 @@ export class CatalogService {
         printedTotal: null,
         setTotal: null,
         nationalPokedexNumbers: [],
+        supertype: null,
+        subtypes: [],
         types: [],
+        rules: [],
+        abilities: Prisma.JsonNull,
+        attacks: Prisma.JsonNull,
+        retreatCost: [],
+        convertedRetreatCost: null,
         variants: [DEFAULT_CARD_VARIANT],
         language: toPrismaLanguage(mappedLanguage),
         imageSmall: card.image ? `${card.image}/low.webp` : null,

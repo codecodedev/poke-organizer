@@ -38,6 +38,27 @@ enum PriceSource {
   @@schema("public")
 }
 
+enum DeckFormat {
+  STANDARD
+  CASUAL
+
+  @@schema("public")
+}
+
+enum DeckGenerationMode {
+  OWNED_ONLY
+  ALLOW_MISSING
+
+  @@schema("public")
+}
+
+enum DeckCardSource {
+  OWNED
+  MISSING
+
+  @@schema("public")
+}
+
 enum PriceProvider {
   LIGAPOKEMON
   MYPCARDS
@@ -54,6 +75,7 @@ model User {
   refreshTokens RefreshToken[]
   collection   CollectionItem[]
   folders      CollectionFolder[]
+  decks        Deck[]
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -102,8 +124,15 @@ model Card {
   artist       String?
   releaseDate  String?
   nationalPokedexNumbers Int[] @default([])
+  supertype    String?
+  subtypes     String[]         @default([])
   types        String[]         @default([])
   regulationMark String?
+  rules        String[]         @default([])
+  abilities    Json?
+  attacks      Json?
+  retreatCost  String[]         @default([])
+  convertedRetreatCost Int?
   variants     String[]         @default([])
   language     CardLanguage     @default(UNKNOWN)
   imageSmall   String?
@@ -111,6 +140,8 @@ model Card {
   raw          Json?
   prices       PriceSnapshot[]
   collection   CollectionItem[]
+  deckCards    DeckCard[]
+  archetypeCards DeckArchetypeCard[]
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
 
@@ -174,6 +205,106 @@ model CollectionFolderItem {
 
   @@index([collectionItemId])
   @@unique([folderId, collectionItemId])
+  @@schema("public")
+}
+
+model Deck {
+  id               String               @id @default(cuid())
+  userId           String
+  name             String
+  format           DeckFormat           @default(STANDARD)
+  generationMode   DeckGenerationMode   @default(OWNED_ONLY)
+  archetypeId      String?
+  validationStatus String               @default("unchecked")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  user             User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  archetype        DeckArchetype?       @relation(fields: [archetypeId], references: [id], onDelete: SetNull)
+  cards            DeckCard[]
+  validations      DeckValidationResult[]
+
+  @@index([userId])
+  @@index([archetypeId])
+  @@schema("public")
+}
+
+model DeckCard {
+  id        String         @id @default(cuid())
+  deckId    String
+  cardId    String
+  quantity  Int
+  source    DeckCardSource @default(OWNED)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+  deck      Deck           @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  card      Card           @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@unique([deckId, cardId, source])
+  @@index([cardId])
+  @@schema("public")
+}
+
+model DeckValidationResult {
+  id         String   @id @default(cuid())
+  deckId     String
+  isValid    Boolean
+  totalCards Int
+  issues     Json
+  createdAt  DateTime @default(now())
+  deck       Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+
+  @@index([deckId, createdAt])
+  @@schema("public")
+}
+
+model DeckArchetype {
+  id          String              @id @default(cuid())
+  slug        String              @unique
+  name        String
+  format      DeckFormat          @default(STANDARD)
+  strategy    String?
+  source      String              @default("curated")
+  sourceUrl   String?
+  confidence  Int                 @default(0)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  cards       DeckArchetypeCard[]
+  decks       Deck[]
+
+  @@index([format])
+  @@index([source])
+  @@schema("public")
+}
+
+model DeckArchetypeCard {
+  id          String        @id @default(cuid())
+  archetypeId String
+  cardId      String?
+  cardName    String
+  quantity    Int
+  role        String
+  required    Boolean       @default(false)
+  priority    Int           @default(0)
+  archetype   DeckArchetype @relation(fields: [archetypeId], references: [id], onDelete: Cascade)
+  card        Card?         @relation(fields: [cardId], references: [id], onDelete: SetNull)
+
+  @@index([archetypeId])
+  @@index([cardId])
+  @@index([cardName])
+  @@schema("public")
+}
+
+model MetagameSyncJob {
+  id              String    @id @default(cuid())
+  source          String
+  status          String
+  message         String?
+  totalArchetypes Int       @default(0)
+  createdAt       DateTime  @default(now())
+  finishedAt      DateTime?
+
+  @@index([source, createdAt])
+  @@index([status])
   @@schema("public")
 }
 

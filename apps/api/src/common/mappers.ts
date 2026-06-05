@@ -33,8 +33,15 @@ export function toCardSummary(card: {
   artist: string | null;
   releaseDate: string | null;
   nationalPokedexNumbers: number[];
+  supertype: string | null;
+  subtypes: string[];
   types: string[];
   regulationMark: string | null;
+  rules: string[];
+  abilities: unknown;
+  attacks: unknown;
+  retreatCost: string[];
+  convertedRetreatCost: number | null;
   variants: string[];
   language: PrismaCardLanguage;
   imageSmall: string | null;
@@ -54,8 +61,15 @@ export function toCardSummary(card: {
     artist: card.artist,
     releaseDate: card.releaseDate,
     nationalPokedexNumbers: card.nationalPokedexNumbers,
+    supertype: card.supertype,
+    subtypes: card.subtypes,
     types: card.types,
     regulationMark: card.regulationMark,
+    rules: card.rules,
+    abilities: Array.isArray(card.abilities) ? card.abilities as CardSummary["abilities"] : null,
+    attacks: Array.isArray(card.attacks) ? card.attacks as CardSummary["attacks"] : null,
+    retreatCost: card.retreatCost,
+    convertedRetreatCost: card.convertedRetreatCost,
     variants: card.variants,
     language: fromPrismaLanguage(card.language),
     imageSmall: card.imageSmall,

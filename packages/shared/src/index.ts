@@ -33,12 +33,33 @@ export type CardSummary = {
   artist?: string | null;
   releaseDate?: string | null;
   nationalPokedexNumbers: number[];
+  supertype?: string | null;
+  subtypes: string[];
   types: string[];
   regulationMark?: string | null;
+  rules: string[];
+  abilities?: CardAbility[] | null;
+  attacks?: CardAttack[] | null;
+  retreatCost: string[];
+  convertedRetreatCost?: number | null;
   variants: string[];
   language: CardLanguage;
   imageSmall?: string | null;
   imageLarge?: string | null;
+};
+
+export type CardAbility = {
+  name: string;
+  text?: string;
+  type?: string;
+};
+
+export type CardAttack = {
+  name: string;
+  cost?: string[];
+  convertedEnergyCost?: number;
+  damage?: string;
+  text?: string;
 };
 
 export type CardSetSummary = {
@@ -161,6 +182,93 @@ export type RecognitionCandidate = {
   card: CardSummary;
   score: number;
   reason: string;
+};
+
+export const DECK_FORMATS = ["standard", "casual"] as const;
+export type DeckFormat = (typeof DECK_FORMATS)[number];
+
+export const DECK_GENERATION_MODES = ["owned-only", "allow-missing"] as const;
+export type DeckGenerationMode = (typeof DECK_GENERATION_MODES)[number];
+
+export type DeckCardSource = "owned" | "missing";
+export type DeckValidationSeverity = "error" | "warning";
+export type DeckValidationCode =
+  | "deck-size"
+  | "copy-limit"
+  | "standard-legality"
+  | "missing-card"
+  | "empty-deck";
+
+export type DeckCard = {
+  id: string;
+  card: CardSummary;
+  quantity: number;
+  source: DeckCardSource;
+};
+
+export type DeckValidationIssue = {
+  severity: DeckValidationSeverity;
+  code: DeckValidationCode;
+  message: string;
+  cardName?: string | null;
+};
+
+export type DeckValidationSnapshot = {
+  id?: string;
+  isValid: boolean;
+  totalCards: number;
+  issues: DeckValidationIssue[];
+  createdAt?: string;
+};
+
+export type DeckSummary = {
+  id: string;
+  name: string;
+  format: DeckFormat;
+  generationMode: DeckGenerationMode;
+  archetypeName?: string | null;
+  validationStatus: string;
+  totalCards: number;
+  missingCards: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type DeckDetail = DeckSummary & {
+  cards: DeckCard[];
+  validation?: DeckValidationSnapshot | null;
+};
+
+export type DeckArchetypeSummary = {
+  id: string;
+  slug: string;
+  name: string;
+  format: DeckFormat;
+  strategy?: string | null;
+  source: string;
+  confidence: number;
+};
+
+export type DeckSuggestionMissingCard = {
+  cardName: string;
+  quantity: number;
+  role: string;
+};
+
+export type DeckSuggestion = {
+  archetype: DeckArchetypeSummary;
+  compatibility: number;
+  format: DeckFormat;
+  mode: DeckGenerationMode;
+  cards: Array<{
+    card: CardSummary;
+    quantity: number;
+    source: DeckCardSource;
+    role: string;
+  }>;
+  missingCards: DeckSuggestionMissingCard[];
+  validation: DeckValidationSnapshot;
+  explanation: string;
 };
 
 export function normalizeCardNumber(value: string): string {

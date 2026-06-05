@@ -8,6 +8,13 @@ import type {
   CollectionFolderSort,
   CollectionFolderSummary,
   CollectionItem,
+  DeckArchetypeSummary,
+  DeckDetail,
+  DeckFormat,
+  DeckGenerationMode,
+  DeckSuggestion,
+  DeckSummary,
+  DeckValidationSnapshot,
   PriceEstimate,
   PublicCollectionDetail,
   RecognitionCandidate,
@@ -320,6 +327,93 @@ export const api = {
   }) {
     return request<RecognitionCandidate[]>("/recognition/candidates", {
       method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  listDecks(token: string) {
+    return request<DeckSummary[]>("/decks", { token });
+  },
+  createDeck(
+    token: string,
+    payload: {
+      name: string;
+      format?: DeckFormat;
+      generationMode?: DeckGenerationMode;
+      archetypeId?: string | null;
+      cards?: Array<{ cardId: string; quantity: number; source?: "owned" | "missing" }>;
+    },
+  ) {
+    return request<DeckDetail>("/decks", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  getDeck(token: string, id: string) {
+    return request<DeckDetail>(`/decks/${encodeURIComponent(id)}`, { token });
+  },
+  updateDeck(
+    token: string,
+    id: string,
+    payload: {
+      name?: string;
+      format?: DeckFormat;
+      generationMode?: DeckGenerationMode;
+      archetypeId?: string | null;
+      cards?: Array<{ cardId: string; quantity: number; source?: "owned" | "missing" }>;
+    },
+  ) {
+    return request<DeckDetail>(`/decks/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  deleteDeck(token: string, id: string) {
+    return request<{ ok: true }>(`/decks/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      token,
+    });
+  },
+  validateDeck(token: string, id: string) {
+    return request<DeckValidationSnapshot>(
+      `/decks/${encodeURIComponent(id)}/validate`,
+      {
+        method: "POST",
+        token,
+      },
+    );
+  },
+  generateBestDeck(
+    token: string,
+    payload: {
+      format?: DeckFormat;
+      mode?: DeckGenerationMode;
+      preferredTypes?: string[];
+      maxSuggestions?: number;
+    },
+  ) {
+    return request<DeckSuggestion[]>("/decks/generate-best", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  listDeckArchetypes(token: string) {
+    return request<DeckArchetypeSummary[]>("/deck-archetypes", { token });
+  },
+  syncMetagame(token: string, payload: { includeLimitless?: boolean } = {}) {
+    return request<{
+      id: string;
+      source: string;
+      status: string;
+      message?: string | null;
+      totalArchetypes: number;
+      createdAt: string;
+      finishedAt?: string | null;
+    }>("/metagame/sync", {
+      method: "POST",
+      token,
       body: JSON.stringify(payload),
     });
   },

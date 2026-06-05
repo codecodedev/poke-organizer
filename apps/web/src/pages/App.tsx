@@ -8,6 +8,7 @@ import {
   Menu,
   Moon,
   Sparkles,
+  Swords,
   Sun,
   X,
 } from "lucide-react";
@@ -15,6 +16,7 @@ import { AudioRegistrationPanel } from "../components/AudioRegistrationPanel";
 import { CardSearch } from "../components/CardSearch";
 import { CollectionList } from "../components/CollectionList";
 import { CollectionsPage } from "../components/collections/CollectionsPage";
+import { DecksPage } from "../components/decks/DecksPage";
 import { PublicCollectionPage } from "../components/collections/PublicCollectionPage";
 import { api, type Session } from "../lib/api";
 import { clearSession, loadSession, saveSession } from "../lib/session";
@@ -23,7 +25,7 @@ import { Button } from "../components/ui/Button";
 import { RequestFeedback } from "../components/ui/RequestFeedback";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
-type View = "home" | "cards" | "collections";
+type View = "home" | "cards" | "collections" | "decks";
 type ThemeMode = "light" | "dark";
 type AppRoute = {
   view: View;
@@ -165,6 +167,14 @@ export function App() {
                 Colecoes
               </NavButton>
 
+              <NavButton
+                active={view === "decks"}
+                icon={<Swords size={16} />}
+                onClick={() => navigate({ view: "decks" })}
+              >
+                Decks
+              </NavButton>
+
               <Button
                 type="button"
                 onClick={logout}
@@ -238,6 +248,14 @@ export function App() {
                   onClick={() => navigate({ view: "collections" })}
                 >
                   Colecoes
+                </NavButton>
+
+                <NavButton
+                  active={view === "decks"}
+                  icon={<Swords size={16} />}
+                  onClick={() => navigate({ view: "decks" })}
+                >
+                  Decks
                 </NavButton>
 
                 <Button
@@ -320,6 +338,14 @@ export function App() {
               onCollectionRouteChange={(collection) =>
                 navigate({ view: "collections", collection })
               }
+            />
+          )}
+
+          {view === "decks" && (
+            <DecksPage
+              session={session}
+              onSession={handleSession}
+              onUnauthorized={handleUnauthorized}
             />
           )}
         </div>
@@ -436,7 +462,10 @@ function parseRoute(): AppRoute {
 
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
-  const view: View = page === "cards" || page === "collections" ? page : "home";
+  const view: View =
+    page === "cards" || page === "collections" || page === "decks"
+      ? page
+      : "home";
 
   return {
     view,
