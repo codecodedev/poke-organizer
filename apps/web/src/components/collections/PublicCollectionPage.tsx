@@ -359,7 +359,7 @@ function sortItems(
       (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
     );
   return [...items].sort(
-    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+    (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
   );
 }
 

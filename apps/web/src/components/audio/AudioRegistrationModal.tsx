@@ -499,7 +499,7 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
   return (
     <Modal title="Cadastro por voz" onClose={onClose}>
 <div className="relative">
-  <div className="grid gap-4 p-5 md:grid-cols-[260px_1fr]">        <div className="rounded-[22px] bg-gradient-to-br from-aqua/15 via-white to-lilac/15 p-4">
+  <div className="grid gap-4 p-5 md:grid-cols-[260px_1fr]">        <div className="voice-mic-panel rounded-[22px] bg-gradient-to-br from-aqua/15 via-white to-lilac/15 p-4">
           <div className="mb-2 flex justify-end">
             <button
               type="button"
@@ -552,7 +552,7 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
           )}
 
           {transcript && (
-            <div className="rounded-2xl border border-aqua/30 bg-aqua/10 px-4 py-3 text-sm text-cyan-900">
+            <div className="voice-transcript rounded-2xl border border-aqua/30 bg-aqua/10 px-4 py-3 text-sm text-cyan-900">
               Ouvido: <span className="font-black">{transcript}</span>
             </div>
           )}

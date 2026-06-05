@@ -6,7 +6,9 @@ import {
   LibraryBig,
   LogOut,
   Menu,
+  Moon,
   Sparkles,
+  Sun,
   X,
 } from "lucide-react";
 import { AudioRegistrationPanel } from "../components/AudioRegistrationPanel";
@@ -21,6 +23,7 @@ import { Button } from "../components/ui/Button";
 import { RequestFeedback } from "../components/ui/RequestFeedback";
 
 type View = "home" | "cards" | "collections";
+type ThemeMode = "light" | "dark";
 type AppRoute = {
   view: View;
   publicCollection?: string | null;
@@ -33,6 +36,7 @@ export function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [route, setRoute] = useState<AppRoute>(() => parseRoute());
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
 
   const view = route.view;
 
@@ -65,10 +69,22 @@ export function App() {
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("poke-organizer-theme", theme);
+  }, [theme]);
+
+  function toggleTheme() {
+    setTheme((current) => (current === "dark" ? "light" : "dark"));
+  }
+
   if (route.publicCollection) {
     return (
       <>
         <RequestFeedback />
+        <div className="fixed right-4 top-4 z-40">
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </div>
         <PublicCollectionPage shareToken={route.publicCollection} />
       </>
     );
@@ -78,6 +94,9 @@ export function App() {
     return (
       <>
         <RequestFeedback />
+        <div className="fixed right-4 top-4 z-40">
+          <ThemeToggle theme={theme} onToggle={toggleTheme} />
+        </div>
         <AuthPanel onSession={handleSession} />
       </>
     );
@@ -152,6 +171,8 @@ export function App() {
               >
                 Sair
               </Button>
+
+              <ThemeToggle theme={theme} onToggle={toggleTheme} />
             </div>
 
             <button
@@ -225,6 +246,8 @@ export function App() {
                 >
                   Sair
                 </Button>
+
+                <ThemeToggle theme={theme} onToggle={toggleTheme} />
               </div>
             </aside>
           </div>
@@ -301,6 +324,28 @@ export function App() {
         </div>
       </main>
     </>
+  );
+}
+
+function ThemeToggle({
+  theme,
+  onToggle,
+}: {
+  theme: ThemeMode;
+  onToggle: () => void;
+}) {
+  const dark = theme === "dark";
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="btn border border-line bg-white/80 text-night shadow-sm hover:border-lilac/40"
+      aria-label={dark ? "Ativar modo claro" : "Ativar modo escuro"}
+      title={dark ? "Modo claro" : "Modo escuro"}
+    >
+      {dark ? <Sun size={16} /> : <Moon size={16} />}
+      <span>{dark ? "Claro" : "Escuro"}</span>
+    </button>
   );
 }
 
@@ -421,4 +466,10 @@ function routeToUrl(route: AppRoute): string {
   const query = params.toString();
 
   return query ? `/?${query}` : "/";
+}
+
+function loadTheme(): ThemeMode {
+  const stored = window.localStorage.getItem("poke-organizer-theme");
+  if (stored === "light" || stored === "dark") return stored;
+  return "dark";
 }

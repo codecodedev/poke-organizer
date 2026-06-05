@@ -16,7 +16,7 @@ const tones: Record<NonNullable<StatCardProps["tone"]>, string> = {
 
 export function StatCard({ label, value, icon, tone = "lilac" }: StatCardProps) {
   return (
-    <div className={`rounded-[20px] border border-white/80 bg-gradient-to-br ${tones[tone]} p-4 shadow-sm`}>
+    <div className={`stat-card stat-card--${tone} rounded-[20px] border border-white/80 bg-gradient-to-br ${tones[tone]} p-4 shadow-sm`}>
       <div className="mb-3 flex items-center justify-between gap-3 text-slate-500">
         <span className="text-xs font-black uppercase tracking-[0.14em]">{label}</span>
         {icon}

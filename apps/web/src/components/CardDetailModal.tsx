@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
+import { FormEvent, useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   CalendarDays,
@@ -234,7 +234,7 @@ export function CardDetailModal({
       onMouseDown={onClose}
     >
       <div
-        className="animate-soft-pop max-h-[80vh] w-full max-w-5xl overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        className="card-detail-modal animate-soft-pop max-h-[80vh] w-full max-w-5xl overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="holo-strip animate-shimmer h-2" />
@@ -320,7 +320,7 @@ export function CardDetailModal({
             {(onAdd || (collectionItem && onUpdate)) && (
               <form
                 onSubmit={submit}
-                className="mt-5 rounded-[22px] border border-line/80 bg-gradient-to-br from-white to-field/80 p-4 shadow-sm"
+                className="card-detail-form mt-5 rounded-[22px] border border-line/80 bg-gradient-to-br from-white to-field/80 p-4 shadow-sm"
               >
                 <h3 className="text-lg font-black text-ink">
                   {mode === "add" ? "Adicionar a colecao" : "Editar na colecao"}
@@ -392,7 +392,7 @@ export function CardDetailModal({
                   <label className="text-sm font-black text-slate-700">
                     Valor
                     <input
-                      className="mt-2 min-h-12 w-full rounded-2xl border border-line bg-slate-100 px-4 font-semibold text-slate-700"
+                      className="card-detail-readonly mt-2 min-h-12 w-full rounded-2xl border border-line bg-slate-100 px-4 font-semibold text-slate-700"
                       value={displayedPrice}
                       readOnly
                     />
@@ -401,7 +401,7 @@ export function CardDetailModal({
                   <label className="text-sm font-black text-slate-700 sm:col-span-2">
                     Notas
                     <textarea
-                      className="focus-ring mt-2 min-h-24 w-full rounded-2xl border border-line bg-white/90 px-4 py-3"
+                      className="premium-input focus-ring mt-2 min-h-24 w-full rounded-2xl border border-line bg-white/90 px-4 py-3"
                       value={notes}
                       onChange={(event) => setNotes(event.target.value)}
                       placeholder="Opcional"
@@ -410,12 +410,12 @@ export function CardDetailModal({
                 </div>
 
                 {!priceLoading && !hasBrazilianPrice && (
-                  <p className="mt-3 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-slate-600">
+                  <p className="card-detail-note mt-3 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-slate-600">
                     Nenhum valor nacional encontrado para esta carta.
                   </p>
                 )}
                 {!priceLoading && hasBrazilianPrice && price?.label && (
-                  <p className="mt-3 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-slate-600">
+                  <p className="card-detail-note mt-3 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-slate-600">
                     {price.label}
                   </p>
                 )}
@@ -483,10 +483,13 @@ function PriceHistoryChart({ price }: { price: PriceEstimate }) {
     return { ...entry, x, y };
   });
   const polyline = points.map((point) => `${point.x},${point.y}`).join(" ");
-  const latestTone = latestChange >= 0 ? "text-emerald-800" : "text-red-700";
+  const latestTone = latestChange >= 0 ? "price-history-chart__delta--up" : "price-history-chart__delta--down";
+  const chartStyle = {
+    "--price-chart-trend": latestChange >= 0 ? "var(--price-chart-up)" : "var(--price-chart-down)",
+  } as CSSProperties;
 
   return (
-    <section className="mt-5 rounded-[22px] border border-line/80 bg-gradient-to-br from-white to-field/80 p-4 shadow-sm">
+    <section className="price-history-chart mt-5 rounded-[22px] border border-line/80 bg-gradient-to-br from-white to-field/80 p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="text-lg font-black text-ink">Historico de valores</h3>
@@ -495,14 +498,14 @@ function PriceHistoryChart({ price }: { price: PriceEstimate }) {
           </p>
         </div>
         <span
-          className={`rounded-full border border-line/70 bg-white/80 px-3 py-1.5 text-xs font-black ${latestTone}`}
+          className={`price-history-chart__delta rounded-full border border-line/70 bg-white/80 px-3 py-1.5 text-xs font-black ${latestTone}`}
         >
           {latestChange >= 0 ? "Subiu" : "Caiu"}{" "}
           {formatBrl(Math.abs(latestChange))}
         </span>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-2xl border border-line/70 bg-white/70 p-3">
+      <div className="price-history-chart__plot mt-4 overflow-hidden rounded-2xl border border-line/70 bg-white/70 p-3" style={chartStyle}>
         <svg
           viewBox={`0 0 ${width} ${height}`}
           className="h-40 w-full"
@@ -514,7 +517,7 @@ function PriceHistoryChart({ price }: { price: PriceEstimate }) {
             y1={paddingY}
             x2={paddingX}
             y2={height - paddingY}
-            stroke="#d8deec"
+            stroke="var(--price-chart-axis)"
             strokeWidth="1"
           />
           <line
@@ -522,13 +525,13 @@ function PriceHistoryChart({ price }: { price: PriceEstimate }) {
             y1={height - paddingY}
             x2={width - paddingX}
             y2={height - paddingY}
-            stroke="#d8deec"
+            stroke="var(--price-chart-axis)"
             strokeWidth="1"
           />
           <polyline
             points={polyline}
             fill="none"
-            stroke={latestChange >= 0 ? "#059669" : "#dc2626"}
+            stroke="var(--price-chart-trend)"
             strokeLinecap="round"
             strokeLinejoin="round"
             strokeWidth="4"
@@ -539,8 +542,8 @@ function PriceHistoryChart({ price }: { price: PriceEstimate }) {
               cx={point.x}
               cy={point.y}
               r="4.5"
-              fill="#ffffff"
-              stroke={latestChange >= 0 ? "#059669" : "#dc2626"}
+              fill="var(--price-chart-point-bg)"
+              stroke="var(--price-chart-trend)"
               strokeWidth="3"
             />
           ))}
@@ -564,8 +567,8 @@ function Detail({
   value: string;
 }) {
   return (
-    <div className="flex gap-3 rounded-[18px] border border-line/80 bg-white/70 p-3 shadow-sm">
-      <div className="mt-1 text-lilac">{icon}</div>
+    <div className="card-detail-attribute flex gap-3 rounded-[18px] border border-line/80 bg-white/70 p-3 shadow-sm">
+      <div className="detail-icon mt-1 text-lilac">{icon}</div>
       <div className="min-w-0">
         <dt className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
           {label}

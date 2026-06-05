@@ -407,7 +407,7 @@ export class CollectionService {
     if (sort === "oldest") {
       return { createdAt: "asc" };
     }
-    return { createdAt: "desc" };
+    return { collectionItem: { updatedAt: "desc" } };
   }
 
   private assertValidVariant(validVariants: string[], variant: string) {
@@ -536,7 +536,7 @@ export class CollectionService {
       );
     }
     return [...items].sort(
-      (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+      (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
     );
   }
 

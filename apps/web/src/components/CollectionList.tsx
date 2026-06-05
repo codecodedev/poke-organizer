@@ -126,6 +126,10 @@ export function CollectionList({
     () => visibleItems.reduce((sum, item) => sum + item.quantity, 0),
     [visibleItems],
   );
+  const uniqueCards = useMemo(
+    () => new Set(visibleItems.map((item) => item.card.id)).size,
+    [visibleItems],
+  );
   const totalValue = useMemo(
     () =>
       visibleItems.reduce((sum, item) => {
@@ -293,11 +297,17 @@ export function CollectionList({
           <h2 className="section-title">{title}</h2>
           <p className="section-copy mt-1">{description}</p>
           {showCounts && (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               <StatCard
                 label={limit ? "Itens exibidos" : "Cartas totais"}
                 value={String(displayedCount)}
                 tone="aqua"
+                icon={<Layers3 size={18} />}
+              />
+              <StatCard
+                label="Cartas unicas"
+                value={String(uniqueCards)}
+                tone="lilac"
                 icon={<Layers3 size={18} />}
               />
               <StatCard
@@ -562,7 +572,7 @@ function sortItems(
       (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
     );
   return [...items].sort(
-    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+    (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
   );
 }
 

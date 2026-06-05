@@ -64,6 +64,10 @@ export function CollectionsPage({
   const [variantFilter, setVariantFilter] = useState("");
   const [sort, setSort] = useState<CollectionFolderSort>("newest");
   const [pickerQuery, setPickerQuery] = useState("");
+  const [pickerTypeFilter, setPickerTypeFilter] = useState("");
+  const [pickerRarityFilter, setPickerRarityFilter] = useState("");
+  const [pickerVariantFilter, setPickerVariantFilter] = useState("");
+  const [pickerSort, setPickerSort] = useState<CollectionFolderSort>("newest");
   const [showAllPickerItems, setShowAllPickerItems] = useState(false);
   const [foldersPage, setFoldersPage] = useState(1);
   const [detailPage, setDetailPage] = useState(1);
@@ -343,6 +347,10 @@ export function CollectionsPage({
 
   function resetPicker() {
     setPickerQuery("");
+    setPickerTypeFilter("");
+    setPickerRarityFilter("");
+    setPickerVariantFilter("");
+    setPickerSort("newest");
     setShowAllPickerItems(false);
     setPickerPage(1);
   }
@@ -380,6 +388,21 @@ export function CollectionsPage({
     () => unique(selectedItems.map((item) => item.variant)),
     [selectedItems],
   );
+  const pickerTypeOptions = useMemo(
+    () => unique(inventory.flatMap((item) => item.card.types)),
+    [inventory],
+  );
+  const pickerRarityOptions = useMemo(
+    () =>
+      unique(
+        inventory.map((item) => item.card.rarity).filter(Boolean) as string[],
+      ),
+    [inventory],
+  );
+  const pickerVariantOptions = useMemo(
+    () => unique(inventory.map((item) => item.variant)),
+    [inventory],
+  );
   const visibleItems = useMemo(() => {
     const filtered = selectedItems.filter((item) => {
       if (typeFilter && !item.card.types.includes(typeFilter)) return false;
@@ -392,9 +415,21 @@ export function CollectionsPage({
   }, [rarityFilter, selectedItems, sort, typeFilter, variantFilter]);
   const pickerItems = useMemo(() => {
     const query = normalizeText(pickerQuery);
-    if (!query && !showAllPickerItems) return [];
+    const hasPickerFilter = Boolean(
+      pickerTypeFilter || pickerRarityFilter || pickerVariantFilter,
+    );
+    if (!query && !showAllPickerItems && !hasPickerFilter) return [];
 
-    return inventory.filter((item) => {
+    const filtered = inventory.filter((item) => {
+      if (pickerTypeFilter && !item.card.types.includes(pickerTypeFilter)) {
+        return false;
+      }
+      if (pickerRarityFilter && item.card.rarity !== pickerRarityFilter) {
+        return false;
+      }
+      if (pickerVariantFilter && item.variant !== pickerVariantFilter) {
+        return false;
+      }
       if (!query) return true;
       const searchable = normalizeText(
         [
@@ -409,7 +444,17 @@ export function CollectionsPage({
       );
       return searchable.includes(query);
     });
-  }, [inventory, pickerQuery, showAllPickerItems]);
+
+    return sortItems(filtered, pickerSort);
+  }, [
+    inventory,
+    pickerQuery,
+    pickerRarityFilter,
+    pickerSort,
+    pickerTypeFilter,
+    pickerVariantFilter,
+    showAllPickerItems,
+  ]);
   const selectedTotalValue = selectedItems.reduce(
     (sum, item) => sum + (item.price?.amount ?? 0) * item.quantity,
     0,
@@ -454,7 +499,15 @@ export function CollectionsPage({
 
   useEffect(() => {
     setPickerPage(1);
-  }, [pickerQuery, showAllPickerItems, screen]);
+  }, [
+    pickerQuery,
+    pickerRarityFilter,
+    pickerSort,
+    pickerTypeFilter,
+    pickerVariantFilter,
+    showAllPickerItems,
+    screen,
+  ]);
 
   useEffect(() => {
     const totalPages = Math.max(
@@ -490,6 +543,13 @@ export function CollectionsPage({
           selectedCount={selectedItemIds.size}
           selectedTotalValue={selectedTotalValue}
           pickerQuery={pickerQuery}
+          pickerTypeOptions={pickerTypeOptions}
+          pickerRarityOptions={pickerRarityOptions}
+          pickerVariantOptions={pickerVariantOptions}
+          pickerTypeFilter={pickerTypeFilter}
+          pickerRarityFilter={pickerRarityFilter}
+          pickerVariantFilter={pickerVariantFilter}
+          pickerSort={pickerSort}
           showAllPickerItems={showAllPickerItems}
           pickerItems={pickerItems}
           pickerPage={pickerPage}
@@ -497,6 +557,10 @@ export function CollectionsPage({
           onBack={backToList}
           onNameChange={setNewName}
           onQueryChange={setPickerQuery}
+          onPickerTypeFilter={setPickerTypeFilter}
+          onPickerRarityFilter={setPickerRarityFilter}
+          onPickerVariantFilter={setPickerVariantFilter}
+          onPickerSort={setPickerSort}
           onShowAllChange={setShowAllPickerItems}
           onPickerPageChange={setPickerPage}
           onToggleItem={toggleItem}
@@ -520,6 +584,13 @@ export function CollectionsPage({
           variantFilter={variantFilter}
           sort={sort}
           pickerQuery={pickerQuery}
+          pickerTypeOptions={pickerTypeOptions}
+          pickerRarityOptions={pickerRarityOptions}
+          pickerVariantOptions={pickerVariantOptions}
+          pickerTypeFilter={pickerTypeFilter}
+          pickerRarityFilter={pickerRarityFilter}
+          pickerVariantFilter={pickerVariantFilter}
+          pickerSort={pickerSort}
           showAllPickerItems={showAllPickerItems}
           pickerItems={pickerItems}
           pickerPage={pickerPage}
@@ -542,6 +613,10 @@ export function CollectionsPage({
           onSort={setSort}
           onDetailPageChange={setDetailPage}
           onQueryChange={setPickerQuery}
+          onPickerTypeFilter={setPickerTypeFilter}
+          onPickerRarityFilter={setPickerRarityFilter}
+          onPickerVariantFilter={setPickerVariantFilter}
+          onPickerSort={setPickerSort}
           onShowAllChange={setShowAllPickerItems}
           onPickerPageChange={setPickerPage}
           onToggleItem={toggleItem}
@@ -673,6 +748,13 @@ function CollectionCreateScreen({
   selectedCount,
   selectedTotalValue,
   pickerQuery,
+  pickerTypeOptions,
+  pickerRarityOptions,
+  pickerVariantOptions,
+  pickerTypeFilter,
+  pickerRarityFilter,
+  pickerVariantFilter,
+  pickerSort,
   showAllPickerItems,
   pickerItems,
   pickerPage,
@@ -680,6 +762,10 @@ function CollectionCreateScreen({
   onBack,
   onNameChange,
   onQueryChange,
+  onPickerTypeFilter,
+  onPickerRarityFilter,
+  onPickerVariantFilter,
+  onPickerSort,
   onShowAllChange,
   onPickerPageChange,
   onToggleItem,
@@ -690,6 +776,13 @@ function CollectionCreateScreen({
   selectedCount: number;
   selectedTotalValue: number;
   pickerQuery: string;
+  pickerTypeOptions: string[];
+  pickerRarityOptions: string[];
+  pickerVariantOptions: string[];
+  pickerTypeFilter: string;
+  pickerRarityFilter: string;
+  pickerVariantFilter: string;
+  pickerSort: CollectionFolderSort;
   showAllPickerItems: boolean;
   pickerItems: CollectionItem[];
   pickerPage: number;
@@ -697,6 +790,10 @@ function CollectionCreateScreen({
   onBack: () => void;
   onNameChange: (value: string) => void;
   onQueryChange: (value: string) => void;
+  onPickerTypeFilter: (value: string) => void;
+  onPickerRarityFilter: (value: string) => void;
+  onPickerVariantFilter: (value: string) => void;
+  onPickerSort: (value: CollectionFolderSort) => void;
   onShowAllChange: (value: boolean) => void;
   onPickerPageChange: (page: number) => void;
   onToggleItem: (itemId: string) => void;
@@ -747,11 +844,22 @@ function CollectionCreateScreen({
         title="Selecionar cartas"
         description="Busque por nome, numero ou colecao. Se preferir, mostre todas as cartas do inventario."
         pickerQuery={pickerQuery}
+        pickerTypeOptions={pickerTypeOptions}
+        pickerRarityOptions={pickerRarityOptions}
+        pickerVariantOptions={pickerVariantOptions}
+        pickerTypeFilter={pickerTypeFilter}
+        pickerRarityFilter={pickerRarityFilter}
+        pickerVariantFilter={pickerVariantFilter}
+        pickerSort={pickerSort}
         showAllPickerItems={showAllPickerItems}
         pickerItems={pickerItems}
         pickerPage={pickerPage}
         selectedItemIds={selectedItemIds}
         onQueryChange={onQueryChange}
+        onPickerTypeFilter={onPickerTypeFilter}
+        onPickerRarityFilter={onPickerRarityFilter}
+        onPickerVariantFilter={onPickerVariantFilter}
+        onPickerSort={onPickerSort}
         onShowAllChange={onShowAllChange}
         onPickerPageChange={onPickerPageChange}
         onToggleItem={onToggleItem}
@@ -775,6 +883,13 @@ function CollectionDetailScreen({
   variantFilter,
   sort,
   pickerQuery,
+  pickerTypeOptions,
+  pickerRarityOptions,
+  pickerVariantOptions,
+  pickerTypeFilter,
+  pickerRarityFilter,
+  pickerVariantFilter,
+  pickerSort,
   showAllPickerItems,
   pickerItems,
   pickerPage,
@@ -793,6 +908,10 @@ function CollectionDetailScreen({
   onSort,
   onDetailPageChange,
   onQueryChange,
+  onPickerTypeFilter,
+  onPickerRarityFilter,
+  onPickerVariantFilter,
+  onPickerSort,
   onShowAllChange,
   onPickerPageChange,
   onToggleItem,
@@ -811,6 +930,13 @@ function CollectionDetailScreen({
   variantFilter: string;
   sort: CollectionFolderSort;
   pickerQuery: string;
+  pickerTypeOptions: string[];
+  pickerRarityOptions: string[];
+  pickerVariantOptions: string[];
+  pickerTypeFilter: string;
+  pickerRarityFilter: string;
+  pickerVariantFilter: string;
+  pickerSort: CollectionFolderSort;
   showAllPickerItems: boolean;
   pickerItems: CollectionItem[];
   pickerPage: number;
@@ -829,6 +955,10 @@ function CollectionDetailScreen({
   onSort: (value: CollectionFolderSort) => void;
   onDetailPageChange: (page: number) => void;
   onQueryChange: (value: string) => void;
+  onPickerTypeFilter: (value: string) => void;
+  onPickerRarityFilter: (value: string) => void;
+  onPickerVariantFilter: (value: string) => void;
+  onPickerSort: (value: CollectionFolderSort) => void;
   onShowAllChange: (value: boolean) => void;
   onPickerPageChange: (page: number) => void;
   onToggleItem: (itemId: string) => void;
@@ -1017,11 +1147,22 @@ function CollectionDetailScreen({
         title="Adicionar cartas"
         description="Busque cartas do inventario, marque novas entradas e salve as alteracoes."
         pickerQuery={pickerQuery}
+        pickerTypeOptions={pickerTypeOptions}
+        pickerRarityOptions={pickerRarityOptions}
+        pickerVariantOptions={pickerVariantOptions}
+        pickerTypeFilter={pickerTypeFilter}
+        pickerRarityFilter={pickerRarityFilter}
+        pickerVariantFilter={pickerVariantFilter}
+        pickerSort={pickerSort}
         showAllPickerItems={showAllPickerItems}
         pickerItems={pickerItems}
         pickerPage={pickerPage}
         selectedItemIds={selectedItemIds}
         onQueryChange={onQueryChange}
+        onPickerTypeFilter={onPickerTypeFilter}
+        onPickerRarityFilter={onPickerRarityFilter}
+        onPickerVariantFilter={onPickerVariantFilter}
+        onPickerSort={onPickerSort}
         onShowAllChange={onShowAllChange}
         onPickerPageChange={onPickerPageChange}
         onToggleItem={onToggleItem}
@@ -1045,6 +1186,13 @@ function CardPickerPanel({
   title,
   description,
   pickerQuery,
+  pickerTypeOptions,
+  pickerRarityOptions,
+  pickerVariantOptions,
+  pickerTypeFilter,
+  pickerRarityFilter,
+  pickerVariantFilter,
+  pickerSort,
   showAllPickerItems,
   pickerItems,
   pickerPage,
@@ -1055,15 +1203,30 @@ function CardPickerPanel({
   onToggleItem,
   onOpenCard,
   action,
+  onPickerTypeFilter,
+  onPickerRarityFilter,
+  onPickerVariantFilter,
+  onPickerSort,
 }: {
   title: string;
   description: string;
   pickerQuery: string;
+  pickerTypeOptions: string[];
+  pickerRarityOptions: string[];
+  pickerVariantOptions: string[];
+  pickerTypeFilter: string;
+  pickerRarityFilter: string;
+  pickerVariantFilter: string;
+  pickerSort: CollectionFolderSort;
   showAllPickerItems: boolean;
   pickerItems: CollectionItem[];
   pickerPage: number;
   selectedItemIds: Set<string>;
   onQueryChange: (value: string) => void;
+  onPickerTypeFilter: (value: string) => void;
+  onPickerRarityFilter: (value: string) => void;
+  onPickerVariantFilter: (value: string) => void;
+  onPickerSort: (value: CollectionFolderSort) => void;
   onShowAllChange: (value: boolean) => void;
   onPickerPageChange: (page: number) => void;
   onToggleItem: (itemId: string) => void;
@@ -1089,7 +1252,7 @@ function CardPickerPanel({
         {action}
       </div>
 
-      <div className="mt-5 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
+      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
         <label className="relative block">
           <Search
             className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
@@ -1112,6 +1275,61 @@ function CardPickerPanel({
         <div className="rounded-2xl border border-line/70 bg-white/70 px-4 py-3 text-sm font-black text-slate-600">
           {selectedItemIds.size} selecionadas
         </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 rounded-[24px] border border-line/70 bg-field/45 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <FilterField label="Tipo">
+          <select
+            className="premium-select"
+            value={pickerTypeFilter}
+            onChange={(event) => onPickerTypeFilter(event.target.value)}
+          >
+            <option value="">Todos os tipos</option>
+            {pickerTypeOptions.map((value) => (
+              <option key={value}>{value}</option>
+            ))}
+          </select>
+        </FilterField>
+        <FilterField label="Raridade">
+          <select
+            className="premium-select"
+            value={pickerRarityFilter}
+            onChange={(event) => onPickerRarityFilter(event.target.value)}
+          >
+            <option value="">Todas as raridades</option>
+            {pickerRarityOptions.map((value) => (
+              <option key={value}>{value}</option>
+            ))}
+          </select>
+        </FilterField>
+        <FilterField label="Variante">
+          <select
+            className="premium-select"
+            value={pickerVariantFilter}
+            onChange={(event) => onPickerVariantFilter(event.target.value)}
+          >
+            <option value="">Todas as variantes</option>
+            {pickerVariantOptions.map((value) => (
+              <option key={value}>{value}</option>
+            ))}
+          </select>
+        </FilterField>
+        <FilterField label="Ordenacao">
+          <select
+            className="premium-select"
+            value={pickerSort}
+            onChange={(event) =>
+              onPickerSort(event.target.value as CollectionFolderSort)
+            }
+          >
+            <option value="newest">Ultima adicionada</option>
+            <option value="oldest">Mais antiga</option>
+            <option value="value-desc">Maior valor</option>
+            <option value="value-asc">Menor valor</option>
+            <option value="price-change-desc">Maior alta</option>
+            <option value="price-change-asc">Maior queda</option>
+          </select>
+        </FilterField>
       </div>
 
       {pickerItems.length ? (
@@ -1221,7 +1439,7 @@ function sortItems(
       (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
     );
   return [...items].sort(
-    (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
+    (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
   );
 }
 
