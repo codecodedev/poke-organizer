@@ -59,6 +59,14 @@ enum DeckCardSource {
   @@schema("public")
 }
 
+enum CollectionOfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+
+  @@schema("public")
+}
+
 enum PriceProvider {
   LIGAPOKEMON
   MYPCARDS
@@ -75,6 +83,8 @@ model User {
   refreshTokens RefreshToken[]
   collection   CollectionItem[]
   folders      CollectionFolder[]
+  collectionBids CollectionItemBid[]
+  collectionOffers CollectionCartOffer[]
   decks        Deck[]
   createdAt    DateTime         @default(now())
   updatedAt    DateTime         @updatedAt
@@ -183,11 +193,13 @@ model CollectionFolder {
   userId    String
   name      String
   isPublic  Boolean                @default(false)
+  isStore   Boolean                @default(false)
   shareToken String?               @unique
   createdAt DateTime               @default(now())
   updatedAt DateTime               @updatedAt
   user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   items     CollectionFolderItem[]
+  cartOffers CollectionCartOffer[]
 
   @@index([userId])
   @@index([shareToken])
@@ -199,12 +211,67 @@ model CollectionFolderItem {
   id               String           @id @default(cuid())
   folderId         String
   collectionItemId String
+  manualPriceBrl   Decimal?         @db.Decimal(10, 2)
+  isSold           Boolean          @default(false)
+  soldPriceBrl     Decimal?         @db.Decimal(10, 2)
+  soldAt           DateTime?
+  soldToUserId     String?
   createdAt        DateTime         @default(now())
   folder           CollectionFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
   collectionItem   CollectionItem   @relation(fields: [collectionItemId], references: [id], onDelete: Cascade)
+  bids             CollectionItemBid[]
+  cartOfferItems   CollectionCartOfferItem[]
 
   @@index([collectionItemId])
+  @@index([soldToUserId])
   @@unique([folderId, collectionItemId])
+  @@schema("public")
+}
+
+model CollectionItemBid {
+  id           String               @id @default(cuid())
+  folderItemId String
+  bidderId     String
+  amountBrl    Decimal              @db.Decimal(10, 2)
+  createdAt    DateTime             @default(now())
+  folderItem   CollectionFolderItem @relation(fields: [folderItemId], references: [id], onDelete: Cascade)
+  bidder       User                 @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+
+  @@index([folderItemId, createdAt])
+  @@index([bidderId])
+  @@schema("public")
+}
+
+model CollectionCartOffer {
+  id          String                    @id @default(cuid())
+  folderId    String
+  buyerId     String
+  status      CollectionOfferStatus     @default(PENDING)
+  message     String?
+  totalOfferBrl Decimal                 @db.Decimal(10, 2)
+  decidedAt   DateTime?
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  folder      CollectionFolder          @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  buyer       User                      @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  items       CollectionCartOfferItem[]
+
+  @@index([folderId, status])
+  @@index([buyerId])
+  @@schema("public")
+}
+
+model CollectionCartOfferItem {
+  id           String               @id @default(cuid())
+  offerId      String
+  folderItemId String
+  quantity     Int                  @default(1)
+  amountBrl    Decimal              @db.Decimal(10, 2)
+  offer        CollectionCartOffer  @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  folderItem   CollectionFolderItem @relation(fields: [folderItemId], references: [id], onDelete: Cascade)
+
+  @@index([offerId])
+  @@index([folderItemId])
   @@schema("public")
 }
 

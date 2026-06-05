@@ -13,6 +13,7 @@ import {
   Trash2,
 } from "lucide-react";
 import type {
+  CollectionCartOffer,
   CollectionFolderDetail,
   CollectionFolderSort,
   CollectionFolderSummary,
@@ -75,6 +76,7 @@ export function CollectionsPage({
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [offers, setOffers] = useState<CollectionCartOffer[]>([]);
 
   async function load() {
     setLoading(true);
@@ -114,6 +116,11 @@ export function CollectionsPage({
       setActiveFolder(detail);
       setActiveName(detail.name);
       setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
+      if (detail.isStore) {
+        await refreshOffers(detail.id);
+      } else {
+        setOffers([]);
+      }
       resetFilters();
       resetPicker();
       setScreen("detail");
@@ -268,6 +275,69 @@ export function CollectionsPage({
     }
   }
 
+  async function updateFolderStore(isStore: boolean) {
+    if (!activeFolder) return;
+    setError(null);
+    setMessage(null);
+    try {
+      const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.updateCollectionFolderStore(token, activeFolder.id, { isStore }),
+      );
+      setActiveFolder(detail);
+      setActiveName(detail.name);
+      await refreshFolders();
+      if (detail.isStore) await refreshOffers(detail.id);
+      setMessage(isStore ? "Modo loja ativado." : "Modo loja desativado.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao atualizar modo loja");
+    }
+  }
+
+  async function updateFolderItemSale(
+    folderItemId: string,
+    payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null },
+  ) {
+    if (!activeFolder) return;
+    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.updateCollectionFolderItemSale(token, activeFolder.id, folderItemId, payload),
+    );
+    setActiveFolder(detail);
+    setActiveName(detail.name);
+    setMessage("Dados de venda atualizados.");
+  }
+
+  async function finishAuction(folderItemId: string) {
+    if (!activeFolder) return;
+    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.finishCollectionItemAuction(token, activeFolder.id, folderItemId),
+    );
+    setActiveFolder(detail);
+    setActiveName(detail.name);
+    setMessage("Leilao finalizado.");
+  }
+
+  async function refreshOffers(folderId = activeFolder?.id) {
+    if (!folderId) return;
+    const nextOffers = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.listCollectionOffers(token, folderId),
+    );
+    setOffers(nextOffers);
+  }
+
+  async function decideOffer(offerId: string, status: "accepted" | "rejected") {
+    if (!activeFolder) return;
+    await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.decideCollectionOffer(token, activeFolder.id, offerId, status),
+    );
+    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.getCollectionFolder(token, activeFolder.id),
+    );
+    setActiveFolder(detail);
+    setActiveName(detail.name);
+    await refreshOffers(activeFolder.id);
+    setMessage(status === "accepted" ? "Proposta aceita e cartas marcadas como vendidas." : "Proposta rejeitada.");
+  }
+
   async function copyShareLink() {
     if (!activeFolder) return;
     setError(null);
@@ -368,8 +438,11 @@ export function CollectionsPage({
   }
 
   const selectedItems = useMemo(
-    () => inventory.filter((item) => selectedItemIds.has(item.id)),
-    [inventory, selectedItemIds],
+    () =>
+      screen === "detail" && activeFolder
+        ? activeFolder.items
+        : inventory.filter((item) => selectedItemIds.has(item.id)),
+    [activeFolder, inventory, screen, selectedItemIds],
   );
   const typeOptions = useMemo(
     () => unique(selectedItems.flatMap((item) => item.card.types)),
@@ -596,6 +669,7 @@ export function CollectionsPage({
           pickerPage={pickerPage}
           selectedItemIds={selectedItemIds}
           isPublic={activeFolder.isPublic}
+          isStore={activeFolder.isStore}
           shareUrl={
             activeFolder.shareToken
               ? publicCollectionUrl(activeFolder.shareToken)
@@ -606,6 +680,12 @@ export function CollectionsPage({
           onSave={() => void saveFolder()}
           onRemove={() => void removeFolder()}
           onToggleSharing={(isPublic) => void updateFolderSharing(isPublic)}
+          onToggleStore={(isStore) => void updateFolderStore(isStore)}
+          onUpdateSale={(folderItemId, payload) => void updateFolderItemSale(folderItemId, payload)}
+          onFinishAuction={(folderItemId) => void finishAuction(folderItemId)}
+          offers={offers}
+          onRefreshOffers={() => void refreshOffers()}
+          onDecideOffer={(offerId, status) => void decideOffer(offerId, status)}
           onCopyShareLink={() => void copyShareLink()}
           onTypeFilter={setTypeFilter}
           onRarityFilter={setRarityFilter}
@@ -895,12 +975,19 @@ function CollectionDetailScreen({
   pickerPage,
   selectedItemIds,
   isPublic,
+  isStore,
   shareUrl,
+  offers,
   onBack,
   onNameChange,
   onSave,
   onRemove,
   onToggleSharing,
+  onToggleStore,
+  onUpdateSale,
+  onFinishAuction,
+  onRefreshOffers,
+  onDecideOffer,
   onCopyShareLink,
   onTypeFilter,
   onRarityFilter,
@@ -942,12 +1029,19 @@ function CollectionDetailScreen({
   pickerPage: number;
   selectedItemIds: Set<string>;
   isPublic: boolean;
+  isStore: boolean;
   shareUrl: string | null;
+  offers: CollectionCartOffer[];
   onBack: () => void;
   onNameChange: (value: string) => void;
   onSave: () => void;
   onRemove: () => void;
   onToggleSharing: (isPublic: boolean) => void;
+  onToggleStore: (isStore: boolean) => void;
+  onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null }) => void;
+  onFinishAuction: (folderItemId: string) => void;
+  onRefreshOffers: () => void;
+  onDecideOffer: (offerId: string, status: "accepted" | "rejected") => void;
   onCopyShareLink: () => void;
   onTypeFilter: (value: string) => void;
   onRarityFilter: (value: string) => void;
@@ -1052,6 +1146,41 @@ function CollectionDetailScreen({
             >
               {shareUrl ? "Copiar link" : "Gerar link"}
             </Button>
+          </div>
+
+          <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-black text-ink">Modo loja</h3>
+                <p className="section-copy mt-1">
+                  Ative para permitir precos manuais, lances e propostas de carrinho nesta colecao.
+                </p>
+              </div>
+              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700">
+                <span>Vitrine</span>
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={isStore}
+                  onChange={(event) => onToggleStore(event.target.checked)}
+                />
+                <span className="relative h-7 w-12 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition peer-checked:bg-aqua peer-checked:after:translate-x-5" />
+                <span>Loja</span>
+              </label>
+            </div>
+
+            {isStore && (
+              <>
+                <StoreOwnerPanel
+                  items={selectedItems}
+                  offers={offers}
+                  onUpdateSale={onUpdateSale}
+                  onFinishAuction={onFinishAuction}
+                  onRefreshOffers={onRefreshOffers}
+                  onDecideOffer={onDecideOffer}
+                />
+              </>
+            )}
           </div>
 
           <div className="grid gap-3 rounded-[24px] border border-line/70 bg-field/45 p-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -1363,6 +1492,102 @@ function CardPickerPanel({
   );
 }
 
+function StoreOwnerPanel({
+  items,
+  offers,
+  onUpdateSale,
+  onFinishAuction,
+  onRefreshOffers,
+  onDecideOffer,
+}: {
+  items: CollectionItem[];
+  offers: CollectionCartOffer[];
+  onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null }) => void;
+  onFinishAuction: (folderItemId: string) => void;
+  onRefreshOffers: () => void;
+  onDecideOffer: (offerId: string, status: "accepted" | "rejected") => void;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div>
+        <h4 className="font-black text-ink">Cartas da loja</h4>
+        <div className="mt-3 grid gap-2">
+          {items.map((item) => {
+            const folderItemId = item.folderItemId;
+            if (!folderItemId) return null;
+            return (
+              <div key={folderItemId} className="grid gap-3 rounded-2xl border border-line/70 bg-field/45 p-3 lg:grid-cols-[minmax(0,1fr)_150px_120px_auto] lg:items-center">
+                <div className="min-w-0">
+                  <p className="truncate font-black text-ink">{item.card.name}</p>
+                  <p className="section-copy">
+                    {item.store?.isSold ? `Vendida por ${formatBrl(item.store.soldPrice ?? 0)}` : `Lance atual: ${item.store?.highestBid ? formatBrl(item.store.highestBid.amount) : "nenhum"}`}
+                  </p>
+                </div>
+                <input
+                  className="premium-input"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  defaultValue={item.store?.manualPrice ?? ""}
+                  placeholder="Preco"
+                  onBlur={(event) =>
+                    onUpdateSale(folderItemId, {
+                      manualPrice: event.target.value ? Number(event.target.value) : null,
+                    })
+                  }
+                />
+                <label className="inline-flex items-center gap-2 text-sm font-black text-slate-700">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(item.store?.isSold)}
+                    onChange={(event) => onUpdateSale(folderItemId, { isSold: event.target.checked })}
+                  />
+                  Vendida
+                </label>
+                <Button type="button" onClick={() => onFinishAuction(folderItemId)}>
+                  Finalizar leilao
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h4 className="font-black text-ink">Propostas de carrinho</h4>
+          <Button type="button" onClick={onRefreshOffers}>Atualizar propostas</Button>
+        </div>
+        <div className="mt-3 grid gap-2">
+          {offers.length === 0 && <p className="section-copy">Nenhuma proposta enviada ainda.</p>}
+          {offers.map((offer) => (
+            <div key={offer.id} className="rounded-2xl border border-line/70 bg-field/45 p-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="font-black text-ink">{offer.buyerName}</p>
+                  <p className="section-copy">
+                    {offer.items.length} carta(s) - {formatBrl(offer.totalOffer)} - {formatOfferStatus(offer.status)}
+                  </p>
+                  {offer.message && <p className="section-copy mt-1">{offer.message}</p>}
+                </div>
+                {offer.status === "pending" && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button type="button" onClick={() => onDecideOffer(offer.id, "accepted")}>Aceitar</Button>
+                    <Button type="button" onClick={() => onDecideOffer(offer.id, "rejected")}>Rejeitar</Button>
+                  </div>
+                )}
+              </div>
+              <p className="section-copy mt-2">
+                {offer.items.map((entry) => `${entry.quantity}x ${entry.item.card.name} por ${formatBrl(entry.amount)}`).join(", ")}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ScreenHeader({
   eyebrow,
   title,
@@ -1447,6 +1672,12 @@ function latestPriceChange(item: CollectionItem): number {
   const history = item.price?.history ?? [];
   const latest = history[history.length - 1];
   return latest ? latest.amount - latest.previousAmount : 0;
+}
+
+function formatOfferStatus(status: CollectionCartOffer["status"]): string {
+  if (status === "accepted") return "aceita";
+  if (status === "rejected") return "rejeitada";
+  return "pendente";
 }
 
 function publicCollectionUrl(shareToken: string): string {

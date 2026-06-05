@@ -5,20 +5,25 @@ import type {
   CollectionItem,
   PublicCollectionDetail,
 } from "@poke-organizer/shared";
-import { api } from "../../lib/api";
+import { api, type Session } from "../../lib/api";
+import { withAuthRetry } from "../../lib/authRetry";
 import { formatBrl } from "../../lib/format";
 import { CollectionItemCard } from "../collection/CollectionItemCard";
 import { CardDetailModal } from "../CardDetailModal";
 import { PaginationControls } from "../ui/PaginationControls";
 import { Panel } from "../ui/Panel";
+import { Button } from "../ui/Button";
 
 const PUBLIC_COLLECTION_PAGE_SIZE = 24;
 
 type Props = {
   shareToken: string;
+  session: Session | null;
+  onSession: (session: Session) => void;
+  onUnauthorized: () => Promise<Session | null>;
 };
 
-export function PublicCollectionPage({ shareToken }: Props) {
+export function PublicCollectionPage({ shareToken, session, onSession, onUnauthorized }: Props) {
   const [collection, setCollection] = useState<PublicCollectionDetail | null>(
     null,
   );
@@ -31,6 +36,10 @@ export function PublicCollectionPage({ shareToken }: Props) {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [message, setMessage] = useState<string | null>(null);
+  const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
+  const [cartAmounts, setCartAmounts] = useState<Record<string, string>>({});
+  const [cartMessage, setCartMessage] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -121,6 +130,51 @@ export function PublicCollectionPage({ shareToken }: Props) {
     page * PUBLIC_COLLECTION_PAGE_SIZE,
   );
 
+  async function reloadCollection() {
+    const detail = await api.getPublicCollection(shareToken);
+    setCollection(detail);
+  }
+
+  async function submitBid(item: CollectionItem) {
+    if (!item.folderItemId) return;
+    if (!session) {
+      setMessage("Faca login no site para dar lances nesta colecao.");
+      return;
+    }
+    const amount = Number(bidAmounts[item.folderItemId]);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setMessage("Informe um valor de lance maior que zero.");
+      return;
+    }
+    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.createPublicCollectionBid(token, shareToken, item.folderItemId!, amount),
+    );
+    setCollection(detail);
+    setBidAmounts((current) => ({ ...current, [item.folderItemId!]: "" }));
+    setMessage("Lance enviado.");
+  }
+
+  async function submitCartOffer() {
+    if (!session) {
+      setMessage("Faca login no site para enviar uma proposta de carrinho.");
+      return;
+    }
+    const offerItems = Object.entries(cartAmounts)
+      .map(([folderItemId, amount]) => ({ folderItemId, amount: Number(amount), quantity: 1 }))
+      .filter((item) => Number.isFinite(item.amount) && item.amount > 0);
+    if (!offerItems.length) {
+      setMessage("Adicione pelo menos uma carta com valor de proposta.");
+      return;
+    }
+    await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.createPublicCollectionOffer(token, shareToken, { items: offerItems, message: cartMessage || undefined }),
+    );
+    setCartAmounts({});
+    setCartMessage("");
+    setMessage("Proposta enviada para o dono da colecao.");
+    await reloadCollection();
+  }
+
   return (
     <main className="app-shell">
       <header className="border-b border-white/70 bg-white/75 backdrop-blur-xl">
@@ -175,6 +229,11 @@ export function PublicCollectionPage({ shareToken }: Props) {
                     Por {collection.ownerName} - {items.length} cartas -{" "}
                     {formatBrl(totalValue)}
                   </p>
+                  {collection.isStore && (
+                    <p className="section-copy mt-1">
+                      Loja ativa: envie lances por carta ou monte uma proposta de carrinho.
+                    </p>
+                  )}
                 </div>
                 <span className="inline-flex items-center gap-2 rounded-full border border-leaf/25 bg-leaf/10 px-3 py-1.5 text-xs font-black text-emerald-800">
                   <FolderOpen size={14} />
@@ -182,6 +241,33 @@ export function PublicCollectionPage({ shareToken }: Props) {
                 </span>
               </div>
             </Panel>
+
+            {collection.isStore && (
+              <Panel title="Negociacao" description="Os lances e propostas ficam pendentes ate o dono da colecao aprovar.">
+                {!session && (
+                  <p className="warning-note">
+                    Para dar lance ou enviar proposta, faca login no site e volte para este link.
+                  </p>
+                )}
+                {message && <p className="success-note">{message}</p>}
+                <div className="mt-4 grid gap-3 rounded-[24px] border border-line/70 bg-field/45 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                  <label className="grid gap-2">
+                    <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                      Mensagem da proposta
+                    </span>
+                    <input
+                      className="premium-input"
+                      value={cartMessage}
+                      onChange={(event) => setCartMessage(event.target.value)}
+                      placeholder="Ex: consigo pagar hoje pelo pix"
+                    />
+                  </label>
+                  <Button type="button" variant="primary" onClick={() => void submitCartOffer()}>
+                    Enviar proposta
+                  </Button>
+                </div>
+              </Panel>
+            )}
 
             <Panel>
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(360px,1.45fr)_repeat(4,minmax(150px,1fr))]">
@@ -252,12 +338,52 @@ export function PublicCollectionPage({ shareToken }: Props) {
                 <>
                   <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
                     {paginatedItems.map((item) => (
-                      <CollectionItemCard
-                        key={item.id}
-                        item={item}
-                        price={item.price ?? undefined}
-                        onOpen={setSelectedItem}
-                      />
+                      <div key={item.id} className="grid gap-2">
+                        <CollectionItemCard
+                          item={item}
+                          price={item.price ?? undefined}
+                          onOpen={setSelectedItem}
+                        />
+                        {collection.isStore && item.folderItemId && (
+                          <div className="rounded-2xl border border-line/70 bg-field/55 p-3">
+                            <p className="text-sm font-black text-ink">
+                              {item.store?.isSold
+                                ? `Vendida por ${formatBrl(item.store.soldPrice ?? 0)}`
+                                : `Preco: ${formatBrl(item.store?.effectivePrice ?? item.price?.amount ?? 0)}`}
+                            </p>
+                            <p className="section-copy text-xs">
+                              Maior lance: {item.store?.highestBid ? formatBrl(item.store.highestBid.amount) : "nenhum"}
+                            </p>
+                            {!item.store?.isSold && (
+                              <div className="mt-2 grid gap-2">
+                                <input
+                                  className="premium-input"
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={bidAmounts[item.folderItemId] ?? ""}
+                                  placeholder="Seu lance"
+                                  onChange={(event) =>
+                                    setBidAmounts((current) => ({ ...current, [item.folderItemId!]: event.target.value }))
+                                  }
+                                />
+                                <Button type="button" onClick={() => void submitBid(item)}>Dar lance</Button>
+                                <input
+                                  className="premium-input"
+                                  type="number"
+                                  min={0}
+                                  step="0.01"
+                                  value={cartAmounts[item.folderItemId] ?? ""}
+                                  placeholder="Valor no carrinho"
+                                  onChange={(event) =>
+                                    setCartAmounts((current) => ({ ...current, [item.folderItemId!]: event.target.value }))
+                                  }
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     ))}
                   </div>
                   <PaginationControls

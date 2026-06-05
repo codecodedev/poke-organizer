@@ -97,10 +97,65 @@ describe("DecksService rules", () => {
     expect(suggestion.missingCards.some((item: { cardName: string; quantity: number }) => item.cardName === "Charizard ex" && item.quantity === 2)).toBe(true);
   });
 
+  it("returns local AI analysis without external provider keys", async () => {
+    const card = makeCard({ name: "Ultra Ball", supertype: "Trainer" });
+    const prisma = makePrismaForAi(card);
+    const config = { get: (key: string) => key === "DECK_AI_PROVIDER" ? "local" : undefined };
+    const analysis = await new DecksService(prisma as never, config as never).analyzeWithAi("u", "deck-1");
+
+    expect(analysis.provider).toBe("local");
+    expect(analysis.fallbackUsed).toBe(false);
+    expect(analysis.summary.length).toBeGreaterThan(10);
+  });
+
+  it("falls back to local AI analysis when Gemini has no key", async () => {
+    const card = makeCard({ name: "Ultra Ball", supertype: "Trainer" });
+    const prisma = makePrismaForAi(card);
+    const config = {
+      get: (key: string) => {
+        if (key === "DECK_AI_PROVIDER") return "gemini";
+        if (key === "DECK_AI_FALLBACK_PROVIDER") return "local";
+        return undefined;
+      },
+    };
+    const analysis = await new DecksService(prisma as never, config as never).analyzeWithAi("u", "deck-1");
+
+    expect(analysis.provider).toBe("local");
+    expect(analysis.fallbackUsed).toBe(true);
+  });
+
   function validate(cards: Array<{ card: ReturnType<typeof makeCard>; quantity: number; source: "owned" | "missing" }>, format: "standard" | "casual" = "standard") {
     return (service as never as { validateCards: Function }).validateCards(cards, format);
   }
 });
+
+function makePrismaForAi(card: ReturnType<typeof makeCard>) {
+  const deck = {
+    id: "deck-1",
+    userId: "u",
+    name: "Deck teste",
+    format: "STANDARD",
+    generationMode: "OWNED_ONLY",
+    archetypeId: null,
+    validationStatus: "unchecked",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    archetype: null,
+    cards: [{ id: "deck-card-1", deckId: "deck-1", cardId: card.id, quantity: 4, source: "OWNED", createdAt: new Date(), updatedAt: new Date(), card }],
+    validations: [],
+  };
+
+  return {
+    deck: {
+      findFirst: async () => deck,
+    },
+    collectionItem: {
+      findMany: async () => [
+        { id: "item-1", userId: "u", cardId: card.id, quantity: 4, condition: "NM", variant: "normal", foil: false, language: "EN", notes: null, cardPriceId: null, createdAt: new Date(), updatedAt: new Date(), card },
+      ],
+    },
+  };
+}
 
 function makeCard(overrides: Record<string, unknown> = {}) {
   return {

@@ -90,6 +90,7 @@ export type PriceHistoryPoint = {
 
 export type CollectionItem = {
   id: string;
+  folderItemId?: string;
   card: CardSummary;
   quantity: number;
   condition: CardCondition;
@@ -98,8 +99,27 @@ export type CollectionItem = {
   language: CardLanguage;
   notes?: string | null;
   price?: PriceEstimate | null;
+  store?: CollectionItemStore | null;
   createdAt: string;
   updatedAt: string;
+};
+
+export type CollectionItemBid = {
+  id: string;
+  bidderId: string;
+  bidderName: string;
+  amount: number;
+  createdAt: string;
+};
+
+export type CollectionItemStore = {
+  manualPrice: number | null;
+  effectivePrice: number | null;
+  isSold: boolean;
+  soldPrice: number | null;
+  soldAt: string | null;
+  highestBid: CollectionItemBid | null;
+  bids: CollectionItemBid[];
 };
 
 export type CollectionAddAction = "created" | "incremented";
@@ -121,6 +141,7 @@ export type CollectionFolderSummary = {
   id: string;
   name: string;
   isPublic: boolean;
+  isStore: boolean;
   shareToken?: string | null;
   itemCount: number;
   totalValue: number;
@@ -135,6 +156,30 @@ export type CollectionFolderDetail = CollectionFolderSummary & {
 export type PublicCollectionDetail = CollectionFolderDetail & {
   isPublic: true;
   ownerName: string;
+};
+
+export type CollectionOfferStatus = "pending" | "accepted" | "rejected";
+
+export type CollectionCartOfferItem = {
+  id: string;
+  folderItemId: string;
+  quantity: number;
+  amount: number;
+  item: CollectionItem;
+};
+
+export type CollectionCartOffer = {
+  id: string;
+  folderId: string;
+  buyerId: string;
+  buyerName: string;
+  status: CollectionOfferStatus;
+  message?: string | null;
+  totalOffer: number;
+  decidedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: CollectionCartOfferItem[];
 };
 
 export type PriceLookupCard = {
@@ -283,6 +328,8 @@ export type DeckAiSuggestedChange = {
 };
 
 export type DeckAiAnalysis = {
+  provider: "gemini" | "openai" | "local";
+  fallbackUsed: boolean;
   model: string;
   generatedAt: string;
   summary: string;

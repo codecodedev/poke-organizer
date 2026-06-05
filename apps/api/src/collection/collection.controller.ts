@@ -6,11 +6,16 @@ import { CollectionService } from "./collection.service";
 import {
   AddCollectionItemDto,
   CollectionFolderQueryDto,
+  CreateCollectionBidDto,
+  CreateCollectionCartOfferDto,
   CreateCollectionFolderDto,
+  DecideCollectionCartOfferDto,
   ListCollectionQueryDto,
   UpdateCollectionFolderDto,
   UpdateCollectionItemDto,
-  UpdateCollectionSharingDto
+  UpdateCollectionSharingDto,
+  UpdateCollectionStoreDto,
+  UpdateFolderItemSaleDto
 } from "./dto";
 
 @ApiTags("collection")
@@ -55,6 +60,41 @@ export class CollectionController {
     return this.collection.updateFolderSharing(user.id, id, dto);
   }
 
+  @Patch("folders/:id/store")
+  updateFolderStore(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateCollectionStoreDto) {
+    return this.collection.updateFolderStore(user.id, id, dto);
+  }
+
+  @Patch("folders/:id/items/:folderItemId/sale")
+  updateFolderItemSale(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Param("folderItemId") folderItemId: string,
+    @Body() dto: UpdateFolderItemSaleDto
+  ) {
+    return this.collection.updateFolderItemSale(user.id, id, folderItemId, dto);
+  }
+
+  @Post("folders/:id/items/:folderItemId/finish-auction")
+  finishAuction(@CurrentUser() user: RequestUser, @Param("id") id: string, @Param("folderItemId") folderItemId: string) {
+    return this.collection.finishAuction(user.id, id, folderItemId);
+  }
+
+  @Get("folders/:id/offers")
+  listFolderOffers(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.collection.listFolderOffers(user.id, id);
+  }
+
+  @Patch("folders/:id/offers/:offerId")
+  decideFolderOffer(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Param("offerId") offerId: string,
+    @Body() dto: DecideCollectionCartOfferDto
+  ) {
+    return this.collection.decideCartOffer(user.id, id, offerId, dto);
+  }
+
   @Delete("folders/:id")
   removeFolder(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.collection.removeFolder(user.id, id);
@@ -79,5 +119,26 @@ export class PublicCollectionController {
   @Get(":shareToken")
   getPublicCollection(@Param("shareToken") shareToken: string, @Query() query: CollectionFolderQueryDto) {
     return this.collection.getPublicFolder(shareToken, query);
+  }
+
+  @Post(":shareToken/items/:folderItemId/bids")
+  @UseGuards(JwtAuthGuard)
+  createBid(
+    @CurrentUser() user: RequestUser,
+    @Param("shareToken") shareToken: string,
+    @Param("folderItemId") folderItemId: string,
+    @Body() dto: CreateCollectionBidDto
+  ) {
+    return this.collection.createBid(user.id, shareToken, folderItemId, dto);
+  }
+
+  @Post(":shareToken/offers")
+  @UseGuards(JwtAuthGuard)
+  createCartOffer(
+    @CurrentUser() user: RequestUser,
+    @Param("shareToken") shareToken: string,
+    @Body() dto: CreateCollectionCartOfferDto
+  ) {
+    return this.collection.createCartOffer(user.id, shareToken, dto);
   }
 }

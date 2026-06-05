@@ -4,6 +4,7 @@ import type {
   CardSetSummary,
   CardSummary,
   CollectionAddResult,
+  CollectionCartOffer,
   CollectionFolderDetail,
   CollectionFolderSort,
   CollectionFolderSummary,
@@ -294,6 +295,65 @@ export const api = {
       },
     );
   },
+  updateCollectionFolderStore(
+    token: string,
+    id: string,
+    payload: { isStore?: boolean },
+  ) {
+    return request<CollectionFolderDetail>(
+      `/collection/folders/${encodeURIComponent(id)}/store`,
+      {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  updateCollectionFolderItemSale(
+    token: string,
+    folderId: string,
+    folderItemId: string,
+    payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null },
+  ) {
+    return request<CollectionFolderDetail>(
+      `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/sale`,
+      {
+        method: "PATCH",
+        token,
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  finishCollectionItemAuction(token: string, folderId: string, folderItemId: string) {
+    return request<CollectionFolderDetail>(
+      `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/finish-auction`,
+      {
+        method: "POST",
+        token,
+      },
+    );
+  },
+  listCollectionOffers(token: string, folderId: string) {
+    return request<CollectionCartOffer[]>(
+      `/collection/folders/${encodeURIComponent(folderId)}/offers`,
+      { token },
+    );
+  },
+  decideCollectionOffer(
+    token: string,
+    folderId: string,
+    offerId: string,
+    status: "accepted" | "rejected",
+  ) {
+    return request<CollectionCartOffer>(
+      `/collection/folders/${encodeURIComponent(folderId)}/offers/${encodeURIComponent(offerId)}`,
+      {
+        method: "PATCH",
+        token,
+        body: JSON.stringify({ status }),
+      },
+    );
+  },
   deleteCollectionFolder(token: string, id: string) {
     return request<{ ok: true }>(
       `/collection/folders/${encodeURIComponent(id)}`,
@@ -319,6 +379,38 @@ export const api = {
     const suffix = search.toString() ? `?${search.toString()}` : "";
     return request<PublicCollectionDetail>(
       `/public/collections/${encodeURIComponent(shareToken)}${suffix}`,
+    );
+  },
+  createPublicCollectionBid(
+    token: string,
+    shareToken: string,
+    folderItemId: string,
+    amount: number,
+  ) {
+    return request<PublicCollectionDetail>(
+      `/public/collections/${encodeURIComponent(shareToken)}/items/${encodeURIComponent(folderItemId)}/bids`,
+      {
+        method: "POST",
+        token,
+        body: JSON.stringify({ amount }),
+      },
+    );
+  },
+  createPublicCollectionOffer(
+    token: string,
+    shareToken: string,
+    payload: {
+      message?: string;
+      items: Array<{ folderItemId: string; quantity?: number; amount: number }>;
+    },
+  ) {
+    return request<CollectionCartOffer>(
+      `/public/collections/${encodeURIComponent(shareToken)}/offers`,
+      {
+        method: "POST",
+        token,
+        body: JSON.stringify(payload),
+      },
     );
   },
   recognitionCandidates(payload: {

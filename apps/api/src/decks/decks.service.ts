@@ -1,4 +1,4 @@
-import { BadGatewayException, BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import {
   DeckCardSource as PrismaDeckCardSource,
@@ -22,6 +22,7 @@ import {
 } from "@poke-organizer/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { toCardSummary } from "../common/mappers";
+import { analyzeDeckWithProvider, type DeckAiContext } from "./deck-ai.providers";
 import { CreateDeckDto, GenerateBestDeckDto, MetagameSyncDto, UpdateDeckDto } from "./dto";
 
 const DECK_SIZE = 60;
@@ -118,47 +119,6 @@ const CURATED_ARCHETYPES = [
   }
 ] as const;
 
-const deckAiAnalysisSchema = {
-  type: "object",
-  additionalProperties: false,
-  required: ["summary", "strategy", "strengths", "weaknesses", "improvements", "suggestedChanges", "playTips"],
-  properties: {
-    summary: { type: "string" },
-    strategy: { type: "array", items: { type: "string" }, minItems: 2, maxItems: 5 },
-    strengths: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
-    weaknesses: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 },
-    improvements: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 6 },
-    suggestedChanges: {
-      type: "array",
-      maxItems: 10,
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["action", "cardName", "cardId", "quantity", "reason", "owned"],
-        properties: {
-          action: { type: "string", enum: ["add", "remove", "increase", "decrease"] },
-          cardName: { type: "string" },
-          cardId: { type: ["string", "null"] },
-          quantity: { type: "integer", minimum: 1, maximum: 4 },
-          reason: { type: "string" },
-          owned: { type: "boolean" }
-        }
-      }
-    },
-    playTips: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 5 }
-  }
-};
-
-type OpenAiResponsePayload = {
-  output_text?: string;
-  output?: Array<{
-    content?: Array<{
-      type?: string;
-      text?: string;
-    }>;
-  }>;
-};
-
 @Injectable()
 export class DecksService {
   constructor(
@@ -254,11 +214,6 @@ export class DecksService {
   }
 
   async analyzeWithAi(userId: string, id: string): Promise<DeckAiAnalysis> {
-    const apiKey = this.config.get<string>("OPENAI_API_KEY");
-    if (!apiKey) {
-      throw new ServiceUnavailableException("Configure OPENAI_API_KEY para usar a analise com IA.");
-    }
-
     const deck = await this.findDeck(userId, id);
     const validation = this.validateCards(deck.cards.map((entry) => ({
       card: entry.card,
@@ -266,77 +221,7 @@ export class DecksService {
       source: fromPrismaDeckCardSource(entry.source)
     })), fromPrismaDeckFormat(deck.format));
     const inventory = await this.loadInventory(userId);
-    const model = this.config.get<string>("OPENAI_MODEL") ?? "gpt-5.5";
-    const baseUrl = this.config.get<string>("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
-
-    const response = await fetch(`${baseUrl}/responses`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model,
-        reasoning: { effort: "medium" },
-        max_output_tokens: 2200,
-        input: [
-          {
-            role: "system",
-            content: [
-              {
-                type: "input_text",
-                text: [
-                  "Voce e um especialista em Pokemon TCG competitivo.",
-                  "Analise decks com rigor, mas nao invente cartas fora dos dados recebidos.",
-                  "Se sugerir carta que o usuario nao possui, marque owned=false e explique como carta faltante.",
-                  "A resposta deve ser em portugues do Brasil, objetiva e util para um jogador montar o deck."
-                ].join(" ")
-              }
-            ]
-          },
-          {
-            role: "user",
-            content: [{ type: "input_text", text: JSON.stringify(buildAiDeckContext(deck, validation, inventory)) }]
-          }
-        ],
-        text: {
-          format: {
-            type: "json_schema",
-            name: "deck_ai_analysis",
-            strict: true,
-            schema: deckAiAnalysisSchema
-          }
-        }
-      })
-    });
-
-    if (!response.ok) {
-      const message = await response.text().catch(() => response.statusText);
-      throw new BadGatewayException(`A IA nao conseguiu analisar o deck agora. ${message.slice(0, 240)}`);
-    }
-
-    const payload = await response.json() as OpenAiResponsePayload;
-    const text = extractOpenAiText(payload);
-    if (!text) {
-      throw new BadGatewayException("A IA retornou uma resposta vazia.");
-    }
-
-    try {
-      const parsed = JSON.parse(text) as Omit<DeckAiAnalysis, "model" | "generatedAt">;
-      return {
-        model,
-        generatedAt: new Date().toISOString(),
-        summary: parsed.summary,
-        strategy: parsed.strategy,
-        strengths: parsed.strengths,
-        weaknesses: parsed.weaknesses,
-        improvements: parsed.improvements,
-        suggestedChanges: parsed.suggestedChanges,
-        playTips: parsed.playTips
-      };
-    } catch (err) {
-      throw new BadGatewayException(err instanceof Error ? `Falha ao interpretar resposta da IA: ${err.message}` : "Falha ao interpretar resposta da IA.");
-    }
+    return analyzeDeckWithProvider(this.config, buildAiDeckContext(deck, validation, inventory));
   }
 
   async listArchetypes(): Promise<DeckArchetypeSummary[]> {
@@ -700,7 +585,7 @@ function toArchetypeSummary(archetype: { id: string; slug: string; name: string;
   };
 }
 
-function buildAiDeckContext(deck: DeckWithRelations, validation: DeckValidationSnapshot, inventory: InventoryItem[]) {
+function buildAiDeckContext(deck: DeckWithRelations, validation: DeckValidationSnapshot, inventory: InventoryItem[]): DeckAiContext {
   const inventoryByCardId = new Map<string, number>();
   inventory.forEach((item) => inventoryByCardId.set(item.cardId, (inventoryByCardId.get(item.cardId) ?? 0) + item.quantity));
   const inventoryCards = inventory.slice(0, 180).map((item) => ({
@@ -758,16 +643,6 @@ function buildAiDeckContext(deck: DeckWithRelations, validation: DeckValidationS
     },
     inventory: inventoryCards
   };
-}
-
-function extractOpenAiText(payload: OpenAiResponsePayload): string | null {
-  if (payload.output_text) return payload.output_text;
-  for (const output of payload.output ?? []) {
-    for (const content of output.content ?? []) {
-      if (typeof content.text === "string") return content.text;
-    }
-  }
-  return null;
 }
 
 function addSelected(

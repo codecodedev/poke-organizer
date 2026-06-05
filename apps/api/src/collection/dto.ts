@@ -6,16 +6,18 @@ import {
   CardLanguage,
   DEFAULT_CARD_VARIANT,
 } from "@poke-organizer/shared";
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
   IsIn,
   IsInt,
+  IsNumber,
   IsOptional,
   IsString,
   Min,
   Max,
+  ValidateNested,
 } from "class-validator";
 
 export class AddCollectionItemDto {
@@ -130,6 +132,77 @@ export class UpdateCollectionSharingDto {
   @Transform(({ value }) => value === true || value === "true")
   @IsBoolean()
   ensureToken?: boolean;
+}
+
+export class UpdateCollectionStoreDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  isStore?: boolean;
+}
+
+export class UpdateFolderItemSaleDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => (value === null || value === "" ? null : Number(value)))
+  @IsNumber()
+  manualPrice?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  isSold?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => (value === null || value === "" ? null : Number(value)))
+  @IsNumber()
+  soldPrice?: number | null;
+}
+
+export class CreateCollectionBidDto {
+  @ApiProperty()
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  amount!: number;
+}
+
+export class CreateCollectionCartOfferItemDto {
+  @ApiProperty()
+  @IsString()
+  folderItemId!: string;
+
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  quantity?: number;
+
+  @ApiProperty()
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  amount!: number;
+}
+
+export class CreateCollectionCartOfferDto {
+  @ApiProperty({ type: [CreateCollectionCartOfferItemDto] })
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateCollectionCartOfferItemDto)
+  items!: CreateCollectionCartOfferItemDto[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  message?: string;
+}
+
+export class DecideCollectionCartOfferDto {
+  @ApiProperty({ enum: ["accepted", "rejected"] })
+  @IsIn(["accepted", "rejected"])
+  status!: "accepted" | "rejected";
 }
 
 export const COLLECTION_FOLDER_SORTS = [

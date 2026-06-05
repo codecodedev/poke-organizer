@@ -657,9 +657,18 @@ function DeckAiAnalysisPanel({ analysis }: { analysis: DeckAiAnalysis }) {
   return (
     <section className="soft-card grid gap-4 p-4">
       <div>
-        <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Analise com IA</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">Analise com IA</p>
+          <span className="chip">{formatAiProvider(analysis.provider)}</span>
+          {analysis.fallbackUsed && <span className="warning-note inline-flex py-1 text-xs">Fallback local</span>}
+        </div>
         <h3 className="mt-1 text-xl font-black text-ink">Estrategia e melhorias</h3>
         <p className="section-copy mt-1">{analysis.summary}</p>
+        {analysis.fallbackUsed && (
+          <p className="warning-note mt-3">
+            Usei a analise local porque a IA externa nao esta configurada ou nao respondeu.
+          </p>
+        )}
       </div>
 
       <div className="grid gap-3 lg:grid-cols-2">
@@ -708,6 +717,16 @@ function AiList({ title, items }: { title: string; items: string[] }) {
       </ul>
     </div>
   );
+}
+
+function formatAiProvider(provider: DeckAiAnalysis["provider"]) {
+  const labels = {
+    gemini: "Gemini Free",
+    openai: "OpenAI",
+    local: "Analise local",
+  } satisfies Record<DeckAiAnalysis["provider"], string>;
+
+  return labels[provider];
 }
 
 function formatAiAction(action: DeckAiAnalysis["suggestedChanges"][number]["action"]) {
