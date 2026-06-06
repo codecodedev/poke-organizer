@@ -1,6 +1,9 @@
 -- AlterTable
 ALTER TABLE "public"."CollectionFolderItem" ADD COLUMN "soldQuantity" INTEGER NOT NULL DEFAULT 0;
 
+-- AlterTable
+ALTER TABLE "public"."CollectionItemBid" ADD COLUMN "quantity" INTEGER NOT NULL DEFAULT 1;
+
 -- CreateTable
 CREATE TABLE "public"."Notification" (
     "id" TEXT NOT NULL,
