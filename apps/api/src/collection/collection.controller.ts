@@ -40,6 +40,16 @@ export class CollectionController {
     return this.collection.listFolders(user.id);
   }
 
+  @Get("my-proposals")
+  listMyProposals(@CurrentUser() user: RequestUser) {
+    return this.collection.listMyProposals(user.id);
+  }
+
+  @Get("my-bids")
+  listMyBids(@CurrentUser() user: RequestUser) {
+    return this.collection.listMyBids(user.id);
+  }
+
   @Post("folders")
   createFolder(@CurrentUser() user: RequestUser, @Body() dto: CreateCollectionFolderDto) {
     return this.collection.createFolder(user.id, dto);
@@ -78,6 +88,16 @@ export class CollectionController {
   @Post("folders/:id/items/:folderItemId/finish-auction")
   finishAuction(@CurrentUser() user: RequestUser, @Param("id") id: string, @Param("folderItemId") folderItemId: string) {
     return this.collection.finishAuction(user.id, id, folderItemId);
+  }
+
+  @Delete("folders/:id/items/:folderItemId/bids/:bidId")
+  invalidateBid(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Param("folderItemId") folderItemId: string,
+    @Param("bidId") bidId: string
+  ) {
+    return this.collection.invalidateBid(user.id, id, folderItemId, bidId);
   }
 
   @Get("folders/:id/offers")

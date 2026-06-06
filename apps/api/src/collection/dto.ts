@@ -160,6 +160,12 @@ export class UpdateFolderItemSaleDto {
   @Transform(({ value }) => (value === null || value === "" ? null : Number(value)))
   @IsNumber()
   soldPrice?: number | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  quantity?: number;
 }
 
 export class CreateCollectionBidDto {
@@ -167,6 +173,12 @@ export class CreateCollectionBidDto {
   @Transform(({ value }) => Number(value))
   @IsNumber()
   amount!: number;
+
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  quantity?: number;
 }
 
 export class CreateCollectionCartOfferItemDto {

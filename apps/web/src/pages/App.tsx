@@ -10,6 +10,7 @@ import {
   Sparkles,
   Swords,
   Sun,
+  User as UserIcon,
   X,
 } from "lucide-react";
 import { AudioRegistrationPanel } from "../components/AudioRegistrationPanel";
@@ -25,7 +26,10 @@ import { Button } from "../components/ui/Button";
 import { RequestFeedback } from "../components/ui/RequestFeedback";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 
-type View = "home" | "cards" | "collections" | "decks";
+import { NotificationBell } from "../components/ui/NotificationBell";
+import { ProfilePage } from "../components/ProfilePage";
+
+type View = "home" | "cards" | "collections" | "decks" | "profile";
 type ThemeMode = "light" | "dark";
 type AppRoute = {
   view: View;
@@ -65,6 +69,28 @@ export function App() {
       return null;
     }
   }, [handleSession, session?.refreshToken]);
+
+  useEffect(() => {
+    if (session) {
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get("redirect");
+      if (redirect) {
+        // Clear the redirect param from current URL to avoid loops
+        params.delete("redirect");
+        const newSearch = params.toString();
+        const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}`;
+        window.history.replaceState(null, "", newUrl);
+        
+        // Handle external-like redirect (to public collection paths) or internal views
+        if (redirect.includes("/public/collections/")) {
+          window.location.href = redirect;
+        } else {
+          // Attempt to parse internal redirect if possible, otherwise just stay at home
+          setRoute(parseRoute());
+        }
+      }
+    }
+  }, [session]);
 
   useEffect(() => {
     const handlePopState = () => setRoute(parseRoute());
@@ -189,6 +215,29 @@ export function App() {
               </Button>
 
               <ThemeToggle theme={theme} onToggle={toggleTheme} />
+
+              <NotificationBell
+                session={session}
+                onSession={handleSession}
+                onUnauthorized={handleUnauthorized}
+                onNavigate={(link) => {
+                  const url = new URL(link, window.location.origin);
+                  const tab = url.searchParams.get("tab");
+                  navigate({ view: "profile", collection: tab });
+                }}
+              />
+
+              <button
+                onClick={() => navigate({ view: "profile" })}
+                className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition ${
+                  view === "profile"
+                    ? "border-brand/50 bg-brand/10 text-brand shadow-soft"
+                    : "border-line bg-white/80 text-slate-700 hover:bg-field"
+                }`}
+                title="Meu Perfil"
+              >
+                <UserIcon size={20} />
+              </button>
             </div>
 
             <button
@@ -351,6 +400,16 @@ export function App() {
               session={session}
               onSession={handleSession}
               onUnauthorized={handleUnauthorized}
+            />
+          )}
+
+          {view === "profile" && (
+            <ProfilePage
+              session={session}
+              onSession={handleSession}
+              onUnauthorized={handleUnauthorized}
+              onBack={() => navigate({ view: "home" })}
+              initialTab={route.collection}
             />
           )}
         </div>

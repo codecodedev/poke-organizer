@@ -1,5 +1,7 @@
+import { type ReactNode } from "react";
 import {
   CheckSquare,
+  Gavel,
   Square,
   TrendingDown,
   TrendingUp,
@@ -18,8 +20,10 @@ type Props = {
   selected?: boolean;
   onOpen: (item: CollectionItem) => void;
   onToggleSelection?: (itemId: string) => void;
+  onPriceChange?: (amount: number | null) => void;
   onRemove?: (item: CollectionItem) => void;
   removeLabel?: string;
+  children?: ReactNode;
 };
 
 export function CollectionItemCard({
@@ -28,13 +32,28 @@ export function CollectionItemCard({
   selected,
   onOpen,
   onToggleSelection,
+  onPriceChange,
   onRemove,
   removeLabel = "Remover carta",
+  children,
 }: Props) {
-  const priceText = price?.amount ? formatBrl(price.amount) : "Sem preco";
+  const isSold = Boolean(item.store?.isSold);
+  const soldPrice = item.store?.soldPrice ?? 0;
+  const manualPrice = item.store?.manualPrice;
+  const marketPrice = price?.amount ?? 0;
+  const highestBid = item.store?.highestBid?.amount;
+
+  const displayPrice = isSold
+    ? soldPrice
+    : highestBid ?? manualPrice ?? marketPrice;
+
   const kind = variantKind(item.variant);
   const latestChange = latestPriceChange(price);
-  const hasPriceChange = latestChange !== 0;
+  const hasBids = Boolean(item.store?.highestBid);
+
+  // So mostra variacao se for o preco de mercado puro
+  const showPriceChange =
+    latestChange !== 0 && !isSold && manualPrice === null && !hasBids;
 
   return (
     <article
@@ -47,12 +66,12 @@ export function CollectionItemCard({
           onOpen(item);
         }
       }}
-      title={`${item.card.name} - ${priceText}`}
+      title={`${item.card.name} - ${formatBrl(displayPrice)}`}
       className={`collection-item-card collection-item-card--${kind} group relative cursor-pointer rounded-[22px] border bg-white/72 p-2 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-soft ${
         selected
           ? "border-brand/50 bg-brand/10 shadow-soft"
           : "border-line/80 bg-white/70"
-      }`}
+      } ${isSold ? "opacity-90" : ""}`}
     >
       {onToggleSelection && (
         <button
@@ -72,6 +91,15 @@ export function CollectionItemCard({
         </button>
       )}
 
+      {hasBids && !isSold && (
+        <span
+          className="absolute left-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-2xl border border-amber-200 bg-amber-50/90 text-amber-700 shadow-sm backdrop-blur"
+          title="Possui lances ativos"
+        >
+          <Gavel size={18} />
+        </span>
+      )}
+
       {item.quantity > 1 && (
         <span
           className={`absolute right-4 z-30 rounded-full border border-white/85 bg-night/88 px-2.5 py-1 text-xs font-black text-white shadow-sm backdrop-blur ${onToggleSelection ? "top-14" : "top-4"}`}
@@ -80,19 +108,54 @@ export function CollectionItemCard({
         </span>
       )}
 
-      <CardVariantImage
-        src={item.card.imageSmall}
-        alt={item.card.name}
-        variant={item.variant}
-        effect="frame"
-        className="aspect-[5/7] rounded-[18px] shadow-sm"
-        imageClassName="object-cover transition duration-300 group-hover:scale-[1.03]"
-      />
+      <div className="relative">
+        <CardVariantImage
+          src={item.card.imageSmall}
+          alt={item.card.name}
+          variant={item.variant}
+          effect="frame"
+          className="aspect-[5/7] rounded-[18px] shadow-sm"
+          imageClassName={`object-cover transition duration-300 group-hover:scale-[1.03] ${isSold ? "grayscale-[0.4]" : ""}`}
+        />
+        {isSold && (
+          <div className="absolute inset-0 z-10 grid place-items-center rounded-[18px] bg-night/40 backdrop-blur-[1px]">
+            <span className="rounded-full bg-white/90 px-4 py-2 text-xs font-black uppercase tracking-widest text-night shadow-glow">
+              Vendido
+            </span>
+          </div>
+        )}
+      </div>
 
-      <div className="grid min-h-[72px] gap-1 px-1 py-2">
+      <div className="grid gap-1 px-1 py-2">
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-          <p className="truncate text-sm font-black text-ink">{priceText}</p>
-          {hasPriceChange && (
+          {onPriceChange && !isSold ? (
+            <div className="flex flex-1 items-center" onClick={(e) => e.stopPropagation()}>
+              <span className="text-sm font-black text-ink mr-1">R$</span>
+              <input
+                className="w-full bg-transparent p-0 text-sm font-black text-ink outline-none placeholder:text-slate-300"
+                type="number"
+                min={0}
+                step="0.01"
+                defaultValue={manualPrice ?? marketPrice}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  onPriceChange(val === "" ? null : Number(val));
+                }}
+              />
+            </div>
+          ) : (
+            <p className={`truncate text-sm font-black ${isSold ? "text-emerald-700" : "text-ink"}`}>
+              {formatBrl(displayPrice)}
+            </p>
+          )}
+
+          {isSold && typeof manualPrice === "number" && manualPrice > 0 && manualPrice !== soldPrice && (
+            <p className="text-[10px] font-bold text-slate-400 line-through">
+              {formatBrl(manualPrice)}
+            </p>
+          )}
+
+          {showPriceChange && (
             <span
               className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-black ${
                 latestChange > 0
@@ -110,13 +173,26 @@ export function CollectionItemCard({
             </span>
           )}
         </div>
-        <p className="truncate text-xs font-semibold text-slate-500">
-          {item.card.name}
-        </p>
+        <div className="flex items-center justify-between gap-2 overflow-auto">
+          <p className="truncate text-xs font-semibold text-slate-500">
+            {item.card.name}
+          </p>
+          {isSold && (
+            <span className="shrink-0 text-[10px] font-black uppercase text-slate-400">
+              {item.store?.soldByAuction ? "Leilão" : "Negociada"}
+            </span>
+          )}
+        </div>
       </div>
 
+      {children && (
+        <div className="mt-1 border-t border-line/50 pt-2" onClick={(e) => e.stopPropagation()}>
+          {children}
+        </div>
+      )}
+
       {onRemove && (
-        <div className="absolute bottom-[70px] right-3 opacity-0 transition duration-200 group-hover:opacity-100">
+        <div className="absolute bottom-[75px] right-3 opacity-0 transition duration-200 group-hover:opacity-100">
           <button
             type="button"
             onClick={(event) => {

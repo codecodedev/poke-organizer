@@ -10,6 +10,7 @@ import {
   CollectionFolderDetail,
   CollectionFolderSummary,
   CollectionItem,
+  CollectionItemBid,
   DEFAULT_CARD_VARIANT,
   PriceEstimate,
   PublicCollectionDetail,
@@ -46,6 +47,7 @@ const collectionItemInclude = {
 const folderItemInclude = {
   collectionItem: { include: collectionItemInclude },
   bids: { include: { bidder: true }, orderBy: { createdAt: "desc" as const } },
+  folder: true,
 } satisfies Prisma.CollectionFolderItemInclude;
 
 type CollectionItemWithCard = Prisma.CollectionItemGetPayload<{
@@ -64,6 +66,7 @@ type FolderItemWithStore = Prisma.CollectionFolderItemGetPayload<{
 type CartOfferWithItems = Prisma.CollectionCartOfferGetPayload<{
   include: {
     buyer: true;
+    folder: true;
     items: { include: { folderItem: { include: typeof folderItemInclude } } };
   };
 }>;
@@ -92,10 +95,41 @@ export class CollectionService {
       include: {
         items: { include: folderItemInclude },
       },
-      orderBy: { updatedAt: "desc" },
+      orderBy: { name: "asc" },
     });
-
     return Promise.all(folders.map((folder) => this.mapFolderSummary(folder)));
+  }
+
+  async listMyProposals(userId: string): Promise<CollectionCartOffer[]> {
+    const offers = await this.prisma.collectionCartOffer.findMany({
+      where: { buyerId: userId },
+      include: {
+        buyer: true,
+        folder: true,
+        items: { include: { folderItem: { include: folderItemInclude } } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return offers.map((offer) => this.mapCartOffer(offer));
+  }
+
+  async listMyBids(userId: string): Promise<CollectionItemBid[]> {
+    const bids = await this.prisma.collectionItemBid.findMany({
+      where: { bidderId: userId },
+      include: {
+        folderItem: { include: folderItemInclude },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return bids.map((bid) => ({
+      id: bid.id,
+      bidderId: bid.bidderId,
+      bidderName: "Você",
+      amount: Number(bid.amountBrl),
+      quantity: bid.quantity,
+      createdAt: bid.createdAt.toISOString(),
+      // Add folder item info if needed, but the interface might need updating
+    }));
   }
 
   async createFolder(
@@ -213,16 +247,24 @@ export class CollectionService {
   ): Promise<CollectionFolderDetail> {
     await this.assertOwnsFolder(userId, folderId);
     const item = await this.assertFolderItem(folderId, folderItemId);
-    const isSold = dto.isSold ?? item.isSold;
-    await this.prisma.collectionFolderItem.update({
-      where: { id: folderItemId },
-      data: {
-        manualPriceBrl: dto.manualPrice === undefined ? undefined : dto.manualPrice,
-        isSold,
-        soldPriceBrl: dto.soldPrice === undefined ? undefined : dto.soldPrice,
-        soldAt: isSold ? item.soldAt ?? new Date() : null,
-      },
+    const isSoldRequest = dto.isSold ?? false;
+    const currentQuantity = item.collectionItem.quantity;
+    const soldQuantity = dto.quantity ?? (isSoldRequest ? currentQuantity : 0);
+    const totalSoldNow = isSoldRequest ? item.soldQuantity + soldQuantity : item.soldQuantity;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.collectionFolderItem.update({
+        where: { id: folderItemId },
+        data: {
+          manualPriceBrl: dto.manualPrice === undefined ? undefined : dto.manualPrice,
+          isSold: isSoldRequest ? totalSoldNow >= currentQuantity : item.isSold,
+          soldQuantity: totalSoldNow,
+          soldPriceBrl: dto.soldPrice === undefined ? undefined : dto.soldPrice,
+          soldAt: isSoldRequest ? new Date() : item.soldAt,
+        },
+      });
     });
+
     return this.getFolder(userId, folderId);
   }
 
@@ -232,7 +274,7 @@ export class CollectionService {
     folderItemId: string,
   ): Promise<CollectionFolderDetail> {
     await this.assertOwnsFolder(userId, folderId);
-    await this.assertFolderItem(folderId, folderItemId);
+    const item = await this.assertFolderItem(folderId, folderItemId);
     const bid = await this.prisma.collectionItemBid.findFirst({
       where: { folderItemId },
       orderBy: { amountBrl: "desc" },
@@ -240,15 +282,56 @@ export class CollectionService {
     if (!bid) {
       throw new BadRequestException("Nao ha lances para finalizar este leilao");
     }
-    await this.prisma.collectionFolderItem.update({
-      where: { id: folderItemId },
-      data: {
-        isSold: true,
-        soldPriceBrl: bid.amountBrl,
-        soldAt: new Date(),
-        soldToUserId: bid.bidderId,
-      },
+
+    const soldQuantity = bid.quantity;
+    const currentQuantity = item.collectionItem.quantity;
+    const totalSoldBefore = item.soldQuantity;
+    const totalSoldNow = totalSoldBefore + soldQuantity;
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.collectionFolderItem.update({
+        where: { id: folderItemId },
+        data: {
+          isSold: totalSoldNow >= currentQuantity,
+          soldQuantity: totalSoldNow,
+          soldPriceBrl: bid.amountBrl,
+          soldAt: new Date(),
+          soldToUserId: bid.bidderId,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: bid.bidderId,
+          title: "Leilão Vencido!",
+          message: `Você venceu o leilão da carta "${item.collectionItem.card.name}" na coleção "${item.folder.name}".`,
+          link: `/profile?tab=bids`,
+        },
+      });
     });
+    
+    return this.getFolder(userId, folderId);
+  }
+
+  async invalidateBid(
+    userId: string,
+    folderId: string,
+    folderItemId: string,
+    bidId: string,
+  ): Promise<CollectionFolderDetail> {
+    await this.assertOwnsFolder(userId, folderId);
+    await this.assertFolderItem(folderId, folderItemId);
+    const bid = await this.prisma.collectionItemBid.findFirst({
+      where: { id: bidId, folderItemId },
+    });
+    if (!bid) {
+      throw new NotFoundException("Lance nao encontrado");
+    }
+
+    await this.prisma.collectionItemBid.delete({
+      where: { id: bidId },
+    });
+
     return this.getFolder(userId, folderId);
   }
 
@@ -259,14 +342,20 @@ export class CollectionService {
     dto: CreateCollectionBidDto,
   ): Promise<PublicCollectionDetail> {
     const amount = this.assertPositiveMoney(dto.amount);
+    const quantity = dto.quantity ?? 1;
     const folder = await this.findPublicStoreFolder(shareToken);
     const item = await this.assertFolderItem(folder.id, folderItemId);
+    
     if (item.isSold) {
       throw new BadRequestException("Esta carta ja foi vendida");
     }
     if (folder.userId === userId) {
       throw new BadRequestException("O dono da colecao nao pode dar lance na propria carta");
     }
+    if (quantity > item.collectionItem.quantity) {
+      throw new BadRequestException("Quantidade solicitada maior que a disponivel");
+    }
+
     const highest = await this.prisma.collectionItemBid.findFirst({
       where: { folderItemId },
       orderBy: { amountBrl: "desc" },
@@ -276,7 +365,7 @@ export class CollectionService {
     }
 
     await this.prisma.collectionItemBid.create({
-      data: { folderItemId, bidderId: userId, amountBrl: amount },
+      data: { folderItemId, bidderId: userId, amountBrl: amount, quantity },
     });
     return this.getPublicFolder(shareToken);
   }
@@ -331,6 +420,7 @@ export class CollectionService {
       },
       include: {
         buyer: true,
+        folder: true,
         items: { include: { folderItem: { include: folderItemInclude } } },
       },
     });
@@ -344,6 +434,7 @@ export class CollectionService {
       where: { folderId },
       include: {
         buyer: true,
+        folder: true,
         items: { include: { folderItem: { include: folderItemInclude } } },
       },
       orderBy: { createdAt: "desc" },
@@ -362,6 +453,7 @@ export class CollectionService {
       where: { id: offerId, folderId },
       include: {
         buyer: true,
+        folder: true,
         items: { include: { folderItem: { include: folderItemInclude } } },
       },
     });
@@ -379,21 +471,43 @@ export class CollectionService {
         data: { status, decidedAt: new Date() },
         include: {
           buyer: true,
+          folder: true,
           items: { include: { folderItem: { include: folderItemInclude } } },
         },
       });
       if (status === "ACCEPTED") {
-        for (const item of offer.items) {
+        for (const offerItem of offer.items) {
+          const folderItem = offerItem.folderItem;
+          const soldQuantity = offerItem.quantity;
+          const currentQuantity = folderItem.collectionItem.quantity;
+          const totalSoldBefore = folderItem.soldQuantity;
+          const totalSoldNow = totalSoldBefore + soldQuantity;
+
           await tx.collectionFolderItem.update({
-            where: { id: item.folderItemId },
+            where: { id: offerItem.folderItemId },
             data: {
-              isSold: true,
-              soldPriceBrl: item.amountBrl,
+              isSold: totalSoldNow >= currentQuantity,
+              soldQuantity: totalSoldNow,
+              soldPriceBrl: offerItem.amountBrl,
               soldAt: new Date(),
               soldToUserId: offer.buyerId,
             },
           });
+
+          if (totalSoldNow > currentQuantity) {
+             // If for some reason we sold more than we had (shouldn't happen with validation),
+             // we just decrement what's left.
+          }
         }
+
+        await tx.notification.create({
+          data: {
+            userId: offer.buyerId,
+            title: "Proposta Aceita!",
+            message: `Sua proposta na coleção "${offer.folder.name}" foi aceita pelo vendedor.`,
+            link: `/profile?tab=proposals`,
+          },
+        });
       }
       return decided;
     });
@@ -498,6 +612,10 @@ export class CollectionService {
       include: collectionItemInclude,
     });
 
+    if (existing || (dto.quantity ?? 0) > 0) {
+      await this.syncFolderItemsReplenishment(item.id, item.quantity);
+    }
+
     return {
       item: this.mapItem(item),
       action: existing ? "incremented" : "created",
@@ -531,7 +649,26 @@ export class CollectionService {
       include: collectionItemInclude,
     });
 
+    if (dto.quantity !== undefined) {
+      await this.syncFolderItemsReplenishment(item.id, item.quantity);
+    }
+
     return this.mapItem(item);
+  }
+
+  private async syncFolderItemsReplenishment(collectionItemId: string, newQuantity: number) {
+    const folderItems = await this.prisma.collectionFolderItem.findMany({
+      where: { collectionItemId, isSold: true },
+    });
+
+    for (const fi of folderItems) {
+      if (newQuantity > fi.soldQuantity) {
+        await this.prisma.collectionFolderItem.update({
+          where: { id: fi.id },
+          data: { isSold: false },
+        });
+      }
+    }
   }
 
   async remove(userId: string, id: string) {
@@ -717,6 +854,7 @@ export class CollectionService {
       bidderId: bid.bidderId,
       bidderName: bid.bidder.name?.trim() || bid.bidder.email,
       amount: Number(bid.amountBrl),
+      quantity: bid.quantity,
       createdAt: bid.createdAt.toISOString(),
     })) ?? [];
     const highestBid = bids.length
@@ -743,6 +881,7 @@ export class CollectionService {
         effectivePrice: manualPrice ?? catalogPrice?.amount ?? null,
         isSold: folderItem.isSold,
         soldPrice: folderItem.soldPriceBrl === null ? null : Number(folderItem.soldPriceBrl),
+        soldQuantity: folderItem.soldQuantity,
         soldAt: folderItem.soldAt?.toISOString() ?? null,
         highestBid,
         bids,

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { FolderOpen, Lock, Search } from "lucide-react";
+import { FolderOpen, Gavel, Lock, Plus, Search, ShoppingBag, X } from "lucide-react";
 import type {
   CollectionFolderSort,
   CollectionItem,
   PublicCollectionDetail,
+  CollectionCartOffer,
 } from "@poke-organizer/shared";
 import { api, type Session } from "../../lib/api";
 import { withAuthRetry } from "../../lib/authRetry";
@@ -29,17 +30,24 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
   );
   const [selectedItem, setSelectedItem] = useState<CollectionItem | null>(null);
   const [query, setQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [rarityFilter, setRarityFilter] = useState("");
-  const [variantFilter, setVariantFilter] = useState("");
-  const [sort, setSort] = useState<CollectionFolderSort>("newest");
+  const [typeFilter, setTypeFilter] = useState(() => localStorage.getItem("pc_typeFilter") ?? "");
+  const [rarityFilter, setRarityFilter] = useState(() => localStorage.getItem("pc_rarityFilter") ?? "");
+  const [variantFilter, setVariantFilter] = useState(() => localStorage.getItem("pc_variantFilter") ?? "");
+  const [sort, setSort] = useState<CollectionFolderSort>(() => (localStorage.getItem("pc_sort") as CollectionFolderSort) ?? "newest");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [bidAmounts, setBidAmounts] = useState<Record<string, string>>({});
-  const [cartAmounts, setCartAmounts] = useState<Record<string, string>>({});
-  const [cartMessage, setCartMessage] = useState("");
+  const [selectedAuctionItem, setSelectedAuctionItem] = useState<CollectionItem | null>(null);
+  const [showProposalModal, setShowProposalModal] = useState(false);
+  const [myProposals, setMyProposals] = useState<CollectionCartOffer[]>([]);
+
+  useEffect(() => {
+    localStorage.setItem("pc_typeFilter", typeFilter);
+    localStorage.setItem("pc_rarityFilter", rarityFilter);
+    localStorage.setItem("pc_variantFilter", variantFilter);
+    localStorage.setItem("pc_sort", sort);
+  }, [typeFilter, rarityFilter, variantFilter, sort]);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +59,17 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
         const detail = await api.getPublicCollection(shareToken);
         if (!cancelled) {
           setCollection(detail);
+
+          if (session) {
+            try {
+              const allMyProposals = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+                api.listMyProposals(token),
+              );
+              setMyProposals(allMyProposals.filter((p) => p.folderId === detail.id));
+            } catch (err) {
+              console.error("Failed to load user proposals", err);
+            }
+          }
         }
       } catch (err) {
         if (!cancelled) {
@@ -67,9 +86,10 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
     return () => {
       cancelled = true;
     };
-  }, [shareToken]);
+  }, [shareToken, session, onSession, onUnauthorized]);
 
   const items = collection?.items ?? [];
+  const unsoldItems = useMemo(() => items.filter((i) => !i.store?.isSold), [items]);
   const typeOptions = useMemo(
     () => unique(items.flatMap((item) => item.card.types)),
     [items],
@@ -86,6 +106,9 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
   const visibleItems = useMemo(() => {
     const normalizedQuery = normalizeText(query);
     const filtered = items.filter((item) => {
+      // Se for vitrine (NAO for loja), nao mostra vendidos pro publico
+      if (!collection?.isStore && item.store?.isSold) return false;
+
       if (typeFilter && !item.card.types.includes(typeFilter)) return false;
       if (rarityFilter && item.card.rarity !== rarityFilter) return false;
       if (variantFilter && item.variant !== variantFilter) return false;
@@ -107,7 +130,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
     });
 
     return sortItems(filtered, sort);
-  }, [items, query, rarityFilter, sort, typeFilter, variantFilter]);
+  }, [items, query, rarityFilter, sort, typeFilter, variantFilter, collection?.isStore]);
 
   useEffect(() => {
     setPage(1);
@@ -135,42 +158,33 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
     setCollection(detail);
   }
 
-  async function submitBid(item: CollectionItem) {
-    if (!item.folderItemId) return;
+  async function submitBid(amount: number) {
+    if (!selectedAuctionItem?.folderItemId) return;
     if (!session) {
       setMessage("Faca login no site para dar lances nesta colecao.");
       return;
     }
-    const amount = Number(bidAmounts[item.folderItemId]);
-    if (!Number.isFinite(amount) || amount <= 0) {
-      setMessage("Informe um valor de lance maior que zero.");
-      return;
-    }
     const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-      api.createPublicCollectionBid(token, shareToken, item.folderItemId!, amount),
+      api.createPublicCollectionBid(token, shareToken, selectedAuctionItem.folderItemId!, amount),
     );
     setCollection(detail);
-    setBidAmounts((current) => ({ ...current, [item.folderItemId!]: "" }));
+    
+    const updatedItem = detail.items.find(i => i.id === selectedAuctionItem.id);
+    if (updatedItem) {
+      setSelectedAuctionItem(updatedItem);
+    }
+    
     setMessage("Lance enviado.");
   }
 
-  async function submitCartOffer() {
+  async function submitProposal(proposalItems: { folderItemId: string; amount: number; quantity: number }[], proposalMessage: string) {
     if (!session) {
-      setMessage("Faca login no site para enviar uma proposta de carrinho.");
-      return;
-    }
-    const offerItems = Object.entries(cartAmounts)
-      .map(([folderItemId, amount]) => ({ folderItemId, amount: Number(amount), quantity: 1 }))
-      .filter((item) => Number.isFinite(item.amount) && item.amount > 0);
-    if (!offerItems.length) {
-      setMessage("Adicione pelo menos uma carta com valor de proposta.");
+      setMessage("Faca login no site para enviar uma proposta.");
       return;
     }
     await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-      api.createPublicCollectionOffer(token, shareToken, { items: offerItems, message: cartMessage || undefined }),
+      api.createPublicCollectionOffer(token, shareToken, { items: proposalItems, message: proposalMessage || undefined }),
     );
-    setCartAmounts({});
-    setCartMessage("");
     setMessage("Proposta enviada para o dono da colecao.");
     await reloadCollection();
   }
@@ -226,56 +240,78 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                   </p>
                   <h2 className="section-title truncate">{collection.name}</h2>
                   <p className="section-copy mt-1">
-                    Por {collection.ownerName} - {items.length} cartas -{" "}
+                    Por {collection.ownerName} - {unsoldItems.length} cartas -{" "}
                     {formatBrl(totalValue)}
                   </p>
-                  {collection.isStore && (
-                    <p className="section-copy mt-1">
-                      Loja ativa: envie lances por carta ou monte uma proposta de carrinho.
-                    </p>
-                  )}
                 </div>
-                <span className="inline-flex items-center gap-2 rounded-full border border-leaf/25 bg-leaf/10 px-3 py-1.5 text-xs font-black text-emerald-800">
-                  <FolderOpen size={14} />
-                  Publica
-                </span>
+                <div className="flex items-center gap-3">
+                  {collection.isStore && (
+                    <Button
+                      variant="primary"
+                      icon={<ShoppingBag size={18} />}
+                      onClick={() => setShowProposalModal(true)}
+                    >
+                      Fazer uma proposta
+                    </Button>
+                  )}
+                  <span className="inline-flex items-center gap-2 rounded-full border border-leaf/25 bg-leaf/10 px-3 py-1.5 text-xs font-black text-emerald-800">
+                    <FolderOpen size={14} />
+                    Publica
+                  </span>
+                </div>
               </div>
+              {message && <p className="success-note mt-4">{message}</p>}
             </Panel>
 
-            {collection.isStore && (
-              <Panel title="Negociacao" description="Os lances e propostas ficam pendentes ate o dono da colecao aprovar.">
-                {!session && (
-                  <p className="warning-note">
-                    Para dar lance ou enviar proposta, faca login no site e volte para este link.
-                  </p>
-                )}
-                {message && <p className="success-note">{message}</p>}
-                <div className="mt-4 grid gap-3 rounded-[24px] border border-line/70 bg-field/45 p-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
-                  <label className="grid gap-2">
-                    <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                      Mensagem da proposta
-                    </span>
-                    <input
-                      className="premium-input"
-                      value={cartMessage}
-                      onChange={(event) => setCartMessage(event.target.value)}
-                      placeholder="Ex: consigo pagar hoje pelo pix"
-                    />
-                  </label>
-                  <Button type="button" variant="primary" onClick={() => void submitCartOffer()}>
-                    Enviar proposta
-                  </Button>
+            {myProposals.length > 0 && (
+              <div className="rounded-[28px] border border-brand/20 bg-brand/5 p-6 shadow-sm">
+                <div className="flex items-center gap-2 mb-4">
+                  <ShoppingBag size={18} className="text-brand" />
+                  <h3 className="font-black text-ink">Minhas Propostas nesta coleção</h3>
                 </div>
-              </Panel>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {myProposals.map((offer) => (
+                    <div
+                      key={offer.id}
+                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/50 p-4"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1">
+                          Enviada em {new Date(offer.createdAt).toLocaleDateString()}
+                        </p>
+                        <p className="font-black text-ink">Total: {formatBrl(offer.totalOffer)}</p>
+                        <p className="text-[10px] font-bold text-slate-400 mt-1">
+                          {offer.items.length} carta(s) selecionada(s)
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ${
+                          offer.status === "accepted"
+                            ? "bg-leaf text-white"
+                            : offer.status === "rejected"
+                              ? "bg-red-500 text-white"
+                              : "bg-amber-100 text-amber-800"
+                        }`}
+                      >
+                        {offer.status === "accepted"
+                          ? "Aceita"
+                          : offer.status === "rejected"
+                            ? "Recusada"
+                            : "Pendente"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
 
             <Panel>
-              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(360px,1.45fr)_repeat(4,minmax(150px,1fr))]">
-                <label className="grid gap-2 md:col-span-2 xl:col-span-1">
+              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1.5fr_1fr_1fr_1fr_1.2fr] p-1">
+                <label className="grid gap-2 md:col-span-2 lg:col-span-1 xl:col-span-1">
                   <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
                     Busca
                   </span>
-                  <span className="relative block">
+                  <div className="relative">
                     <Search
                       className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
                       size={18}
@@ -284,9 +320,9 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                       className="premium-input w-full pl-11"
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Buscar por nome, numero, colecao..."
+                      placeholder="Nome, número, coleção..."
                     />
-                  </span>
+                  </div>
                 </label>
                 <FilterSelect
                   label="Tipo"
@@ -311,7 +347,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                 />
                 <label className="grid gap-2">
                   <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                    Ordenacao
+                    Ordenação
                   </span>
                   <select
                     className="premium-select"
@@ -320,7 +356,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                       setSort(event.target.value as CollectionFolderSort)
                     }
                   >
-                    <option value="newest">Ultima adicionada</option>
+                    <option value="newest">Última adicionada</option>
                     <option value="oldest">Mais antiga</option>
                     <option value="value-desc">Maior valor</option>
                     <option value="value-asc">Menor valor</option>
@@ -330,60 +366,34 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                 </label>
               </div>
 
-              <div className="mt-5 rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
-                {visibleItems.length} de {items.length} cartas visiveis
+              <div className="mt-6 rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
+                {visibleItems.length} de {items.length} cartas visíveis
               </div>
 
               {visibleItems.length ? (
                 <>
-                  <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
+                  <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                     {paginatedItems.map((item) => (
-                      <div key={item.id} className="grid gap-2">
-                        <CollectionItemCard
-                          item={item}
-                          price={item.price ?? undefined}
-                          onOpen={setSelectedItem}
-                        />
-                        {collection.isStore && item.folderItemId && (
-                          <div className="rounded-2xl border border-line/70 bg-field/55 p-3">
-                            <p className="text-sm font-black text-ink">
-                              {item.store?.isSold
-                                ? `Vendida por ${formatBrl(item.store.soldPrice ?? 0)}`
-                                : `Preco: ${formatBrl(item.store?.effectivePrice ?? item.price?.amount ?? 0)}`}
-                            </p>
-                            <p className="section-copy text-xs">
-                              Maior lance: {item.store?.highestBid ? formatBrl(item.store.highestBid.amount) : "nenhum"}
-                            </p>
-                            {!item.store?.isSold && (
-                              <div className="mt-2 grid gap-2">
-                                <input
-                                  className="premium-input"
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  value={bidAmounts[item.folderItemId] ?? ""}
-                                  placeholder="Seu lance"
-                                  onChange={(event) =>
-                                    setBidAmounts((current) => ({ ...current, [item.folderItemId!]: event.target.value }))
-                                  }
-                                />
-                                <Button type="button" onClick={() => void submitBid(item)}>Dar lance</Button>
-                                <input
-                                  className="premium-input"
-                                  type="number"
-                                  min={0}
-                                  step="0.01"
-                                  value={cartAmounts[item.folderItemId] ?? ""}
-                                  placeholder="Valor no carrinho"
-                                  onChange={(event) =>
-                                    setCartAmounts((current) => ({ ...current, [item.folderItemId!]: event.target.value }))
-                                  }
-                                />
-                              </div>
-                            )}
+                      <CollectionItemCard
+                        key={item.id}
+                        item={item}
+                        price={item.price ?? undefined}
+                        onOpen={setSelectedItem}
+                      >
+                        {collection.isStore && item.folderItemId && !item.store?.isSold && (
+                          <div className="mt-1 space-y-2">
+                            <Button
+                              type="button"
+                              variant="primary"
+                              className="h-9 w-full text-xs"
+                              icon={<Gavel size={14} />}
+                              onClick={() => setSelectedAuctionItem(item)}
+                            >
+                              {item.store?.highestBid ? "Ver lances" : "Dar lance"}
+                            </Button>
                           </div>
                         )}
-                      </div>
+                      </CollectionItemCard>
                     ))}
                   </div>
                   <PaginationControls
@@ -410,7 +420,405 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
         collectionPrice={selectedItem?.price ?? null}
         onClose={() => setSelectedItem(null)}
       />
+
+      {selectedAuctionItem && (
+        <BidsModal
+          item={selectedAuctionItem}
+          onClose={() => setSelectedAuctionItem(null)}
+          onBid={submitBid}
+          isOwner={false}
+          session={session}
+        />
+      )}
+
+      {showProposalModal && collection && (
+        <ProposalModal
+          items={unsoldItems}
+          onClose={() => setShowProposalModal(false)}
+          onSubmit={submitProposal}
+          session={session}
+        />
+      )}
     </main>
+  );
+}
+
+function LoginWarning({ message }: { message: string }) {
+  const currentUrl = encodeURIComponent(window.location.href);
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm font-bold text-amber-800">{message}</p>
+        <Button
+          type="button"
+          variant="brand"
+          className="h-9 text-xs"
+          onClick={() => (window.location.href = `/?redirect=${currentUrl}`)}
+        >
+          Fazer Login
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function BidsModal({
+  item,
+  onClose,
+  onBid,
+  isOwner,
+  session,
+}: {
+  item: CollectionItem;
+  onClose: () => void;
+  onBid?: (amount: number, quantity: number) => Promise<void>;
+  isOwner?: boolean;
+  session?: Session | null;
+}) {
+  const [amount, setAmount] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
+
+  const bids = useMemo(() => {
+    return item.store?.highestBid ? [item.store.highestBid] : [];
+  }, [item.store?.highestBid]);
+
+  async function submit() {
+    if (!onBid || !amount) return;
+    setError(null);
+    setSuccess(null);
+    setSubmitting(true);
+    try {
+      await onBid(Number(amount), quantity);
+      setAmount("");
+      setSuccess("Lance enviado com sucesso!");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao enviar lance");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        className="animate-soft-pop w-full max-w-md overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+          <div>
+            <h2 className="text-xl font-black text-ink">Lances: {item.card.name}</h2>
+            <p className="text-sm font-semibold text-slate-500">Acompanhe e participe do leilão.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5">
+          <div className="grid gap-4">
+            {!session && !isOwner && (
+              <LoginWarning message="Você precisa estar logado para dar um lance." />
+            )}
+
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-amber-600">Lance Atual</p>
+              <div className="mt-1 flex items-baseline justify-between">
+                <p className="text-2xl font-black text-amber-900">
+                  {item.store?.highestBid ? formatBrl(item.store.highestBid.amount) : "Nenhum lance"}
+                </p>
+                {item.store?.highestBid && (
+                  <p className="text-xs font-bold text-amber-700">por {item.store.highestBid.quantity} carta(s)</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-black text-ink">Histórico de Lances</h3>
+              {bids.length === 0 ? (
+                <p className="py-4 text-center text-xs font-bold text-slate-400">Aguardando primeiro lance...</p>
+              ) : (
+                <div className="grid gap-2">
+                  {bids.map((bid, index) => (
+                    <div key={index} className="flex items-center justify-between rounded-xl bg-field p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-8 w-8 place-items-center rounded-lg bg-white font-black text-ink shadow-sm text-xs">
+                          {index + 1}
+                        </div>
+                        <span className="text-xs font-bold text-ink">Lance por {bid.quantity} carta(s)</span>
+                      </div>
+                      <span className="text-sm font-black text-ink">{formatBrl(bid.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {error && <p className="danger-note text-xs">{error}</p>}
+            {success && <p className="success-note text-xs">{success}</p>}
+
+            {!isOwner && onBid && session && (
+              <div className="mt-2 grid gap-4 border-t border-line/50 pt-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="grid gap-2">
+                    <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Valor Unitário</span>
+                    <input
+                      className="premium-input"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="Em R$"
+                    />
+                  </label>
+                  <label className="grid gap-2">
+                    <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Quantidade</span>
+                    <input
+                      className="premium-input"
+                      type="number"
+                      min={1}
+                      max={item.quantity}
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.min(item.quantity, Math.max(1, Number(e.target.value))))}
+                    />
+                  </label>
+                </div>
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="w-full"
+                  disabled={submitting || !amount}
+                  onClick={submit}
+                >
+                  Enviar Lance
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ProposalModal({
+  items,
+  onClose,
+  onSubmit,
+  session,
+}: {
+  items: CollectionItem[];
+  onClose: () => void;
+  onSubmit: (proposalItems: { folderItemId: string; amount: number; quantity: number }[], message: string) => Promise<void>;
+  session?: Session | null;
+}) {
+  const [query, setQuery] = useState("");
+  const [cart, setCart] = useState<Record<string, { item: CollectionItem; amount: string; quantity: number }>>({});
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const searchResults = useMemo(() => {
+    if (!query.trim()) return [];
+    const normalized = normalizeText(query);
+    return items.filter((item) => {
+      const searchable = normalizeText(item.card.name);
+      return searchable.includes(normalized);
+    }).slice(0, 5);
+  }, [items, query]);
+
+  const cartList = Object.values(cart);
+  const totalValue = cartList.reduce((sum, entry) => sum + (Number(entry.amount) || 0) * entry.quantity, 0);
+
+  async function submit() {
+    const proposalItems = cartList.map((entry) => ({
+      folderItemId: entry.item.folderItemId!,
+      amount: Number(entry.amount),
+      quantity: entry.quantity,
+    })).filter(i => i.amount > 0);
+
+    if (proposalItems.length === 0) return;
+
+    setError(null);
+    setSubmitting(true);
+    try {
+      await onSubmit(proposalItems, message);
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao enviar proposta");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        className="animate-soft-pop flex h-full max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-card"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-line/70 px-6 py-5">
+          <div>
+            <h2 className="text-xl font-black text-ink">Fazer uma proposta</h2>
+            <p className="text-sm font-semibold text-slate-500">Selecione as cartas e sugira um valor total.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-6">
+          <div className="grid gap-6">
+            {!session && (
+              <LoginWarning message="Você precisa estar logado para enviar uma proposta." />
+            )}
+
+            <div className="relative">
+              <label className="grid gap-2">
+                <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Adicionar carta</span>
+                <div className="relative">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                  <input
+                    className="premium-input w-full pl-11"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder="Pesquise cartas nesta coleção..."
+                  />
+                </div>
+              </label>
+
+              {searchResults.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-line bg-white shadow-soft">
+                  {searchResults.map((item) => (
+                    <button
+                      key={item.id}
+                      className="flex w-full items-center gap-3 p-3 text-left transition hover:bg-field"
+                      onClick={() => {
+                        setCart(prev => ({
+                          ...prev,
+                          [item.id]: {
+                            item,
+                            amount: String(item.store?.effectivePrice ?? item.price?.amount ?? 0),
+                            quantity: 1
+                          }
+                        }));
+                        setQuery("");
+                      }}
+                    >
+                      <img src={item.card.imageSmall ?? undefined} className="h-10 w-7 rounded object-cover" alt="" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-ink">{item.card.name}</p>
+                        <p className="text-[10px] font-bold text-slate-500">{item.card.rarity} • {item.card.setName}</p>
+                      </div>
+                      <Plus size={16} className="text-aqua" />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h3 className="text-sm font-black text-ink">Cartas selecionadas ({cartList.length})</h3>
+              <div className="mt-3 space-y-3">
+                {cartList.length === 0 && (
+                  <p className="py-8 text-center text-xs font-bold text-slate-400">Nenhuma carta selecionada ainda.</p>
+                )}
+                {cartList.map((entry) => (
+                  <div key={entry.item.id} className="grid gap-3 rounded-2xl border border-line/60 bg-field/30 p-3">
+                    <div className="flex items-center gap-4">
+                      <img src={entry.item.card.imageSmall ?? undefined} className="h-12 w-8 rounded object-cover shadow-sm" alt="" />
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-black text-ink">{entry.item.card.name}</p>
+                        <p className="text-[10px] font-bold text-slate-500">Ref: {formatBrl(entry.item.store?.effectivePrice ?? entry.item.price?.amount ?? 0)}</p>
+                      </div>
+                      <button
+                        onClick={() => setCart(prev => {
+                          const next = { ...prev };
+                          delete next[entry.item.id];
+                          return next;
+                        })}
+                        className="text-slate-400 hover:text-red-500"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                    
+                    <div className="grid grid-cols-[1fr_120px] gap-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase text-slate-400">Unitário</span>
+                        <div className="relative flex-1">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">R$</span>
+                          <input
+                            className="premium-input h-9 w-full pl-8 text-sm"
+                            type="number"
+                            value={entry.amount}
+                            onChange={(e) => setCart(prev => ({
+                              ...prev,
+                              [entry.item.id]: { ...prev[entry.item.id], amount: e.target.value }
+                            }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase text-slate-400">Qtd</span>
+                        <input
+                          className="premium-input h-9 w-full text-center text-sm"
+                          type="number"
+                          min={1}
+                          max={entry.item.quantity}
+                          value={entry.quantity}
+                          onChange={(e) => setCart(prev => ({
+                            ...prev,
+                            [entry.item.id]: { ...prev[entry.item.id], quantity: Math.min(entry.item.quantity, Math.max(1, Number(e.target.value))) }
+                          }))}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {error && <p className="danger-note text-xs">{error}</p>}
+
+            <label className="grid gap-2">
+              <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Sua mensagem</span>
+              <textarea
+                className="premium-input min-h-[100px] py-3"
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Explique sua proposta ou adicione detalhes para o vendedor..."
+              />
+            </label>
+          </div>
+        </div>
+
+        <div className="border-t border-line/70 bg-field/30 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm font-black text-slate-500 uppercase tracking-widest">Valor Total</span>
+            <span className="text-2xl font-black text-ink">{formatBrl(totalValue)}</span>
+          </div>
+          <Button
+            type="button"
+            variant="primary"
+            className="w-full h-12 text-base"
+            disabled={submitting || cartList.length === 0 || !session}
+            onClick={submit}
+          >
+            {session ? "Enviar Proposta" : "Login necessário"}
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }
 

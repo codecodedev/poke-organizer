@@ -9,6 +9,7 @@ import type {
   CollectionFolderSort,
   CollectionFolderSummary,
   CollectionItem,
+  CollectionItemBid,
   DeckArchetypeSummary,
   DeckAiAnalysis,
   DeckDetail,
@@ -327,10 +328,13 @@ export const api = {
   finishCollectionItemAuction(token: string, folderId: string, folderItemId: string) {
     return request<CollectionFolderDetail>(
       `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/finish-auction`,
-      {
-        method: "POST",
-        token,
-      },
+      { method: "POST", token },
+    );
+  },
+  invalidateCollectionBid(token: string, folderId: string, folderItemId: string, bidId: string) {
+    return request<CollectionFolderDetail>(
+      `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/bids/${encodeURIComponent(bidId)}`,
+      { method: "DELETE", token },
     );
   },
   listCollectionOffers(token: string, folderId: string) {
@@ -338,6 +342,21 @@ export const api = {
       `/collection/folders/${encodeURIComponent(folderId)}/offers`,
       { token },
     );
+  },
+  listMyProposals(token: string) {
+    return request<CollectionCartOffer[]>("/collection/my-proposals", { token });
+  },
+  listMyBids(token: string) {
+    return request<CollectionItemBid[]>("/collection/my-bids", { token });
+  },
+  listNotifications(token: string) {
+    return request<any[]>("/notifications", { token });
+  },
+  markNotificationAsRead(token: string, id: string) {
+    return request<{ ok: true }>(`/notifications/${encodeURIComponent(id)}/read`, {
+      method: "PATCH",
+      token,
+    });
   },
   decideCollectionOffer(
     token: string,
@@ -386,13 +405,14 @@ export const api = {
     shareToken: string,
     folderItemId: string,
     amount: number,
+    quantity?: number,
   ) {
     return request<PublicCollectionDetail>(
       `/public/collections/${encodeURIComponent(shareToken)}/items/${encodeURIComponent(folderItemId)}/bids`,
       {
         method: "POST",
         token,
-        body: JSON.stringify({ amount }),
+        body: JSON.stringify({ amount, quantity }),
       },
     );
   },

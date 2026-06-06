@@ -109,6 +109,7 @@ export type CollectionItemBid = {
   bidderId: string;
   bidderName: string;
   amount: number;
+  quantity: number;
   createdAt: string;
 };
 
@@ -117,7 +118,9 @@ export type CollectionItemStore = {
   effectivePrice: number | null;
   isSold: boolean;
   soldPrice: number | null;
+  soldQuantity: number;
   soldAt: string | null;
+  soldByAuction?: boolean;
   highestBid: CollectionItemBid | null;
   bids: CollectionItemBid[];
 };

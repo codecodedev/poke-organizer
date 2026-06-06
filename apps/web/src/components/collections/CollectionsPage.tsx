@@ -4,6 +4,7 @@ import {
   Copy,
   Eye,
   FolderPlus,
+  Gavel,
   Layers3,
   Lock,
   Plus,
@@ -11,6 +12,7 @@ import {
   Search,
   Share2,
   Trash2,
+  X,
 } from "lucide-react";
 import type {
   CollectionCartOffer,
@@ -60,10 +62,10 @@ export function CollectionsPage({
   const [selectedItem, setSelectedItem] = useState<CollectionItem | null>(null);
   const [newName, setNewName] = useState("");
   const [activeName, setActiveName] = useState("");
-  const [typeFilter, setTypeFilter] = useState("");
-  const [rarityFilter, setRarityFilter] = useState("");
-  const [variantFilter, setVariantFilter] = useState("");
-  const [sort, setSort] = useState<CollectionFolderSort>("newest");
+  const [typeFilter, setTypeFilter] = useState(() => localStorage.getItem("cp_typeFilter") ?? "");
+  const [rarityFilter, setRarityFilter] = useState(() => localStorage.getItem("cp_rarityFilter") ?? "");
+  const [variantFilter, setVariantFilter] = useState(() => localStorage.getItem("cp_variantFilter") ?? "");
+  const [sort, setSort] = useState<CollectionFolderSort>(() => (localStorage.getItem("cp_sort") as CollectionFolderSort) ?? "newest");
   const [pickerQuery, setPickerQuery] = useState("");
   const [pickerTypeFilter, setPickerTypeFilter] = useState("");
   const [pickerRarityFilter, setPickerRarityFilter] = useState("");
@@ -77,6 +79,16 @@ export function CollectionsPage({
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [offers, setOffers] = useState<CollectionCartOffer[]>([]);
+  const [showOffersModal, setShowOffersModal] = useState(false);
+  const [selectedAuctionItem, setSelectedAuctionItem] = useState<CollectionItem | null>(null);
+  const [sellingItem, setSellingItem] = useState<CollectionItem | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem("cp_typeFilter", typeFilter);
+    localStorage.setItem("cp_rarityFilter", rarityFilter);
+    localStorage.setItem("cp_variantFilter", variantFilter);
+    localStorage.setItem("cp_sort", sort);
+  }, [typeFilter, rarityFilter, variantFilter, sort]);
 
   async function load() {
     setLoading(true);
@@ -295,7 +307,12 @@ export function CollectionsPage({
 
   async function updateFolderItemSale(
     folderItemId: string,
-    payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null },
+    payload: {
+      manualPrice?: number | null;
+      isSold?: boolean;
+      soldPrice?: number | null;
+      quantity?: number;
+    },
   ) {
     if (!activeFolder) return;
     const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
@@ -314,6 +331,23 @@ export function CollectionsPage({
     setActiveFolder(detail);
     setActiveName(detail.name);
     setMessage("Leilao finalizado.");
+  }
+
+  async function invalidateBid(folderItemId: string, bidId: string) {
+    if (!activeFolder) return;
+    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.invalidateCollectionBid(token, activeFolder.id, folderItemId, bidId),
+    );
+    setActiveFolder(detail);
+    setActiveName(detail.name);
+    
+    // Atualiza o item selecionado para refletir a remocao do lance no modal aberto
+    const updatedItem = detail.items.find(i => i.folderItemId === folderItemId);
+    if (updatedItem) {
+      setSelectedAuctionItem(updatedItem);
+    }
+    
+    setMessage("Lance invalidado.");
   }
 
   async function refreshOffers(folderId = activeFolder?.id) {
@@ -413,6 +447,10 @@ export function CollectionsPage({
     setVariantFilter("");
     setSort("newest");
     setDetailPage(1);
+    localStorage.removeItem("cp_typeFilter");
+    localStorage.removeItem("cp_rarityFilter");
+    localStorage.removeItem("cp_variantFilter");
+    localStorage.removeItem("cp_sort");
   }
 
   function resetPicker() {
@@ -528,9 +566,17 @@ export function CollectionsPage({
     pickerVariantFilter,
     showAllPickerItems,
   ]);
-  const selectedTotalValue = selectedItems.reduce(
+  const unsoldItems = useMemo(
+    () => selectedItems.filter((item) => !item.store?.isSold),
+    [selectedItems],
+  );
+  const selectedTotalValue = unsoldItems.reduce(
     (sum, item) => sum + (item.price?.amount ?? 0) * item.quantity,
     0,
+  );
+  const pendingOffersCount = useMemo(
+    () => offers.filter((o) => o.status === "pending").length,
+    [offers],
   );
 
   useEffect(() => {
@@ -646,9 +692,12 @@ export function CollectionsPage({
         <CollectionDetailScreen
           activeName={activeName}
           selectedItems={selectedItems}
+          unsoldCount={unsoldItems.length}
           visibleItems={visibleItems}
           detailPage={detailPage}
           selectedTotalValue={selectedTotalValue}
+          pendingOffersCount={pendingOffersCount}
+          onViewOffers={() => setShowOffersModal(true)}
           typeOptions={typeOptions}
           rarityOptions={rarityOptions}
           variantOptions={variantOptions}
@@ -683,9 +732,6 @@ export function CollectionsPage({
           onToggleStore={(isStore) => void updateFolderStore(isStore)}
           onUpdateSale={(folderItemId, payload) => void updateFolderItemSale(folderItemId, payload)}
           onFinishAuction={(folderItemId) => void finishAuction(folderItemId)}
-          offers={offers}
-          onRefreshOffers={() => void refreshOffers()}
-          onDecideOffer={(offerId, status) => void decideOffer(offerId, status)}
           onCopyShareLink={() => void copyShareLink()}
           onTypeFilter={setTypeFilter}
           onRarityFilter={setRarityFilter}
@@ -701,8 +747,10 @@ export function CollectionsPage({
           onPickerPageChange={setPickerPage}
           onToggleItem={toggleItem}
           onOpenCard={setSelectedItem}
-        />
-      )}
+          setSelectedAuctionItem={setSelectedAuctionItem}
+          setSellingItem={setSellingItem}
+          />
+          )}
 
       {message && <p className="success-note">{message}</p>}
       {error && <p className="danger-note">{error}</p>}
@@ -714,6 +762,407 @@ export function CollectionsPage({
         onClose={() => setSelectedItem(null)}
         onUpdate={updateItemDetails}
       />
+
+      {showOffersModal && activeFolder && (
+        <OffersModal
+          offers={offers}
+          onClose={() => setShowOffersModal(false)}
+          onDecide={decideOffer}
+          onRefresh={refreshOffers}
+        />
+      )}
+
+      {selectedAuctionItem && activeFolder && (
+        <BidsModal
+          item={selectedAuctionItem}
+          onClose={() => setSelectedAuctionItem(null)}
+          onAcceptBid={async (bidAmount) => {
+            await finishAuction(selectedAuctionItem.folderItemId!);
+            setSelectedAuctionItem(null);
+          }}
+          onInvalidateBid={(bidId) => invalidateBid(selectedAuctionItem.folderItemId!, bidId)}
+          isOwner={true}
+        />
+      )}
+
+      {sellingItem && activeFolder && (
+        <SellModal
+          item={sellingItem}
+          onClose={() => setSellingItem(null)}
+          onConfirm={async (soldPrice, soldQuantity) => {
+            await updateFolderItemSale(sellingItem.folderItemId!, {
+              isSold: true,
+              soldPrice,
+              quantity: soldQuantity,
+            });
+            setSellingItem(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function SellModal({
+  item,
+  onClose,
+  onConfirm,
+}: {
+  item: CollectionItem;
+  onClose: () => void;
+  onConfirm: (price: number, quantity: number) => Promise<void>;
+}) {
+  const initialPrice = item.store?.manualPrice ?? item.price?.amount ?? 0;
+  const [price, setPrice] = useState(initialPrice.toString());
+  const [quantity, setQuantity] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    setSubmitting(true);
+    try {
+      await onConfirm(Number(price), quantity);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        className="animate-soft-pop w-full max-w-sm overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+          <div>
+            <h2 className="text-lg font-black text-ink">Confirmar venda</h2>
+            <p className="text-xs font-semibold text-slate-500">{item.card.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5">
+          <div className="grid gap-4">
+            <div className="grid grid-cols-[1fr_80px] gap-3">
+              <label className="grid gap-2">
+                <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Preço unitário</span>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">R$</span>
+                  <input
+                    className="premium-input w-full pl-10"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    autoFocus
+                  />
+                </div>
+              </label>
+
+              <label className="grid gap-2">
+                <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Qtd</span>
+                <input
+                  className="premium-input w-full text-center"
+                  type="number"
+                  min={1}
+                  max={item.quantity}
+                  value={quantity}
+                  onChange={(e) => setQuantity(Math.min(item.quantity, Math.max(1, Number(e.target.value))))}
+                />
+              </label>
+            </div>
+
+            <div className="rounded-xl bg-field p-3 text-center">
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total da venda</p>
+              <p className="text-xl font-black text-ink">{formatBrl(Number(price || 0) * quantity)}</p>
+            </div>
+
+            <div className="flex gap-3">
+              <Button type="button" className="flex-1" onClick={onClose}>Cancelar</Button>
+              <Button
+                type="button"
+                variant="primary"
+                className="flex-1"
+                disabled={submitting || !price}
+                onClick={submit}
+              >
+                Confirmar
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BidsModal({
+  item,
+  onClose,
+  onBid,
+  onAcceptBid,
+  onInvalidateBid,
+  isOwner,
+}: {
+  item: CollectionItem;
+  onClose: () => void;
+  onBid?: (amount: number, quantity: number) => Promise<void>;
+  onAcceptBid?: (amount: number) => Promise<void>;
+  onInvalidateBid?: (bidId: string) => Promise<void>;
+  isOwner?: boolean;
+}) {
+  const [amount, setAmount] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+
+  const bids = useMemo(() => {
+    return item.store?.highestBid ? [item.store.highestBid] : [];
+  }, [item.store?.highestBid]);
+
+  async function submit() {
+    if (!onBid || !amount) return;
+    setSubmitting(true);
+    try {
+      await onBid(Number(amount), quantity);
+      setAmount("");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        className="animate-soft-pop w-full max-w-md overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+          <div>
+            <h2 className="text-xl font-black text-ink">Lances: {item.card.name}</h2>
+            <p className="text-sm font-semibold text-slate-500">Acompanhe e participe do leilão.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5">
+          <div className="grid gap-4">
+            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
+              <p className="text-xs font-black uppercase tracking-widest text-amber-600">Lance Atual</p>
+              <div className="mt-1 flex items-baseline justify-between">
+                <p className="text-2xl font-black text-amber-900">
+                  {item.store?.highestBid ? formatBrl(item.store.highestBid.amount) : "Nenhum lance"}
+                </p>
+                {item.store?.highestBid && (
+                  <p className="text-xs font-bold text-amber-700">por {item.store.highestBid.quantity} carta(s)</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-sm font-black text-ink">Histórico de Lances</h3>
+              {bids.length === 0 ? (
+                <p className="py-4 text-center text-xs font-bold text-slate-400">Aguardando primeiro lance...</p>
+              ) : (
+                <div className="grid gap-2">
+                  {bids.map((bid, index) => (
+                    <div key={index} className="flex items-center justify-between rounded-xl bg-field p-3">
+                      <div className="flex items-center gap-3">
+                        <div className="grid h-8 w-8 place-items-center rounded-lg bg-white font-black text-ink shadow-sm text-xs">
+                          {index + 1}
+                        </div>
+                        <span className="text-xs font-bold text-ink">Lance por {bid.quantity} carta(s)</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-black text-ink">{formatBrl(bid.amount)}</span>
+                        {isOwner && (
+                          <div className="flex gap-2">
+                            {onInvalidateBid && (
+                              <button
+                                onClick={() => onInvalidateBid(bid.id)}
+                                className="grid h-8 w-8 place-items-center rounded-lg border border-red-100 bg-white text-red-500 hover:bg-red-50 transition"
+                                title="Invalidar lance"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                            {onAcceptBid && (
+                              <button
+                                onClick={() => onAcceptBid(bid.amount)}
+                                className="rounded-lg bg-aqua px-3 py-1.5 text-[10px] font-black text-white hover:bg-cyan-600 transition"
+                              >
+                                Aceitar
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {!isOwner && onBid && (
+              <div className="mt-2 grid gap-4 border-t border-line/50 pt-5">
+                <div className="grid grid-cols-2 gap-3">
+                  <label className="grid gap-2">
+                    <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Valor Unitário</span>
+                    <input
+                      className="premium-input"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="Em R$"
+                    />
+                  </label>
+                  <label className="grid gap-2">
+                    <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Quantidade</span>
+                    <input
+                      className="premium-input"
+                      type="number"
+                      min={1}
+                      max={item.quantity}
+                      value={quantity}
+                      onChange={(e) => setQuantity(Math.min(item.quantity, Math.max(1, Number(e.target.value))))}
+                    />
+                  </label>
+                </div>
+                <Button
+                  type="button"
+                  variant="primary"
+                  className="w-full"
+                  disabled={submitting || !amount}
+                  onClick={submit}
+                >
+                  Enviar Lance
+                </Button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OffersModal({
+  offers,
+  onClose,
+  onDecide,
+  onRefresh,
+}: {
+  offers: CollectionCartOffer[];
+  onClose: () => void;
+  onDecide: (offerId: string, status: "accepted" | "rejected") => void;
+  onRefresh: () => void;
+}) {
+  const [filter, setFilter] = useState<"pending" | "resolved">("pending");
+
+  const filteredOffers = useMemo(
+    () => offers.filter((o) => (filter === "pending" ? o.status === "pending" : o.status !== "pending")),
+    [filter, offers],
+  );
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        className="animate-soft-pop max-h-[80vh] w-full max-w-2xl overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+          <div>
+            <h2 className="text-xl font-black text-ink">Propostas de Negociação</h2>
+            <p className="text-sm font-semibold text-slate-500">Analise e decida sobre as propostas recebidas.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex gap-2 rounded-2xl bg-field p-1">
+              <button
+                className={`rounded-xl px-4 py-2 text-xs font-black transition ${filter === "pending" ? "bg-white text-ink shadow-sm" : "text-slate-500 hover:text-ink"}`}
+                onClick={() => setFilter("pending")}
+              >
+                Pendentes
+              </button>
+              <button
+                className={`rounded-xl px-4 py-2 text-xs font-black transition ${filter === "resolved" ? "bg-white text-ink shadow-sm" : "text-slate-500 hover:text-ink"}`}
+                onClick={() => setFilter("resolved")}
+              >
+                Resolvidas
+              </button>
+            </div>
+            <Button type="button" onClick={onRefresh} className="h-9 text-xs">Atualizar</Button>
+          </div>
+
+          <div className="mt-5 grid gap-4">
+            {filteredOffers.length === 0 && (
+              <p className="py-10 text-center text-sm font-bold text-slate-400">Nenhuma proposta encontrada.</p>
+            )}
+            {filteredOffers.map((offer) => (
+              <div key={offer.id} className="rounded-2xl border border-line/70 bg-field/45 p-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="font-black text-ink">{offer.buyerName}</p>
+                    <p className="text-xs font-semibold text-slate-500">
+                      {offer.items.length} carta(s) • {formatBrl(offer.totalOffer)} • {formatOfferStatus(offer.status)}
+                    </p>
+                    {offer.message && (
+                      <p className="mt-2 rounded-xl bg-white/60 p-3 text-sm italic text-slate-600 border border-line/40">
+                        "{offer.message}"
+                      </p>
+                    )}
+                  </div>
+                  {offer.status === "pending" && (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        className="h-9 bg-leaf text-white hover:bg-emerald-600"
+                        onClick={() => onDecide(offer.id, "accepted")}
+                      >
+                        Aceitar
+                      </Button>
+                      <Button
+                        type="button"
+                        className="h-9 bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
+                        onClick={() => onDecide(offer.id, "rejected")}
+                      >
+                        Rejeitar
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <div className="mt-4 space-y-2 border-t border-line/40 pt-3">
+                  {offer.items.map((entry) => (
+                    <div key={entry.item.id} className="flex items-center justify-between text-xs font-bold">
+                      <span className="text-slate-600">{entry.quantity}x {entry.item.card.name}</span>
+                      <span className="text-ink">{formatBrl(entry.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -952,9 +1401,12 @@ function CollectionCreateScreen({
 function CollectionDetailScreen({
   activeName,
   selectedItems,
+  unsoldCount,
   visibleItems,
   detailPage,
   selectedTotalValue,
+  pendingOffersCount,
+  onViewOffers,
   typeOptions,
   rarityOptions,
   variantOptions,
@@ -977,7 +1429,6 @@ function CollectionDetailScreen({
   isPublic,
   isStore,
   shareUrl,
-  offers,
   onBack,
   onNameChange,
   onSave,
@@ -986,8 +1437,6 @@ function CollectionDetailScreen({
   onToggleStore,
   onUpdateSale,
   onFinishAuction,
-  onRefreshOffers,
-  onDecideOffer,
   onCopyShareLink,
   onTypeFilter,
   onRarityFilter,
@@ -1003,12 +1452,17 @@ function CollectionDetailScreen({
   onPickerPageChange,
   onToggleItem,
   onOpenCard,
+  setSelectedAuctionItem,
+  setSellingItem,
 }: {
   activeName: string;
   selectedItems: CollectionItem[];
+  unsoldCount: number;
   visibleItems: CollectionItem[];
   detailPage: number;
   selectedTotalValue: number;
+  pendingOffersCount: number;
+  onViewOffers: () => void;
   typeOptions: string[];
   rarityOptions: string[];
   variantOptions: string[];
@@ -1031,7 +1485,6 @@ function CollectionDetailScreen({
   isPublic: boolean;
   isStore: boolean;
   shareUrl: string | null;
-  offers: CollectionCartOffer[];
   onBack: () => void;
   onNameChange: (value: string) => void;
   onSave: () => void;
@@ -1040,8 +1493,6 @@ function CollectionDetailScreen({
   onToggleStore: (isStore: boolean) => void;
   onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null }) => void;
   onFinishAuction: (folderItemId: string) => void;
-  onRefreshOffers: () => void;
-  onDecideOffer: (offerId: string, status: "accepted" | "rejected") => void;
   onCopyShareLink: () => void;
   onTypeFilter: (value: string) => void;
   onRarityFilter: (value: string) => void;
@@ -1057,6 +1508,8 @@ function CollectionDetailScreen({
   onPickerPageChange: (page: number) => void;
   onToggleItem: (itemId: string) => void;
   onOpenCard: (item: CollectionItem) => void;
+  setSelectedAuctionItem: (item: CollectionItem) => void;
+  setSellingItem: (item: CollectionItem) => void;
 }) {
   const paginatedVisibleItems = useMemo(
     () =>
@@ -1067,6 +1520,17 @@ function CollectionDetailScreen({
     [detailPage, visibleItems],
   );
 
+  const debouncedUpdates = useMemo(() => {
+    const timers: Record<string, any> = {};
+    return (folderItemId: string, amount: number | null) => {
+      if (timers[folderItemId]) clearTimeout(timers[folderItemId]);
+      timers[folderItemId] = setTimeout(() => {
+        onUpdateSale(folderItemId, { manualPrice: amount });
+        delete timers[folderItemId];
+      }, 2000);
+    };
+  }, [onUpdateSale]);
+
   return (
     <>
       <Panel>
@@ -1074,8 +1538,9 @@ function CollectionDetailScreen({
           <ScreenHeader
             eyebrow="Detalhes"
             title={activeName || "Colecao"}
-            description={`${selectedItems.length} cartas - ${formatBrl(selectedTotalValue)}`}
+            description={`${unsoldCount} cartas - ${formatBrl(selectedTotalValue)}`}
             onBack={onBack}
+            notification={pendingOffersCount > 0}
             action={
               <div className="flex flex-wrap gap-2">
                 <Button
@@ -1170,20 +1635,31 @@ function CollectionDetailScreen({
             </div>
 
             {isStore && (
-              <>
-                <StoreOwnerPanel
-                  items={selectedItems}
-                  offers={offers}
-                  onUpdateSale={onUpdateSale}
-                  onFinishAuction={onFinishAuction}
-                  onRefreshOffers={onRefreshOffers}
-                  onDecideOffer={onDecideOffer}
-                />
-              </>
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-aqua/20 bg-aqua/5 p-4">
+                <div>
+                  <h4 className="font-black text-ink">Propostas e Lances</h4>
+                  <p className="text-sm font-semibold text-slate-500">
+                    Gerencie as ofertas recebidas e acompanhe os leilões ativos.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="primary"
+                  icon={<Layers3 size={16} />}
+                  onClick={onViewOffers}
+                >
+                  Ver propostas
+                  {pendingOffersCount > 0 && (
+                    <span className="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">
+                      {pendingOffersCount}
+                    </span>
+                  )}
+                </Button>
+              </div>
             )}
           </div>
 
-          <div className="grid gap-3 rounded-[24px] border border-line/70 bg-field/45 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 rounded-[24px] border border-line/70 bg-field/45 p-4 sm:grid-cols-2 lg:grid-cols-4">
             <FilterField label="Tipo">
               <select
                 className="premium-select"
@@ -1220,7 +1696,7 @@ function CollectionDetailScreen({
                 ))}
               </select>
             </FilterField>
-            <FilterField label="Ordenacao">
+            <FilterField label="Ordenação">
               <select
                 className="premium-select"
                 value={sort}
@@ -1228,7 +1704,7 @@ function CollectionDetailScreen({
                   onSort(event.target.value as CollectionFolderSort)
                 }
               >
-                <option value="newest">Ultima adicionada</option>
+                <option value="newest">Última adicionada</option>
                 <option value="oldest">Mais antiga</option>
                 <option value="value-desc">Maior valor</option>
                 <option value="value-asc">Menor valor</option>
@@ -1239,7 +1715,7 @@ function CollectionDetailScreen({
           </div>
 
           <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
-            {visibleItems.length} de {selectedItems.length} cartas visiveis
+            {visibleItems.length} de {unsoldCount} cartas visiveis
           </div>
 
           {visibleItems.length ? (
@@ -1251,9 +1727,38 @@ function CollectionDetailScreen({
                     item={item}
                     price={item.price ?? undefined}
                     onOpen={onOpenCard}
+                    onPriceChange={
+                      isStore && item.folderItemId
+                        ? (amount) => debouncedUpdates(item.folderItemId!, amount)
+                        : undefined
+                    }
                     onRemove={(nextItem) => onToggleItem(nextItem.id)}
                     removeLabel="Remover da colecao"
-                  />
+                  >
+                    {isStore && item.folderItemId && (
+                      <div className="grid gap-2 p-1">
+                        {!item.store?.isSold && !item.store?.highestBid && (
+                          <Button
+                            type="button"
+                            variant="primary"
+                            className="h-9 w-full text-[11px] bg-leaf hover:bg-emerald-600"
+                            onClick={() => setSellingItem(item)}
+                          >
+                            Marcar vendido
+                          </Button>
+                        )}
+                        {item.store?.highestBid && !item.store?.isSold && (
+                          <Button
+                            type="button"
+                            className="h-8 w-full text-[10px]"
+                            onClick={() => setSelectedAuctionItem(item)}
+                          >
+                            Ver lances
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </CollectionItemCard>
                 ))}
               </div>
               <PaginationControls
@@ -1492,101 +1997,7 @@ function CardPickerPanel({
   );
 }
 
-function StoreOwnerPanel({
-  items,
-  offers,
-  onUpdateSale,
-  onFinishAuction,
-  onRefreshOffers,
-  onDecideOffer,
-}: {
-  items: CollectionItem[];
-  offers: CollectionCartOffer[];
-  onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null }) => void;
-  onFinishAuction: (folderItemId: string) => void;
-  onRefreshOffers: () => void;
-  onDecideOffer: (offerId: string, status: "accepted" | "rejected") => void;
-}) {
-  return (
-    <div className="grid gap-4">
-      <div>
-        <h4 className="font-black text-ink">Cartas da loja</h4>
-        <div className="mt-3 grid gap-2">
-          {items.map((item) => {
-            const folderItemId = item.folderItemId;
-            if (!folderItemId) return null;
-            return (
-              <div key={folderItemId} className="grid gap-3 rounded-2xl border border-line/70 bg-field/45 p-3 lg:grid-cols-[minmax(0,1fr)_150px_120px_auto] lg:items-center">
-                <div className="min-w-0">
-                  <p className="truncate font-black text-ink">{item.card.name}</p>
-                  <p className="section-copy">
-                    {item.store?.isSold ? `Vendida por ${formatBrl(item.store.soldPrice ?? 0)}` : `Lance atual: ${item.store?.highestBid ? formatBrl(item.store.highestBid.amount) : "nenhum"}`}
-                  </p>
-                </div>
-                <input
-                  className="premium-input"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  defaultValue={item.store?.manualPrice ?? ""}
-                  placeholder="Preco"
-                  onBlur={(event) =>
-                    onUpdateSale(folderItemId, {
-                      manualPrice: event.target.value ? Number(event.target.value) : null,
-                    })
-                  }
-                />
-                <label className="inline-flex items-center gap-2 text-sm font-black text-slate-700">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(item.store?.isSold)}
-                    onChange={(event) => onUpdateSale(folderItemId, { isSold: event.target.checked })}
-                  />
-                  Vendida
-                </label>
-                <Button type="button" onClick={() => onFinishAuction(folderItemId)}>
-                  Finalizar leilao
-                </Button>
-              </div>
-            );
-          })}
-        </div>
-      </div>
 
-      <div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h4 className="font-black text-ink">Propostas de carrinho</h4>
-          <Button type="button" onClick={onRefreshOffers}>Atualizar propostas</Button>
-        </div>
-        <div className="mt-3 grid gap-2">
-          {offers.length === 0 && <p className="section-copy">Nenhuma proposta enviada ainda.</p>}
-          {offers.map((offer) => (
-            <div key={offer.id} className="rounded-2xl border border-line/70 bg-field/45 p-3">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="font-black text-ink">{offer.buyerName}</p>
-                  <p className="section-copy">
-                    {offer.items.length} carta(s) - {formatBrl(offer.totalOffer)} - {formatOfferStatus(offer.status)}
-                  </p>
-                  {offer.message && <p className="section-copy mt-1">{offer.message}</p>}
-                </div>
-                {offer.status === "pending" && (
-                  <div className="flex flex-wrap gap-2">
-                    <Button type="button" onClick={() => onDecideOffer(offer.id, "accepted")}>Aceitar</Button>
-                    <Button type="button" onClick={() => onDecideOffer(offer.id, "rejected")}>Rejeitar</Button>
-                  </div>
-                )}
-              </div>
-              <p className="section-copy mt-2">
-                {offer.items.map((entry) => `${entry.quantity}x ${entry.item.card.name} por ${formatBrl(entry.amount)}`).join(", ")}
-              </p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function ScreenHeader({
   eyebrow,
@@ -1594,12 +2005,14 @@ function ScreenHeader({
   description,
   onBack,
   action,
+  notification,
 }: {
   eyebrow: string;
   title: string;
   description: string;
   onBack: () => void;
   action?: ReactNode;
+  notification?: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
@@ -1616,7 +2029,12 @@ function ScreenHeader({
           <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
             {eyebrow}
           </p>
-          <h2 className="section-title truncate">{title}</h2>
+          <div className="relative flex items-center gap-2">
+            <h2 className="section-title truncate">{title}</h2>
+            {notification && (
+              <span className="flex h-3 w-3 shrink-0 animate-pulse rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" />
+            )}
+          </div>
           <p className="section-copy mt-1">{description}</p>
         </div>
       </div>

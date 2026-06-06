@@ -8,6 +8,7 @@ import { HealthController } from "./health.controller";
 import { PricingModule } from "./pricing/pricing.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { RecognitionModule } from "./recognition/recognition.module";
+import { NotificationModule } from "./notification/notification.module";
 
 @Module({
   imports: [
@@ -18,7 +19,8 @@ import { RecognitionModule } from "./recognition/recognition.module";
     CollectionModule,
     DecksModule,
     PricingModule,
-    RecognitionModule
+    RecognitionModule,
+    NotificationModule
   ],
   controllers: [HealthController]
 })
