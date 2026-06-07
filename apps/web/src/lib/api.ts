@@ -349,10 +349,14 @@ export const api = {
       { method: "POST", token, body: JSON.stringify({}) },
     );
   },
-  undoCollectionItemSale(token: string, folderId: string, folderItemId: string) {
+  undoCollectionItemSale(token: string, folderId: string, folderItemId: string, quantity?: number) {
     return request<CollectionFolderDetail>(
       `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/undo-sale`,
-      { method: "POST", token, body: JSON.stringify({}) },
+      {
+        method: "POST",
+        token,
+        body: JSON.stringify({ quantity }),
+      },
     );
   },
   removeCollectionFolderItem(token: string, folderId: string, folderItemId: string) {

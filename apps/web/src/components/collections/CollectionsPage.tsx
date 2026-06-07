@@ -89,6 +89,7 @@ export function CollectionsPage({
   const [itemToRemove, setItemToRemove] = useState<CollectionItem | null>(null);
   const [showPickerModal, setShowPickerModal] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [undoingItem, setUndoingItem] = useState<CollectionItem | null>(null);
   const [permissions, setPermissions] = useState<Array<{ id: string; user: { email: string; name: string | null } }>>([]);
 
   useEffect(() => {
@@ -189,10 +190,10 @@ export function CollectionsPage({
     resetPicker();
   }
 
-  async function undoFolderItemSale(folderItemId: string) {
+  async function undoFolderItemSale(folderItemId: string, quantity?: number) {
     if (!activeFolder) return;
     const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-      api.undoCollectionItemSale(token, activeFolder.id, folderItemId),
+      api.undoCollectionItemSale(token, activeFolder.id, folderItemId, quantity),
     );
     setActiveFolder(detail);
     setActiveName(detail.name);
@@ -625,13 +626,24 @@ export function CollectionsPage({
     pickerVariantFilter,
     showAllPickerItems,
   ]);
-  const unsoldItems = useMemo(
-    () => selectedItems.filter((item) => !item.store?.isSold),
+  const unsoldCount = useMemo(
+    () =>
+      selectedItems.reduce(
+        (sum, item) => sum + (item.quantity - (item.store?.soldQuantity ?? 0)),
+        0,
+      ),
     [selectedItems],
   );
-  const selectedTotalValue = unsoldItems.reduce(
-    (sum, item) => sum + (item.price?.amount ?? 0) * item.quantity,
-    0,
+  const selectedTotalValue = useMemo(
+    () =>
+      selectedItems.reduce(
+        (sum, item) =>
+          sum +
+          (item.price?.amount ?? 0) *
+            (item.quantity - (item.store?.soldQuantity ?? 0)),
+        0,
+      ),
+    [selectedItems],
   );
   const pendingOffersCount = useMemo(
     () => offers.filter((o) => o.status === "pending").length,
@@ -753,7 +765,7 @@ export function CollectionsPage({
         <CollectionDetailScreen
           activeName={activeName}
           selectedItems={selectedItems}
-          unsoldCount={unsoldItems.length}
+          unsoldCount={unsoldCount}
           visibleItems={visibleItems}
           detailPage={detailPage}
           selectedTotalValue={selectedTotalValue}
@@ -795,7 +807,7 @@ export function CollectionsPage({
           onToggleStore={(isStore) => void updateFolderStore(isStore)}
           onUpdateSale={(folderItemId, payload) => void updateFolderItemSale(folderItemId, payload)}
           onFinishAuction={(folderItemId) => void finishAuction(folderItemId)}
-          onUndoSale={(folderItemId: string) => void undoFolderItemSale(folderItemId)}
+          onUndoSale={setUndoingItem}
           onCopyShareLink={() => void copyShareLink()}
           onTypeFilter={setTypeFilter}
           onRarityFilter={setRarityFilter}
@@ -897,6 +909,17 @@ export function CollectionsPage({
               quantity: soldQuantity,
             });
             setSellingItem(null);
+          }}
+        />
+      )}
+
+      {undoingItem && activeFolder && (
+        <UndoSaleModal
+          item={undoingItem}
+          onClose={() => setUndoingItem(null)}
+          onConfirm={async (quantity) => {
+            await undoFolderItemSale(undoingItem.folderItemId!, quantity);
+            setUndoingItem(null);
           }}
         />
       )}
@@ -1006,6 +1029,79 @@ function PermissionsModal({
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function UndoSaleModal({
+  item,
+  onClose,
+  onConfirm,
+}: {
+  item: CollectionItem;
+  onClose: () => void;
+  onConfirm: (quantity: number) => Promise<void>;
+}) {
+  const soldQuantity = item.store?.soldQuantity ?? 0;
+  const [quantity, setQuantity] = useState(soldQuantity);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function submit() {
+    setSubmitting(true);
+    try {
+      await onConfirm(quantity);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        className="animate-soft-pop w-full max-w-sm overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+          <div>
+            <h2 className="text-lg font-black text-ink">Desfazer venda</h2>
+            <p className="text-xs font-semibold text-slate-500">{item.card.name}</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="grid h-9 w-9 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5">
+          <div className="grid gap-4">
+            <p className="text-xs font-bold text-slate-600">
+              Você tem {soldQuantity} unidades marcadas como vendidas. Quantas deseja retornar ao inventário?
+            </p>
+            <label className="grid gap-2">
+              <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Quantidade a devolver</span>
+              <input
+                className="premium-input w-full"
+                type="number"
+                min={1}
+                max={soldQuantity}
+                value={quantity}
+                onChange={(e) => setQuantity(Math.min(soldQuantity, Math.max(1, Number(e.target.value))))}
+              />
+            </label>
+            <Button
+              type="button"
+              variant="primary"
+              className="mt-2 w-full bg-red-500 hover:bg-red-600"
+              disabled={submitting || quantity < 1}
+              onClick={submit}
+            >
+              Confirmar cancelamento
+            </Button>
           </div>
         </div>
       </div>
@@ -1742,7 +1838,7 @@ function CollectionDetailScreen({
   onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null }) => void;
   onFinishAuction: (folderItemId: string) => void;
   onCopyShareLink: () => void;
-  onUndoSale: (folderItemId: string) => void;
+  onUndoSale: (item: CollectionItem) => void;
   onTypeFilter: (value: string) => void;
   onRarityFilter: (value: string) => void;
   onVariantFilter: (value: string) => void;
@@ -2066,12 +2162,12 @@ function CollectionDetailScreen({
                             Marcar vendido
                           </Button>
                         )}
-                        {item.store?.isSold && (
+                        {(item.store?.isSold || (item.store?.soldQuantity ?? 0) > 0) && (
                           <Button
                             type="button"
                             variant="ghost"
                             className="h-8 w-full text-[10px] text-slate-500 hover:text-red-500"
-                            onClick={() => onUndoSale(item.folderItemId!)}
+                            onClick={() => onUndoSale(item)}
                           >
                             Desfazer venda
                           </Button>

@@ -217,6 +217,14 @@ export class DecideCollectionCartOfferDto {
   status!: "accepted" | "rejected";
 }
 
+export class UndoFolderItemSaleDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  quantity?: number;
+}
+
 export class ClearCollectionDto {
   @ApiProperty()
   @IsString()

@@ -40,6 +40,7 @@ import {
   DecideCollectionCartOfferDto,
   ClearCollectionDto,
   AddFolderPermissionDto,
+  UndoFolderItemSaleDto,
 } from "./dto";
 import type { CollectionFolderSort } from "./dto";
 
@@ -343,20 +344,34 @@ export class CollectionService {
     userId: string,
     folderId: string,
     folderItemId: string,
+    dto: UndoFolderItemSaleDto = {},
   ): Promise<CollectionFolderDetail> {
     await this.assertOwnsFolder(userId, folderId);
-    await this.assertFolderItem(folderId, folderItemId);
+    const item = await this.assertFolderItem(folderId, folderItemId);
 
-    await this.prisma.collectionFolderItem.update({
-      where: { id: folderItemId },
-      data: {
-        isSold: false,
-        soldQuantity: 0,
-        soldPriceBrl: null,
-        soldAt: null,
-        soldToUserId: null,
-      },
-    });
+    const quantityToUndo = dto.quantity ?? item.soldQuantity;
+    const newSoldQuantity = Math.max(0, item.soldQuantity - quantityToUndo);
+
+    if (newSoldQuantity === 0) {
+      await this.prisma.collectionFolderItem.update({
+        where: { id: folderItemId },
+        data: {
+          isSold: false,
+          soldQuantity: 0,
+          soldPriceBrl: null,
+          soldAt: null,
+          soldToUserId: null,
+        },
+      });
+    } else {
+      await this.prisma.collectionFolderItem.update({
+        where: { id: folderItemId },
+        data: {
+          isSold: false,
+          soldQuantity: newSoldQuantity,
+        },
+      });
+    }
 
     return this.getFolder(userId, folderId);
   }

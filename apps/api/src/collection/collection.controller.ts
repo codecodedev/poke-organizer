@@ -19,6 +19,7 @@ import {
   UpdateCollectionStoreDto,
   UpdateFolderItemSaleDto,
   AddFolderPermissionDto,
+  UndoFolderItemSaleDto,
   } from "./dto";
 
 @ApiTags("collection")
@@ -104,8 +105,13 @@ export class CollectionController {
   }
 
   @Post("folders/:id/items/:folderItemId/undo-sale")
-  undoSale(@CurrentUser() user: RequestUser, @Param("id") id: string, @Param("folderItemId") folderItemId: string) {
-    return this.collection.undoFolderItemSale(user.id, id, folderItemId);
+  undoSale(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Param("folderItemId") folderItemId: string,
+    @Body() dto: UndoFolderItemSaleDto
+  ) {
+    return this.collection.undoFolderItemSale(user.id, id, folderItemId, dto);
   }
 
   @Delete("folders/:id/items/:folderItemId")
