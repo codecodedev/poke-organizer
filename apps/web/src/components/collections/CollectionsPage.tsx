@@ -88,6 +88,8 @@ export function CollectionsPage({
   const [sellingItem, setSellingItem] = useState<CollectionItem | null>(null);
   const [itemToRemove, setItemToRemove] = useState<CollectionItem | null>(null);
   const [showPickerModal, setShowPickerModal] = useState(false);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [permissions, setPermissions] = useState<Array<{ id: string; user: { email: string; name: string | null } }>>([]);
 
   useEffect(() => {
     localStorage.setItem("cp_typeFilter", typeFilter);
@@ -140,6 +142,7 @@ export function CollectionsPage({
       } else {
         setOffers([]);
       }
+      await refreshPermissions(detail.id);
       resetFilters();
       resetPicker();
       setScreen("detail");
@@ -399,6 +402,32 @@ export function CollectionsPage({
     setActiveName(detail.name);
     await refreshOffers(activeFolder.id);
     setMessage(status === "accepted" ? "Proposta aceita e cartas marcadas como vendidas." : "Proposta rejeitada.");
+  }
+
+  async function refreshPermissions(folderId = activeFolder?.id) {
+    if (!folderId) return;
+    const nextPermissions = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.getCollectionFolderPermissions(token, folderId),
+    );
+    setPermissions(nextPermissions);
+  }
+
+  async function addPermission(email: string) {
+    if (!activeFolder) return;
+    await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.addCollectionFolderPermission(token, activeFolder.id, email),
+    );
+    await refreshPermissions(activeFolder.id);
+    setMessage("Permissao adicionada.");
+  }
+
+  async function removePermission(permissionId: string) {
+    if (!activeFolder) return;
+    await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.removeCollectionFolderPermission(token, activeFolder.id, permissionId),
+    );
+    await refreshPermissions(activeFolder.id);
+    setMessage("Permissao removida.");
   }
 
   async function copyShareLink() {
@@ -789,6 +818,7 @@ export function CollectionsPage({
           onTogglePickerModal={setShowPickerModal}
           setSelectedAuctionItem={setSelectedAuctionItem}
           setSellingItem={setSellingItem}
+          onManagePermissions={() => setShowPermissionsModal(true)}
         />
       )}
 
@@ -870,6 +900,115 @@ export function CollectionsPage({
           }}
         />
       )}
+
+      {showPermissionsModal && activeFolder && (
+        <PermissionsModal
+          permissions={permissions}
+          onClose={() => setShowPermissionsModal(false)}
+          onAdd={addPermission}
+          onRemove={removePermission}
+        />
+      )}
+    </div>
+  );
+}
+
+function PermissionsModal({
+  permissions,
+  onClose,
+  onAdd,
+  onRemove,
+}: {
+  permissions: Array<{ id: string; user: { email: string; name: string | null } }>;
+  onClose: () => void;
+  onAdd: (email: string) => Promise<void>;
+  onRemove: (id: string) => Promise<void>;
+}) {
+  const [email, setEmail] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await onAdd(email.trim());
+      setEmail("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao adicionar permissao");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        className="animate-soft-pop w-full max-w-md overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+          <div>
+            <h2 className="text-xl font-black text-ink">Acessos Privados</h2>
+            <p className="text-sm font-semibold text-slate-500">Autorize outros usuários a verem esta coleção.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="p-5">
+          <form onSubmit={submit} className="grid gap-4">
+            <label className="grid gap-2">
+              <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">E-mail do usuário</span>
+              <div className="flex gap-2">
+                <input
+                  className="premium-input flex-1"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="exemplo@email.com"
+                  required
+                />
+                <Button type="submit" variant="primary" disabled={submitting || !email.trim()}>
+                  Adicionar
+                </Button>
+              </div>
+            </label>
+            {error && <p className="text-xs font-bold text-red-500">{error}</p>}
+          </form>
+
+          <div className="mt-6 space-y-3">
+            <h3 className="text-sm font-black text-ink">Usuários com acesso</h3>
+            {permissions.length === 0 ? (
+              <p className="py-4 text-center text-xs font-bold text-slate-400">Apenas você tem acesso a esta coleção privada.</p>
+            ) : (
+              <div className="grid gap-2">
+                {permissions.map((perm) => (
+                  <div key={perm.id} className="flex items-center justify-between rounded-xl bg-field p-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-black text-ink">{perm.user.name || "Sem nome"}</p>
+                      <p className="truncate text-[10px] font-semibold text-slate-500">{perm.user.email}</p>
+                    </div>
+                    <button
+                      onClick={() => onRemove(perm.id)}
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition"
+                      title="Remover acesso"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1621,6 +1760,7 @@ function CollectionDetailScreen({
   onTogglePickerModal: (open: boolean) => void;
   setSelectedAuctionItem: (item: CollectionItem | null) => void;
   setSellingItem: (item: CollectionItem | null) => void;
+  onManagePermissions: () => void;
 }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const paginatedVisibleItems = useMemo(
@@ -1716,13 +1856,25 @@ function CollectionDetailScreen({
               </p>
             </div>
 
-            <Button
-              type="button"
-              icon={shareUrl ? <Copy size={16} /> : <Share2 size={16} />}
-              onClick={onCopyShareLink}
-            >
-              {shareUrl ? "Copiar link" : "Gerar link"}
-            </Button>
+            <div className="flex gap-2">
+              {!isPublic && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  icon={<Plus size={16} />}
+                  onClick={onManagePermissions}
+                >
+                  Autorizar usuários
+                </Button>
+              )}
+              <Button
+                type="button"
+                icon={shareUrl ? <Copy size={16} /> : <Share2 size={16} />}
+                onClick={onCopyShareLink}
+              >
+                {shareUrl ? "Copiar link" : "Gerar link"}
+              </Button>
+            </div>
           </div>
 
           <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm">

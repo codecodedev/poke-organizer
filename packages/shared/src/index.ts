@@ -165,7 +165,7 @@ export type PublicCollectionDetail = CollectionFolderDetail & {
 };
 
 export type HomeSummary = {
-  recentItems: CollectionItem[];
+  hotAuctions: CollectionItem[];
   recentBids: CollectionItemBid[];
   recentProposals: CollectionCartOffer[];
   ranking: CollectionFolderSummary[];

@@ -156,6 +156,16 @@ function friendlyErrorMessage(err: unknown): string {
     : "Nao foi possivel concluir a acao.";
 }
 
+function getSessionId(): string {
+  const key = "poke-organizer-sid";
+  let sid = sessionStorage.getItem(key);
+  if (!sid) {
+    sid = crypto.randomUUID();
+    sessionStorage.setItem(key, sid);
+  }
+  return sid;
+}
+
 export const api = {
   login(email: string, password: string) {
     return request<Session>("/auth/login", {
@@ -363,6 +373,28 @@ export const api = {
       { token },
     );
   },
+  getCollectionFolderPermissions(token: string, folderId: string) {
+    return request<Array<{ id: string; user: { id: string; email: string; name: string | null } }>>(
+      `/collection/folders/${encodeURIComponent(folderId)}/permissions`,
+      { token },
+    );
+  },
+  addCollectionFolderPermission(token: string, folderId: string, email: string) {
+    return request<{ id: string }>(
+      `/collection/folders/${encodeURIComponent(folderId)}/permissions`,
+      {
+        method: "POST",
+        token,
+        body: JSON.stringify({ email }),
+      },
+    );
+  },
+  removeCollectionFolderPermission(token: string, folderId: string, permissionId: string) {
+    return request<{ ok: true }>(
+      `/collection/folders/${encodeURIComponent(folderId)}/permissions/${encodeURIComponent(permissionId)}`,
+      { method: "DELETE", token },
+    );
+  },
   listMyProposals(token: string) {
     return request<CollectionCartOffer[]>("/collection/my-proposals", { token });
   },
@@ -414,14 +446,17 @@ export const api = {
       variant?: string;
       sort?: CollectionFolderSort;
     } = {},
+    token?: string,
   ) {
     const search = new URLSearchParams();
     Object.entries(params).forEach(([key, value]) => {
       if (value) search.set(key, value);
     });
+    search.set("sid", getSessionId());
     const suffix = search.toString() ? `?${search.toString()}` : "";
     return request<PublicCollectionDetail>(
       `/public/collections/${encodeURIComponent(shareToken)}${suffix}`,
+      { token },
     );
   },
   createPublicCollectionBid(

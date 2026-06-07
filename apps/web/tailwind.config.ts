@@ -5,6 +5,15 @@ export default {
   theme: {
     extend: {
       colors: {
+        background: "#020617",
+        primary: "#243665",
+        cyan: "#00f2ff",
+        magenta: "#FF5790",
+        teal: "#053b50",
+        gray: {
+          light: "#a62830", // Keeping hex as requested even if name is odd
+          medium: "#838987",
+        },
         ink: "#18212f",
         field: "#f7f5ff",
         line: "#e4dff2",

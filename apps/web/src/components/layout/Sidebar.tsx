@@ -71,25 +71,27 @@ export function Sidebar({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-full flex-col border-r border-white/70 bg-white/75 backdrop-blur-xl transition-all duration-300 ease-in-out dark:border-slate-800/50 dark:bg-slate-900/80 ${
+        className={`fixed left-0 top-0 z-50 flex h-full flex-col border-r border-white/5 bg-white/5 backdrop-blur-2xl transition-all duration-300 ease-in-out dark:border-white/5 dark:bg-black/20 ${
           isOpen 
             ? "w-[280px] translate-x-0" 
             : "w-[280px] -translate-x-full md:w-20 md:translate-x-0"
         }`}
       >
         {/* Header/Logo */}
-        <div className="flex h-20 items-center justify-between gap-3 px-5">
+        <div className="flex h-24 items-center justify-between gap-3 px-5">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white shadow-glow">
-              CC
-            </div>
+            <img 
+              src={dark ? "/images/logo-dark-bg.png" : "/images/logo-light-bg.png"} 
+              alt="Logo" 
+              className="h-12 w-12 shrink-0 object-contain animate-soft-pop scale-[2.5]"
+            />
             <div
               className={`min-w-0 transition-all duration-300 ${
                 isOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4 md:hidden"
               }`}
             >
-              <h1 className="truncate text-xl font-black text-ink">
-                Coleciona cards
+              <h1 className="truncate text-xl font-black text-ink dark:text-white">
+                coleciona<span className="gradient-text">.cards</span>
               </h1>
               <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">
                 {session?.user.email ?? "Visitante"}
@@ -119,12 +121,12 @@ export function Sidebar({
                 onClick={() => onNavigate(item.id)}
                 className={`group flex w-full items-center gap-3 rounded-2xl px-3 py-3 font-bold transition-all duration-200 ${
                   activeView === item.id
-                    ? "bg-night text-white shadow-soft dark:bg-brand dark:text-white"
-                    : "text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
+                    ? "bg-gradient-to-r from-cyan/20 to-magenta/20 text-white shadow-[0_0_20px_rgba(0,242,255,0.15)] border border-cyan/30 sidebar-active-item"
+                    : "text-slate-400 hover:bg-white/5 hover:text-white"
                 }`}
                 title={!isOpen ? item.label : undefined}
               >
-                <span className="shrink-0">{item.icon}</span>
+                <span className={`shrink-0 ${activeView === item.id ? 'text-cyan' : ''}`}>{item.icon}</span>
                 <span
                   className={`truncate transition-opacity duration-200 ${
                     isOpen ? "opacity-100" : "opacity-0 md:hidden"
@@ -135,14 +137,13 @@ export function Sidebar({
               </button>
             ))
           ) : (
-             <Button
+             <button
                 type="button"
-                variant="brand"
-                className="w-full"
+                className="btn-gradient w-full py-3 rounded-2xl"
                 onClick={() => window.location.href = "/"}
               >
                 {isOpen ? "Entrar" : "In"}
-              </Button>
+              </button>
           )}
         </nav>
 

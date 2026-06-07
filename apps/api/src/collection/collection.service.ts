@@ -191,6 +191,59 @@ export class CollectionService {
     return this.mapFolderDetail(folder, query.sort);
   }
 
+  async getFolderPermissions(userId: string, folderId: string) {
+    await this.assertOwnsFolder(userId, folderId);
+    return this.prisma.collectionFolderPermission.findMany({
+      where: { folderId },
+      include: { user: { select: { id: true, email: true, name: true } } },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  async addFolderPermission(
+    userId: string,
+    folderId: string,
+    dto: AddFolderPermissionDto,
+  ) {
+    await this.assertOwnsFolder(userId, folderId);
+    const targetUser = await this.prisma.user.findUnique({
+      where: { email: dto.email },
+    });
+    if (!targetUser) {
+      throw new NotFoundException("Usuário não encontrado com este e-mail");
+    }
+    if (targetUser.id === userId) {
+      throw new BadRequestException("Você já é o dono desta coleção");
+    }
+
+    return this.prisma.collectionFolderPermission.upsert({
+      where: {
+        folderId_userId: {
+          folderId,
+          userId: targetUser.id,
+        },
+      },
+      create: {
+        folderId,
+        userId: targetUser.id,
+      },
+      update: {},
+      include: { user: { select: { id: true, email: true, name: true } } },
+    });
+  }
+
+  async removeFolderPermission(
+    userId: string,
+    folderId: string,
+    permissionId: string,
+  ) {
+    await this.assertOwnsFolder(userId, folderId);
+    await this.prisma.collectionFolderPermission.delete({
+      where: { id: permissionId, folderId },
+    });
+    return { ok: true };
+  }
+
   async updateFolder(
     userId: string,
     id: string,
@@ -557,10 +610,19 @@ export class CollectionService {
   async getPublicFolder(
     shareToken: string,
     query: CollectionFolderQueryDto = {},
-    viewerInfo?: { ip?: string; userAgent?: string; userId?: string },
+    viewerInfo?: { ip?: string; userAgent?: string; userId?: string; sid?: string },
   ): Promise<PublicCollectionDetail> {
+    const accessConditions: Prisma.CollectionFolderWhereInput[] = [{ isPublic: true }];
+    if (viewerInfo?.userId) {
+      accessConditions.push({ userId: viewerInfo.userId });
+      accessConditions.push({ permissions: { some: { userId: viewerInfo.userId } } });
+    }
+
     const folder = await this.prisma.collectionFolder.findFirst({
-      where: { shareToken, isPublic: true },
+      where: { 
+        shareToken,
+        OR: accessConditions,
+      },
       include: {
         user: true,
         items: {
@@ -572,6 +634,10 @@ export class CollectionService {
     });
 
     if (!folder) {
+      const exists = await this.prisma.collectionFolder.findUnique({ where: { shareToken } });
+      if (exists) {
+        throw new UnauthorizedException("Esta coleção é privada e você não tem permissão para vê-la.");
+      }
       throw new NotFoundException("Public collection not found");
     }
 
@@ -581,26 +647,31 @@ export class CollectionService {
 
     return {
       ...(await this.mapFolderDetail(folder, query.sort)),
-      isPublic: true,
+      isPublic: folder.isPublic,
       ownerName: folder.user.name?.trim() || "Colecionador",
       viewCount: folder.viewCount,
-    };
+    } as PublicCollectionDetail;
   }
 
   private async recordView(
     folderId: string,
-    info: { ip?: string; userAgent?: string; userId?: string },
+    info: { ip?: string; userAgent?: string; userId?: string; sid?: string },
   ) {
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // 12h window is a good standard for "daily uniques"
+    const window = new Date(Date.now() - 12 * 60 * 60 * 1000);
+
+    const conditions: Prisma.CollectionViewWhereInput[] = [];
+    if (info.userId) conditions.push({ viewerId: info.userId });
+    if (info.sid) conditions.push({ userAgent: { contains: `sid:${info.sid}` } }); // Temporary hack to store sid in UA if model doesn't have it
+    if (info.ip) conditions.push({ ip: info.ip });
+
+    if (conditions.length === 0) return;
 
     const recentView = await this.prisma.collectionView.findFirst({
       where: {
         folderId,
-        viewedAt: { gte: yesterday },
-        OR: [
-          info.userId ? { viewerId: info.userId } : undefined,
-          info.ip ? { ip: info.ip } : undefined,
-        ].filter((x): x is NonNullable<typeof x> => !!x),
+        viewedAt: { gte: window },
+        OR: conditions,
       },
     });
 
@@ -611,7 +682,7 @@ export class CollectionService {
             folderId,
             viewerId: info.userId,
             ip: info.ip,
-            userAgent: info.userAgent,
+            userAgent: info.sid ? `${info.userAgent} sid:${info.sid}` : info.userAgent,
           },
         }),
         this.prisma.collectionFolder.update({
@@ -622,9 +693,14 @@ export class CollectionService {
     }
   }
 
-  async getRanking(limit = 5): Promise<CollectionFolderSummary[]> {
+  async getRanking(limit = 5, userId?: string): Promise<CollectionFolderSummary[]> {
+    const accessConditions: Prisma.CollectionFolderWhereInput[] = [{ isPublic: true }];
+    if (userId) {
+      accessConditions.push({ permissions: { some: { userId } } });
+    }
+
     const folders = await this.prisma.collectionFolder.findMany({
-      where: { isPublic: true },
+      where: { OR: accessConditions },
       include: {
         items: { include: folderItemInclude },
       },
@@ -634,16 +710,42 @@ export class CollectionService {
     return Promise.all(folders.map((folder) => this.mapFolderSummary(folder)));
   }
 
+  async getHotAuctions(limit = 5, userId?: string): Promise<CollectionItem[]> {
+    const accessConditions: Prisma.CollectionFolderWhereInput[] = [{ isPublic: true }];
+    if (userId) {
+      accessConditions.push({ permissions: { some: { userId } } });
+    }
+
+    const hotItems = await this.prisma.collectionFolderItem.findMany({
+      where: {
+        isSold: false,
+        folder: { 
+          OR: accessConditions,
+          isStore: true 
+        },
+        bids: { some: {} },
+      },
+      include: {
+        ...folderItemInclude,
+        _count: { select: { bids: true } },
+      },
+      orderBy: { bids: { _count: "desc" } },
+      take: limit,
+    });
+
+    return hotItems.map((item) => this.mapItem(item.collectionItem, item));
+  }
+
   async getHomeSummary(userId: string) {
-    const [recentItems, recentBids, recentProposals, ranking] = await Promise.all([
-      this.list(userId, 5),
+    const [hotAuctions, recentBids, recentProposals, ranking] = await Promise.all([
+      this.getHotAuctions(5, userId),
       this.listMyBids(userId),
       this.listMyProposals(userId),
-      this.getRanking(5),
+      this.getRanking(5, userId),
     ]);
 
     return {
-      recentItems,
+      hotAuctions,
       recentBids: recentBids.slice(0, 5),
       recentProposals: recentProposals.slice(0, 5),
       ranking,

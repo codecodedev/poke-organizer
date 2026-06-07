@@ -6,9 +6,11 @@ import { Button } from "./ui/Button";
 
 type Props = {
   onSession: (session: Session) => void;
+  theme?: "light" | "dark";
 };
 
-export function AuthPanel({ onSession }: Props) {
+export function AuthPanel({ onSession, theme = "dark" }: Props) {
+  const dark = theme === "dark";
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -34,92 +36,99 @@ export function AuthPanel({ onSession }: Props) {
   }
 
   return (
-    <section className="app-shell mx-auto grid min-h-screen w-full max-w-6xl items-center gap-8 px-5 py-8 lg:grid-cols-[1fr_420px]">
-      <div className="max-w-2xl">
-        <div className="mb-5 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber text-lg font-black text-white shadow-glow">
-          CC
-        </div>
-        <span className="chip mb-4">
-          <Sparkles size={14} />
-          Colecao premium
-        </span>
-        <h1 className="text-4xl font-black tracking-normal text-ink sm:text-6xl">Coleciona cards</h1>
-        <p className="mt-4 max-w-xl text-lg leading-8 text-slate-600">
-          Organize sua colecao, cadastre cartas por busca ou audio e acompanhe valores nacionais com uma interface mais leve.
+    <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center gap-12 px-5 py-12">
+      <div className="flex flex-col items-center text-center">
+        <img 
+          src={dark ? "/images/logo-dark-bg.png" : "/images/logo-light-bg.png"} 
+          alt="Coleciona Cards" 
+          className="mb-6 h-36 w-auto animate-soft-pop scale-[2.5]"
+        />
+        <p className="mt-6 max-w-md text-lg leading-relaxed text-slate-400">
+              Coleção, mercado e comunidade.
         </p>
       </div>
 
-      <form onSubmit={submit} className="glass-panel panel-padding">
-        <div className="mb-5 flex rounded-2xl border border-line/80 bg-white/60 p-1">
+      <form onSubmit={submit} className="glass-panel w-full max-w-[420px] p-8 shadow-[0_0_50px_rgba(0,242,255,0.1)]">
+        <div className="mb-8 flex rounded-2xl bg-white/5 p-1">
           <button
             type="button"
             onClick={() => setMode("login")}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-black transition ${
-              mode === "login" ? "bg-white text-ink shadow-sm" : "text-slate-600 hover:text-ink"
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition ${
+              mode === "login" ? "bg-white/10 text-white shadow-sm" : "text-slate-400 hover:text-white"
             }`}
           >
-            <LogIn size={16} />
+            <LogIn size={18} />
             Entrar
           </button>
           <button
             type="button"
             onClick={() => setMode("register")}
-            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-black transition ${
-              mode === "register" ? "bg-white text-ink shadow-sm" : "text-slate-600 hover:text-ink"
+            className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition ${
+              mode === "register" ? "bg-white/10 text-white shadow-sm" : "text-slate-400 hover:text-white"
             }`}
           >
-            <UserPlus size={16} />
+            <UserPlus size={18} />
             Criar conta
           </button>
         </div>
 
         {mode === "register" && (
-          <label className="mb-4 block text-sm font-black text-slate-700">
-            Nome
+          <div className="mb-5">
+            <label className="mb-2 block text-sm font-bold text-slate-300">Nome</label>
             <input
-              className="premium-input mt-2 w-full"
+              className="input-dark w-full"
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Ash Ketchum"
+              placeholder="Ex: Ash Ketchum"
             />
-          </label>
+          </div>
         )}
 
-        <label className="mb-4 block text-sm font-black text-slate-700">
-          Email
+        <div className="mb-5">
+          <label className="mb-2 block text-sm font-bold text-slate-300">Email</label>
           <input
-            className="premium-input mt-2 w-full"
+            className="input-dark w-full"
             value={email}
             type="email"
             onChange={(event) => setEmail(event.target.value)}
             placeholder="voce@email.com"
             required
           />
-        </label>
+        </div>
 
-        <label className="mb-4 block text-sm font-black text-slate-700">
-          Senha
+        <div className="mb-6">
+          <label className="mb-2 block text-sm font-bold text-slate-300">Senha</label>
           <input
-            className="premium-input mt-2 w-full"
+            className="input-dark w-full"
             value={password}
             type="password"
             minLength={8}
             onChange={(event) => setPassword(event.target.value)}
+            placeholder="••••••••"
             required
           />
-        </label>
+        </div>
 
-        {error && <p className="danger-note mb-4">{error}</p>}
+        {error && <p className="mb-6 rounded-xl border border-magenta/20 bg-magenta/10 px-4 py-3 text-sm font-semibold text-magenta">{error}</p>}
 
-        <Button
+        <button
           type="submit"
           disabled={loading}
-          variant="brand"
-          className="w-full"
-          icon={mode === "login" ? <LogIn size={18} /> : <UserPlus size={18} />}
+          className="btn-gradient flex h-14 w-full items-center justify-center gap-3 rounded-2xl text-lg disabled:opacity-50"
         >
-          {loading ? "Aguarde" : mode === "login" ? "Entrar" : "Criar conta"}
-        </Button>
+          {loading ? (
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          ) : (
+            <>
+              {mode === "login" ? <LogIn size={20} /> : <UserPlus size={20} />}
+              {mode === "login" ? "Entrar" : "Criar conta"}
+            </>
+          )}
+        </button>
+        
+        <p className="mt-6 text-center text-xs text-slate-500">
+          Ao continuar, você concorda com nossos Termos de Uso.
+        </p>
       </form>
     </section>
   );

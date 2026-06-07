@@ -67,10 +67,10 @@ export function CollectionItemCard({
         }
       }}
       title={`${item.card.name} - ${formatBrl(displayPrice)}`}
-      className={`collection-item-card collection-item-card--${kind} group relative cursor-pointer rounded-[22px] border bg-white/72 p-2 shadow-sm transition duration-200 hover:-translate-y-1 hover:shadow-soft ${
+      className={`collection-item-card collection-item-card--${kind} group relative cursor-pointer rounded-[24px] border p-2 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-cyan/5 ${
         selected
-          ? "border-brand/50 bg-brand/10 shadow-soft"
-          : "border-line/80 bg-white/70"
+          ? "border-cyan/50 bg-cyan/10 shadow-[0_0_20px_rgba(0,242,255,0.1)]"
+          : "border-white/5 bg-white/5 backdrop-blur-md"
       } ${isSold ? "opacity-90" : ""}`}
     >
       {onToggleSelection && (
@@ -80,7 +80,7 @@ export function CollectionItemCard({
             event.stopPropagation();
             onToggleSelection(item.id);
           }}
-          className="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-2xl border border-white/80 bg-white/90 text-slate-700 shadow-sm backdrop-blur transition hover:border-brand/40"
+          className="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-2xl border border-white/10 bg-black/40 text-slate-300 shadow-sm backdrop-blur transition hover:border-cyan/40 hover:text-white"
           aria-label={
             selected
               ? "Remover da atualizacao de valores"
@@ -93,7 +93,7 @@ export function CollectionItemCard({
 
       {hasBids && !isSold && (
         <span
-          className="absolute left-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-2xl border border-amber-200 bg-amber-50/90 text-amber-700 shadow-sm backdrop-blur"
+          className="absolute left-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-500 shadow-sm backdrop-blur"
           title="Possui lances ativos"
         >
           <Gavel size={18} />
@@ -102,7 +102,7 @@ export function CollectionItemCard({
 
       {item.quantity > 1 && (
         <span
-          className={`absolute right-4 z-30 rounded-full border border-white/85 bg-night/88 px-2.5 py-1 text-xs font-black text-white shadow-sm backdrop-blur ${onToggleSelection ? "top-14" : "top-4"}`}
+          className={`absolute right-4 z-30 rounded-full border border-white/10 bg-black/60 px-2.5 py-1 text-xs font-black text-white shadow-sm backdrop-blur ${onToggleSelection ? "top-14" : "top-4"}`}
         >
           x{item.quantity}
         </span>
@@ -114,12 +114,12 @@ export function CollectionItemCard({
           alt={item.card.name}
           variant={item.variant}
           effect="frame"
-          className="aspect-[5/7] rounded-[18px] shadow-sm"
+          className="aspect-[5/7] rounded-[20px] shadow-lg"
           imageClassName={`object-cover transition duration-300 group-hover:scale-[1.03] ${isSold ? "grayscale-[0.4]" : ""}`}
         />
         {isSold && (
-          <div className="absolute inset-0 z-10 grid place-items-center rounded-[18px] bg-night/40 backdrop-blur-[1px]">
-            <span className="rounded-full bg-white/90 px-4 py-2 text-xs font-black uppercase tracking-widest text-night shadow-glow">
+          <div className="absolute inset-0 z-10 grid place-items-center rounded-[20px] bg-black/40 backdrop-blur-[1px]">
+            <span className="rounded-full bg-white/10 border border-white/20 px-4 py-2 text-xs font-black uppercase tracking-widest text-white shadow-xl">
               Vendido
             </span>
           </div>
@@ -130,9 +130,9 @@ export function CollectionItemCard({
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {onPriceChange && !isSold ? (
             <div className="flex flex-1 items-center" onClick={(e) => e.stopPropagation()}>
-              <span className="text-sm font-black text-ink mr-1">R$</span>
+              <span className="text-sm font-black text-white mr-1">R$</span>
               <input
-                className="w-full bg-slate-700 p-0.5 pl-2 rounded-xl text-sm font-black text-ink outline-none placeholder:text-slate-300"
+                className="w-full bg-white/5 border border-white/10 p-1.5 pl-3 rounded-xl text-sm font-black text-white outline-none focus:ring-1 focus:ring-cyan/50 transition"
                 type="number"
                 min={0}
                 step="0.01"
@@ -144,13 +144,13 @@ export function CollectionItemCard({
               />
             </div>
           ) : (
-            <p className={`truncate text-sm font-black ${isSold ? "text-emerald-700" : "text-ink"}`}>
+            <p className={`truncate text-sm font-black ${isSold ? "text-emerald-400" : "text-white"}`}>
               {formatBrl(displayPrice)}
             </p>
           )}
 
           {isSold && typeof manualPrice === "number" && manualPrice > 0 && manualPrice !== soldPrice && (
-            <p className="text-[10px] font-bold text-slate-400 line-through">
+            <p className="text-[10px] font-bold text-slate-500 line-through">
               {formatBrl(manualPrice)}
             </p>
           )}
@@ -159,8 +159,8 @@ export function CollectionItemCard({
             <span
               className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-black ${
                 latestChange > 0
-                  ? "border-leaf/25 bg-leaf/10 text-emerald-800"
-                  : "border-red-200 bg-red-50 text-red-700"
+                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                  : "border-rose-500/20 bg-rose-500/10 text-rose-400"
               }`}
               title={latestChange > 0 ? "Valor subiu" : "Valor caiu"}
             >
@@ -174,11 +174,11 @@ export function CollectionItemCard({
           )}
         </div>
         <div className="flex items-center justify-between gap-2 overflow-auto">
-          <p className="truncate text-xs font-semibold text-slate-500">
+          <p className="truncate text-xs font-semibold text-slate-400">
             {item.card.name}
           </p>
           {isSold && (
-            <span className="shrink-0 text-[10px] font-black uppercase text-slate-400">
+            <span className="shrink-0 text-[10px] font-black uppercase text-slate-500">
               {item.store?.soldByAuction ? "Leilão" : "Negociada"}
             </span>
           )}
@@ -186,7 +186,7 @@ export function CollectionItemCard({
       </div>
 
       {children && (
-        <div className="mt-1 border-t border-line/50 pt-2" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-1 border-t border-white/5 pt-2" onClick={(e) => e.stopPropagation()}>
           {children}
         </div>
       )}
@@ -199,7 +199,7 @@ export function CollectionItemCard({
               event.stopPropagation();
               onRemove(item);
             }}
-            className="grid h-9 w-9 place-items-center rounded-2xl border border-red-100 bg-white/95 text-red-600 shadow-sm backdrop-blur transition hover:-translate-y-0.5 hover:bg-red-50"
+            className="grid h-9 w-9 place-items-center rounded-2xl border border-rose-500/20 bg-black/60 text-rose-500 shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:bg-rose-500/20"
             aria-label={removeLabel}
           >
             <Trash2 size={16} />

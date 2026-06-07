@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   BarChart3,
   Eye,
+  Flame,
   FolderOpen,
   Gavel,
   Home,
@@ -152,37 +153,50 @@ export function App() {
     <>
       <RequestFeedback />
       <div className="flex min-h-screen transition-all duration-300">
-        <Sidebar
-          session={session}
-          activeView={view}
-          onNavigate={(nextView) => navigate({ view: nextView })}
-          onLogout={logout}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-          isOpen={sidebarOpen}
-          onToggleOpen={() => setSidebarOpen(!sidebarOpen)}
-          onSession={handleSession}
-          onUnauthorized={handleUnauthorized}
-        />
+        {session && (
+          <Sidebar
+            session={session}
+            activeView={view}
+            onNavigate={(nextView) => navigate({ view: nextView })}
+            onLogout={logout}
+            theme={theme}
+            onToggleTheme={toggleTheme}
+            isOpen={sidebarOpen}
+            onToggleOpen={() => setSidebarOpen(!sidebarOpen)}
+            onSession={handleSession}
+            onUnauthorized={handleUnauthorized}
+          />
+        )}
 
-        <div className={`flex flex-1 flex-col transition-all duration-300 ${sidebarOpen ? "md:ml-[280px]" : "md:ml-20"}`}>
-          <header className="sticky top-0 z-30 flex h-16 items-center border-b border-white/70 bg-white/75 px-5 backdrop-blur-xl md:hidden">
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 text-night shadow-sm"
-            >
-              <Menu size={22} />
-            </button>
-            <div className="ml-4 flex items-center gap-2">
-              <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand via-coral to-amber font-black text-white text-[10px]">
-                CC
+        <div className={`flex flex-1 flex-col transition-all duration-300 ${session ? (sidebarOpen ? "md:ml-[280px]" : "md:ml-20") : ""}`}>
+          {(session || !route.publicCollection) && (
+            <header className={`sticky top-0 z-30 flex h-20 items-center border-b border-white/5 bg-white/5 px-5 backdrop-blur-xl dark:bg-black/20 ${session ? 'md:hidden' : 'justify-between'}`}>
+              <div className="flex items-center gap-3">
+                <img 
+                  src={theme === "dark" ? "/images/logo-dark-bg.png" : "/images/logo-light-bg.png"} 
+                  alt="Logo" 
+                  className="h-10 w-10 object-contain scale-[2.5]"
+                />
+                <span className="text-xl font-black text-ink dark:text-white">coleciona<span className="gradient-text">.cards</span></span>
               </div>
-              <span className="font-black text-ink">Coleciona cards</span>
-            </div>
-          </header>
 
-          <main className="mx-auto w-full max-w-7xl gap-5 px-5 py-6">
+              {session ? (
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(true)}
+                  className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 text-night shadow-sm"
+                >
+                  <Menu size={22} />
+                </button>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <ThemeToggle theme={theme} onToggle={toggleTheme} />
+                </div>
+              )}
+            </header>
+          )}
+
+          <main className={`mx-auto w-full max-w-7xl gap-5 px-5 py-6 ${!session && !route.publicCollection ? 'flex flex-1 flex-col items-center justify-center' : ''}`}>
             {route.publicCollection && (
               <PublicCollectionPage
                 shareToken={route.publicCollection}
@@ -194,18 +208,7 @@ export function App() {
             )}
 
             {!session && !route.publicCollection && (
-              <div className="flex h-full min-h-[60vh] flex-col items-center justify-center text-center">
-                <div className="grid h-20 w-20 place-items-center rounded-3xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white text-3xl shadow-glow mb-6">
-                  CC
-                </div>
-                <h2 className="text-3xl font-black text-ink mb-2">Bem-vindo ao Coleciona cards</h2>
-                <p className="text-slate-500 max-w-md mb-8">
-                  Organize sua coleção de Pokémon TCG, acompanhe preços do mercado brasileiro e crie decks incríveis.
-                </p>
-                <AuthPanel
-                  onSession={handleSession}
-                />
-              </div>
+              <AuthPanel onSession={handleSession} theme={theme} />
             )}
 
             {!route.publicCollection && view === "home" && session && (
@@ -441,38 +444,92 @@ function HomeView({
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
-          <CollectionList
-            session={session}
-            onSession={onSession}
-            onUnauthorized={onUnauthorized}
-            refreshKey={refreshKey}
-            limit={5}
-            title="Ultimas adicionadas"
-            description="As cartas mais recentes do seu inventario."
-            modalItemId={cardRoute}
-            onModalItemChange={(card) => navigate({ view: "home", card })}
-            showCounts={false}
-          />
+          <div className="glass-panel p-5">
+            <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-orange-500/10 text-orange-500">
+                  <Flame size={18} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white text-lg">Leilões mais movimentados</h3>
+                  <p className="text-xs text-slate-400">As cartas que estão recebendo mais lances no momento.</p>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                className="text-xs h-8 px-3"
+                onClick={() => navigate({ view: "collections" })}
+              >
+                Ver tudo
+              </Button>
+            </div>
+
+            {loading ? (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                {[...Array(5)].map((_, i) => (
+                  <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-slate-100" />
+                ))}
+              </div>
+            ) : !summary?.hotAuctions?.length ? (
+              <p className="py-8 text-center text-slate-400 text-sm italic">Nenhum leilão ativo no momento.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+                {summary?.hotAuctions?.map((item) => (
+                  <div
+                    key={item.id}
+                    className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-white/5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-cyan/5"
+                    onClick={() => {
+                      if (item.store?.highestBid?.folderId) {
+                        navigate({ view: "home", publicCollection: item.store.highestBid.folderId });
+                      }
+                    }}
+                  >
+                    <div className="aspect-[3/4] overflow-hidden bg-white/5">
+                      <img
+                        src={item.card.imageSmall || ""}
+                        alt={item.card.name}
+                        className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                      />
+                    </div>
+                    <div className="p-3">
+                      <p className="truncate text-xs font-bold text-white">{item.card.name}</p>
+                      <div className="mt-2 flex items-center justify-between">
+                        <span className="text-[10px] font-black text-cyan">
+                          {formatBrl(item.store?.highestBid?.amount || item.store?.effectivePrice || 0)}
+                        </span>
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-orange-400">
+                          <Gavel size={10} /> {item.store?.bids.length || 0}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-0.5 text-[8px] font-black text-white shadow-glow">
+                      HOT
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           <div className="grid gap-6 md:grid-cols-2">
             <div className="glass-panel p-5">
               <div className="mb-4 flex items-center gap-2">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-amber/10 text-amber">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan/10 text-cyan">
                   <Gavel size={18} />
                 </div>
-                <h3 className="font-bold text-ink">Seus lances recentes</h3>
+                <h3 className="font-bold text-white">Seus lances recentes</h3>
               </div>
-              {!summary?.recentBids.length && !loading ? (
+              {!summary?.recentBids?.length && !loading ? (
                 <p className="py-4 text-center text-slate-400 text-sm italic">Nenhum lance realizado ainda.</p>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {summary?.recentBids.map((bid) => (
-                    <div key={bid.id} className="flex items-center justify-between rounded-xl border border-line bg-white/50 p-3">
+                  {summary?.recentBids?.map((bid) => (
+                    <div key={bid.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3">
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Lance em {bid.folderId}</p>
-                        <p className="font-bold text-ink">{formatBrl(bid.amount)}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Lance em {bid.folderId}</p>
+                        <p className="font-bold text-white">{formatBrl(bid.amount)}</p>
                       </div>
-                      <span className="text-[10px] text-slate-400">{new Date(bid.createdAt).toLocaleDateString()}</span>
+                      <span className="text-[10px] text-slate-500">{new Date(bid.createdAt).toLocaleDateString()}</span>
                     </div>
                   ))}
                 </div>
@@ -481,23 +538,23 @@ function HomeView({
 
             <div className="glass-panel p-5">
               <div className="mb-4 flex items-center gap-2">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand/10 text-brand">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
                   <ShoppingBag size={18} />
                 </div>
-                <h3 className="font-bold text-ink">Suas propostas</h3>
+                <h3 className="font-bold text-white">Suas propostas</h3>
               </div>
-              {!summary?.recentProposals.length && !loading ? (
+              {!summary?.recentProposals?.length && !loading ? (
                 <p className="py-4 text-center text-slate-400 text-sm italic">Nenhuma proposta enviada ainda.</p>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {summary?.recentProposals.map((offer) => (
-                    <div key={offer.id} className="flex items-center justify-between rounded-xl border border-line bg-white/50 p-3">
+                  {summary?.recentProposals?.map((offer) => (
+                    <div key={offer.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3">
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Proposta para {offer.buyerName}</p>
-                        <p className="font-bold text-ink">{formatBrl(offer.totalOffer)}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Proposta para {offer.buyerName}</p>
+                        <p className="font-bold text-white">{formatBrl(offer.totalOffer)}</p>
                       </div>
                       <div className="text-right">
-                        <span className={`text-[10px] font-bold uppercase ${offer.status === 'accepted' ? 'text-emerald-500' : offer.status === 'rejected' ? 'text-rose-500' : 'text-amber-500'}`}>
+                        <span className={`text-[10px] font-bold uppercase ${offer.status === 'accepted' ? 'text-emerald-400' : offer.status === 'rejected' ? 'text-rose-400' : 'text-amber'}`}>
                           {offer.status === 'accepted' ? 'Aceita' : offer.status === 'rejected' ? 'Recusada' : 'Pendente'}
                         </span>
                       </div>
@@ -512,28 +569,28 @@ function HomeView({
         <div className="flex flex-col gap-6">
           <div className="glass-panel overflow-hidden p-5">
             <div className="mb-5 flex items-center gap-2">
-              <div className="grid h-8 w-8 place-items-center rounded-lg bg-coral/10 text-coral">
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
                 <TrendingUp size={18} />
               </div>
-              <h3 className="font-bold text-ink">Coleções em alta</h3>
+              <h3 className="font-bold text-white">Coleções em alta</h3>
             </div>
             
             <div className="flex flex-col gap-4">
-              {summary?.ranking.map((folder, index) => (
+              {summary?.ranking?.map((folder, index) => (
                 <button
                   key={folder.id}
                   onClick={() => navigate({ view: "home", publicCollection: folder.shareToken })}
                   className="group flex flex-col gap-2 text-left"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-[10px] font-black text-slate-400 group-hover:bg-brand group-hover:text-white transition-colors">
+                    <div className="grid h-7 w-7 place-items-center rounded-full bg-white/5 text-[10px] font-black text-slate-500 group-hover:bg-cyan group-hover:text-black transition-colors">
                       #{index + 1}
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <p className="truncate font-bold text-ink text-sm group-hover:text-brand transition-colors">
+                      <p className="truncate font-bold text-white text-sm group-hover:text-cyan transition-colors">
                         {folder.name}
                       </p>
-                      <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                      <div className="flex items-center gap-3 text-[10px] text-slate-500">
                         <span className="flex items-center gap-1">
                           <Eye size={12} /> {folder.viewCount}
                         </span>
@@ -543,10 +600,10 @@ function HomeView({
                       </div>
                     </div>
                   </div>
-                  <div className="h-1 w-full rounded-full bg-slate-100 overflow-hidden">
+                  <div className="h-1 w-full rounded-full bg-white/5 overflow-hidden">
                     <div 
-                      className="h-full bg-gradient-to-r from-brand to-coral" 
-                      style={{ width: `${Math.min(100, (folder.viewCount / (summary.ranking[0]?.viewCount || 1)) * 100)}%` }} 
+                      className="h-full bg-gradient-to-r from-cyan to-magenta" 
+                      style={{ width: `${Math.min(100, (folder.viewCount / (summary?.ranking?.[0]?.viewCount || 1)) * 100)}%` }} 
                     />
                   </div>
                 </button>

@@ -360,14 +360,14 @@ export function CollectionList({
               </Button>
 
               {showSettings && (
-                <div className="absolute right-0 top-full z-40 mt-2 w-48 animate-soft-pop overflow-hidden rounded-2xl border border-line bg-white shadow-card backdrop-blur-md">
+                <div className="absolute right-0 top-full z-40 mt-2 w-48 animate-soft-pop overflow-hidden rounded-2xl border border-white/10 bg-black/40 shadow-2xl backdrop-blur-xl">
                   <button
                     type="button"
                     onClick={() => {
                       exportCsv();
                       setShowSettings(false);
                     }}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-700 hover:bg-field/50"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-300 hover:bg-white/5"
                   >
                     <Download size={16} />
                     Baixar CSV
@@ -378,7 +378,7 @@ export function CollectionList({
                       fileInputRef.current?.click();
                       setShowSettings(false);
                     }}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-700 hover:bg-field/50"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-300 hover:bg-white/5"
                   >
                     <Upload size={16} />
                     Restaurar CSV
@@ -389,7 +389,7 @@ export function CollectionList({
                       setIsClearModalOpen(true);
                       setShowSettings(false);
                     }}
-                    className="flex w-full items-center gap-3 border-t border-line/40 px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50"
+                    className="flex w-full items-center gap-3 border-t border-white/10 px-4 py-3 text-left text-sm font-bold text-rose-500 hover:bg-rose-500/10"
                   >
                     <Trash2 size={16} />
                     Apagar tudo

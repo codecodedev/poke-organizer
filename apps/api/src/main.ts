@@ -7,7 +7,10 @@ import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestFastifyApplication>(AppModule, new FastifyAdapter());
+  const app = await NestFactory.create<NestFastifyApplication>(
+    AppModule,
+    new FastifyAdapter({ trustProxy: true }),
+  );
   const config = app.get(ConfigService);
   const webOrigins = (config.get<string>("WEB_ORIGIN") ?? "http://localhost:5173")
     .split(",")

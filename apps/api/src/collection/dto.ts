@@ -223,6 +223,12 @@ export class ClearCollectionDto {
   password!: string;
 }
 
+export class AddFolderPermissionDto {
+  @ApiProperty()
+  @IsString()
+  email!: string;
+}
+
 export const COLLECTION_FOLDER_SORTS = [
   "value-desc",
   "value-asc",

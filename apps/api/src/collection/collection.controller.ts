@@ -17,8 +17,9 @@ import {
   UpdateCollectionItemDto,
   UpdateCollectionSharingDto,
   UpdateCollectionStoreDto,
-  UpdateFolderItemSaleDto
-} from "./dto";
+  UpdateFolderItemSaleDto,
+  AddFolderPermissionDto,
+  } from "./dto";
 
 @ApiTags("collection")
 @ApiBearerAuth()
@@ -137,6 +138,29 @@ export class CollectionController {
     return this.collection.decideCartOffer(user.id, id, offerId, dto);
   }
 
+  @Get("folders/:id/permissions")
+  getFolderPermissions(@CurrentUser() user: RequestUser, @Param("id") id: string) {
+    return this.collection.getFolderPermissions(user.id, id);
+  }
+
+  @Post("folders/:id/permissions")
+  addFolderPermission(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Body() dto: AddFolderPermissionDto
+  ) {
+    return this.collection.addFolderPermission(user.id, id, dto);
+  }
+
+  @Delete("folders/:id/permissions/:permissionId")
+  removeFolderPermission(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Param("permissionId") permissionId: string
+  ) {
+    return this.collection.removeFolderPermission(user.id, id, permissionId);
+  }
+
   @Delete("folders/:id")
   removeFolder(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.collection.removeFolder(user.id, id);
@@ -162,7 +186,7 @@ export class PublicCollectionController {
   @UseGuards(OptionalJwtAuthGuard)
   getPublicCollection(
     @Param("shareToken") shareToken: string,
-    @Query() query: CollectionFolderQueryDto,
+    @Query() query: CollectionFolderQueryDto & { sid?: string },
     @Req() req: FastifyRequest,
     @CurrentUser() user?: RequestUser,
   ) {
@@ -173,6 +197,7 @@ export class PublicCollectionController {
       ip,
       userAgent,
       userId: user?.id,
+      sid: query.sid,
     });
   }
 

@@ -17,12 +17,12 @@ export function AudioRegistrationPanel(props: Props) {
   return (
     <>
         <div className="mb-4 flex items-start gap-3">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-aqua/20 text-cyan-700">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-cyan/10 text-cyan">
             <Mic size={22} />
           </div>
           <div>
-            <p className="text-base font-black text-ink">Cadastro por voz</p>
-            <p className="mt-1 text-sm leading-5 text-slate-600">A maneira mais rápida de cadastrar uma grande quantidade de cartas.</p>
+            <p className="text-base font-black text-white">Cadastro por voz</p>
+            <p className="mt-1 text-sm leading-5 text-slate-400">A maneira mais rápida de cadastrar uma grande quantidade de cartas.</p>
           </div>
         </div>
         <Button type="button" variant="brand" icon={<Sparkles size={18} />} className="w-full" onClick={() => setOpen(true)}>

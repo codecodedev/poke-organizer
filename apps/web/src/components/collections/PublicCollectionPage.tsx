@@ -64,7 +64,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
       setLoading(true);
       setError(null);
       try {
-        const detail = await api.getPublicCollection(shareToken);
+        const detail = await api.getPublicCollection(shareToken, {}, session?.accessToken);
         if (!cancelled) {
           setCollection(detail);
 
@@ -245,15 +245,26 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
 
         {!loading && error && (
           <Panel>
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-4">
               <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-100 text-slate-600">
                 <Lock size={20} />
               </span>
               <div>
-                <h2 className="section-title">Colecao indisponivel</h2>
+                <h2 className="section-title">Coleção indisponível</h2>
                 <p className="section-copy mt-1">
-                  Este link nao esta publico ou nao existe mais.
+                  {error.includes("permissão") || error.includes("privada") || error.includes("Unauthorized")
+                    ? "Esta coleção é privada. Se você recebeu permissão para vê-la, certifique-se de estar logado."
+                    : "Este link não está público ou não existe mais."}
                 </p>
+                {!session && (error.includes("permissão") || error.includes("privada") || error.includes("Unauthorized")) && (
+                  <Button
+                    variant="brand"
+                    className="mt-5"
+                    onClick={() => window.location.href = "/"}
+                  >
+                    Entrar para acessar
+                  </Button>
+                )}
               </div>
             </div>
           </Panel>
@@ -265,7 +276,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                    Visualizacao publica
+                    Visualizacao compartilhada
                   </p>
                   <h2 className="section-title truncate">{collection.name}</h2>
                   <p className="section-copy mt-1">
@@ -293,9 +304,13 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                       Fazer uma proposta
                     </Button>
                   )}
-                  <span className="inline-flex items-center gap-2 rounded-full border border-leaf/25 bg-leaf/10 px-3 py-1.5 text-xs font-black text-emerald-800">
-                    <FolderOpen size={14} />
-                    Publica
+                  <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
+                    collection.isPublic 
+                      ? "border-leaf/25 bg-leaf/10 text-emerald-800" 
+                      : "border-amber-200 bg-amber-50 text-amber-800"
+                  }`}>
+                    {collection.isPublic ? <FolderOpen size={14} /> : <Lock size={14} />}
+                    {collection.isPublic ? "Publica" : "Privada (Acesso Autorizado)"}
                   </span>
                 </div>
               </div>

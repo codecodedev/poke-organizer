@@ -83,6 +83,7 @@ model User {
   refreshTokens RefreshToken[]
   collection   CollectionItem[]
   folders      CollectionFolder[]
+  folderPermissions CollectionFolderPermission[]
   collectionBids CollectionItemBid[]
   collectionOffers CollectionCartOffer[]
   notifications    Notification[]
@@ -203,11 +204,25 @@ model CollectionFolder {
   items     CollectionFolderItem[]
   cartOffers CollectionCartOffer[]
   views      CollectionView[]
+  permissions CollectionFolderPermission[]
 
   @@index([userId])
   @@index([shareToken])
   @@index([viewCount(sort: Desc)])
   @@unique([userId, name])
+  @@schema("public")
+}
+
+model CollectionFolderPermission {
+  id        String           @id @default(cuid())
+  folderId  String
+  userId    String
+  createdAt DateTime         @default(now())
+  folder    CollectionFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, userId])
+  @@index([userId])
   @@schema("public")
 }
 

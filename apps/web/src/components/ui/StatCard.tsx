@@ -8,20 +8,20 @@ type StatCardProps = {
 };
 
 const tones: Record<NonNullable<StatCardProps["tone"]>, string> = {
-  aqua: "from-aqua/30 to-white",
-  brand: "from-brand/20 to-white",
-  leaf: "from-leaf/25 to-white",
-  lilac: "from-lilac/25 to-white"
+  aqua: "from-cyan/20 to-cyan/5",
+  brand: "from-magenta/20 to-magenta/5",
+  leaf: "from-emerald-500/20 to-emerald-500/5",
+  lilac: "from-cyan/20 to-magenta/20"
 };
 
 export function StatCard({ label, value, icon, tone = "lilac" }: StatCardProps) {
   return (
-    <div className={`stat-card stat-card--${tone} rounded-[20px] border border-white/80 bg-gradient-to-br ${tones[tone]} p-4 shadow-sm`}>
-      <div className="mb-3 flex items-center justify-between gap-3 text-slate-500">
-        <span className="text-xs font-black uppercase tracking-[0.14em]">{label}</span>
+    <div className={`stat-card rounded-[24px] border border-white/10 bg-gradient-to-br ${tones[tone]} p-5 shadow-2xl backdrop-blur-xl`}>
+      <div className="mb-4 flex items-center justify-between gap-3 text-slate-400">
+        <span className="text-[10px] font-black uppercase tracking-[0.16em]">{label}</span>
         {icon}
       </div>
-      <p className="text-2xl font-black text-ink">{value}</p>
+      <p className="text-3xl font-black text-white">{value}</p>
     </div>
   );
 }
