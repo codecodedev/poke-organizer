@@ -39,6 +39,7 @@ import {
   CreateCollectionCartOfferDto,
   DecideCollectionCartOfferDto,
   ClearCollectionDto,
+  AddFolderPermissionDto,
 } from "./dto";
 import type { CollectionFolderSort } from "./dto";
 

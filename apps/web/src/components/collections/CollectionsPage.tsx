@@ -1699,6 +1699,7 @@ function CollectionDetailScreen({
   setSelectedAuctionItem,
   setSellingItem,
   onUndoSale,
+  onManagePermissions,
 }: {
   activeName: string;
   selectedItems: CollectionItem[];
