@@ -5,6 +5,7 @@ import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { CollectionService } from "./collection.service";
 import {
   AddCollectionItemDto,
+  ClearCollectionDto,
   CollectionFolderQueryDto,
   CreateCollectionBidDto,
   CreateCollectionCartOfferDto,
@@ -24,6 +25,11 @@ import {
 @Controller("collection")
 export class CollectionController {
   constructor(private readonly collection: CollectionService) {}
+
+  @Delete("clear")
+  clear(@CurrentUser() user: RequestUser, @Body() dto: ClearCollectionDto) {
+    return this.collection.clearCollection(user.id, dto);
+  }
 
   @Get()
   list(@CurrentUser() user: RequestUser, @Query() query: ListCollectionQueryDto) {
@@ -88,6 +94,16 @@ export class CollectionController {
   @Post("folders/:id/items/:folderItemId/finish-auction")
   finishAuction(@CurrentUser() user: RequestUser, @Param("id") id: string, @Param("folderItemId") folderItemId: string) {
     return this.collection.finishAuction(user.id, id, folderItemId);
+  }
+
+  @Post("folders/:id/items/:folderItemId/undo-sale")
+  undoSale(@CurrentUser() user: RequestUser, @Param("id") id: string, @Param("folderItemId") folderItemId: string) {
+    return this.collection.undoFolderItemSale(user.id, id, folderItemId);
+  }
+
+  @Delete("folders/:id/items/:folderItemId")
+  removeItem(@CurrentUser() user: RequestUser, @Param("id") id: string, @Param("folderItemId") folderItemId: string) {
+    return this.collection.removeItemFromFolder(user.id, id, folderItemId);
   }
 
   @Delete("folders/:id/items/:folderItemId/bids/:bidId")

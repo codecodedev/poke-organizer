@@ -110,6 +110,7 @@ export type CollectionItemBid = {
   bidderName: string;
   amount: number;
   quantity: number;
+  folderId?: string;
   createdAt: string;
 };
 

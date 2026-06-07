@@ -61,15 +61,19 @@ export function RequestFeedback() {
   return (
     <>
       {showLoading && (
-        <div className="fixed left-1/2 top-4 z-[80] -translate-x-1/2 rounded-2xl border border-line/80 bg-white/95 px-4 py-3 text-sm font-black text-slate-700 shadow-card backdrop-blur">
-          <span className="inline-flex items-center gap-2">
-            <LoaderCircle size={18} className="animate-spin text-brand" />
-            Carregando dados...
-          </span>
+        <div className="fixed bottom-6 right-6 z-[80] animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <div className="flex items-center gap-3 rounded-full border border-white/60 bg-white/80 px-4 py-2.5 text-[13px] font-black text-ink shadow-soft backdrop-blur-xl">
+            <span className="relative flex h-3 w-3">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75"></span>
+              <span className="relative inline-flex h-3 w-3 rounded-full bg-brand"></span>
+            </span>
+            Carregando...
+          </div>
         </div>
       )}
 
       <div className="fixed right-4 top-4 z-[90] grid w-[min(420px,calc(100vw-32px))] gap-3">
+
         {toasts.map((toast) => (
           <div
             key={toast.id}

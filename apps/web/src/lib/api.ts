@@ -238,6 +238,13 @@ export const api = {
       token,
     });
   },
+  clearCollection(token: string, payload: { password: string }) {
+    return request<{ ok: true }>("/collection/clear", {
+      method: "DELETE",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
   listCollectionFolders(token: string) {
     return request<CollectionFolderSummary[]>("/collection/folders", { token });
   },
@@ -328,7 +335,19 @@ export const api = {
   finishCollectionItemAuction(token: string, folderId: string, folderItemId: string) {
     return request<CollectionFolderDetail>(
       `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/finish-auction`,
-      { method: "POST", token },
+      { method: "POST", token, body: JSON.stringify({}) },
+    );
+  },
+  undoCollectionItemSale(token: string, folderId: string, folderItemId: string) {
+    return request<CollectionFolderDetail>(
+      `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/undo-sale`,
+      { method: "POST", token, body: JSON.stringify({}) },
+    );
+  },
+  removeCollectionFolderItem(token: string, folderId: string, folderItemId: string) {
+    return request<CollectionFolderDetail>(
+      `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}`,
+      { method: "DELETE", token },
     );
   },
   invalidateCollectionBid(token: string, folderId: string, folderItemId: string, bidId: string) {
@@ -356,6 +375,7 @@ export const api = {
     return request<{ ok: true }>(`/notifications/${encodeURIComponent(id)}/read`, {
       method: "PATCH",
       token,
+      body: JSON.stringify({}),
     });
   },
   decideCollectionOffer(
@@ -494,6 +514,7 @@ export const api = {
       {
         method: "POST",
         token,
+        body: JSON.stringify({}),
       },
     );
   },
@@ -503,6 +524,7 @@ export const api = {
       {
         method: "POST",
         token,
+        body: JSON.stringify({}),
       },
     );
   },

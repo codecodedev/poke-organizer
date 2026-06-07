@@ -68,7 +68,7 @@ export function NotificationBell({ session, onSession, onUnauthorized, onNavigat
   }
 
   return (
-    <div className="relative" ref={containerRef}>
+    <div className="z-20" ref={containerRef}>
       <button
         onClick={() => setOpen(!open)}
         className={`relative grid h-10 w-10 place-items-center rounded-xl border transition ${
@@ -84,7 +84,7 @@ export function NotificationBell({ session, onSession, onUnauthorized, onNavigat
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-[100] w-80 animate-soft-pop overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-card backdrop-blur-md">
+        <div className="absolute left-0 bottom-12 z-[100] w-[calc(100vw-2rem)] max-w-80 animate-soft-pop overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-card backdrop-blur-md md:left-full h-auto md:ml-4 md:bottom-0">
           <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
             <h2 className="text-sm font-black text-ink">Notificações</h2>
             <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600">

@@ -132,7 +132,7 @@ export function CollectionItemCard({
             <div className="flex flex-1 items-center" onClick={(e) => e.stopPropagation()}>
               <span className="text-sm font-black text-ink mr-1">R$</span>
               <input
-                className="w-full bg-transparent p-0 text-sm font-black text-ink outline-none placeholder:text-slate-300"
+                className="w-full bg-slate-700 p-0.5 pl-2 rounded-xl text-sm font-black text-ink outline-none placeholder:text-slate-300"
                 type="number"
                 min={0}
                 step="0.01"
@@ -192,7 +192,7 @@ export function CollectionItemCard({
       )}
 
       {onRemove && (
-        <div className="absolute bottom-[75px] right-3 opacity-0 transition duration-200 group-hover:opacity-100">
+        <div className="absolute bottom-[75px] right-3 z-30 opacity-0 transition duration-200 group-hover:opacity-100">
           <button
             type="button"
             onClick={(event) => {

@@ -7,6 +7,7 @@ import {
   LogOut,
   Menu,
   Moon,
+  ShoppingBag,
   Sparkles,
   Swords,
   Sun,
@@ -28,6 +29,8 @@ import { SpeedInsights } from "@vercel/speed-insights/react";
 
 import { NotificationBell } from "../components/ui/NotificationBell";
 import { ProfilePage } from "../components/ProfilePage";
+import { Sidebar } from "../components/layout/Sidebar";
+import { ThemeToggle } from "../components/ui/ThemeToggle";
 
 type View = "home" | "cards" | "collections" | "decks" | "profile";
 type ThemeMode = "light" | "dark";
@@ -42,7 +45,7 @@ export function App() {
   const [session, setSession] = useState<Session | null>(() => loadSession());
   const [refreshKey, setRefreshKey] = useState(0);
   const [route, setRoute] = useState<AppRoute>(() => parseRoute());
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
 
   const view = route.view;
@@ -107,45 +110,32 @@ export function App() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
   }
 
-  if (route.publicCollection) {
+  if (route.publicCollection && !session) {
     return (
       <>
         <RequestFeedback />
-        <div className="fixed right-4 top-4 z-40">
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
-        </div>
         <PublicCollectionPage
           shareToken={route.publicCollection}
           session={session}
           onSession={handleSession}
           onUnauthorized={handleUnauthorized}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
-      </>
-    );
-  }
-
-  if (!session) {
-    return (
-      <>
-        <RequestFeedback />
-        <div className="fixed right-4 top-4 z-40">
-          <ThemeToggle theme={theme} onToggle={toggleTheme} />
-        </div>
-        <AuthPanel onSession={handleSession} />
       </>
     );
   }
 
   function navigate(nextRoute: AppRoute) {
     setRoute(nextRoute);
-    setMobileMenuOpen(false);
+    setSidebarOpen(false);
     window.history.pushState(null, "", routeToUrl(nextRoute));
   }
 
   function logout() {
     clearSession();
     setSession(null);
-    setMobileMenuOpen(false);
+    setSidebarOpen(false);
   }
 
   function refreshCollection() {
@@ -155,316 +145,153 @@ export function App() {
   return (
     <>
       <RequestFeedback />
-      <main className="app-shell">
-        <header className="sticky top-0 z-30 border-b border-white/70 bg-white/75 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white shadow-glow">
-                CC
-              </div>
+      <div className="flex min-h-screen transition-all duration-300">
+        <Sidebar
+          session={session}
+          activeView={view}
+          onNavigate={(nextView) => navigate({ view: nextView })}
+          onLogout={logout}
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          isOpen={sidebarOpen}
+          onToggleOpen={() => setSidebarOpen(!sidebarOpen)}
+          onSession={handleSession}
+          onUnauthorized={handleUnauthorized}
+        />
 
-              <div className="min-w-0">
-                <h1 className="truncate text-xl font-black text-ink">
-                  Coleciona cards
-                </h1>
-                <p className="truncate text-sm font-medium text-slate-600">
-                  {session.user.email}
-                </p>
-              </div>
-            </div>
-
-            <div className="hidden flex-wrap items-center gap-2 md:flex">
-              <NavButton
-                active={view === "home"}
-                icon={<Home size={16} />}
-                onClick={() => navigate({ view: "home" })}
-              >
-                Inicio
-              </NavButton>
-
-              <NavButton
-                active={view === "cards"}
-                icon={<LibraryBig size={16} />}
-                onClick={() => navigate({ view: "cards" })}
-              >
-                Cartas
-              </NavButton>
-
-              <NavButton
-                active={view === "collections"}
-                icon={<FolderOpen size={16} />}
-                onClick={() => navigate({ view: "collections" })}
-              >
-                Colecoes
-              </NavButton>
-
-              <NavButton
-                active={view === "decks"}
-                icon={<Swords size={16} />}
-                onClick={() => navigate({ view: "decks" })}
-              >
-                Decks
-              </NavButton>
-
-              <Button
-                type="button"
-                onClick={logout}
-                icon={<LogOut size={16} />}
-              >
-                Sair
-              </Button>
-
-              <ThemeToggle theme={theme} onToggle={toggleTheme} />
-
-              <NotificationBell
-                session={session}
-                onSession={handleSession}
-                onUnauthorized={handleUnauthorized}
-                onNavigate={(link) => {
-                  const url = new URL(link, window.location.origin);
-                  const tab = url.searchParams.get("tab");
-                  navigate({ view: "profile", collection: tab });
-                }}
-              />
-
-              <button
-                onClick={() => navigate({ view: "profile" })}
-                className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl border transition ${
-                  view === "profile"
-                    ? "border-brand/50 bg-brand/10 text-brand shadow-soft"
-                    : "border-line bg-white/80 text-slate-700 hover:bg-field"
-                }`}
-                title="Meu Perfil"
-              >
-                <UserIcon size={20} />
-              </button>
-            </div>
-
+        <div className={`flex flex-1 flex-col transition-all duration-300 ${sidebarOpen ? "md:ml-[280px]" : "md:ml-20"}`}>
+          <header className="sticky top-0 z-30 flex h-16 items-center border-b border-white/70 bg-white/75 px-5 backdrop-blur-xl md:hidden">
             <button
               type="button"
-              onClick={() => setMobileMenuOpen(true)}
-              className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl border border-line bg-white/80 text-night shadow-sm md:hidden"
-              aria-label="Abrir menu"
+              onClick={() => setSidebarOpen(true)}
+              className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 text-night shadow-sm"
             >
               <Menu size={22} />
             </button>
-          </div>
-        </header>
+            <div className="ml-4 flex items-center gap-2">
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand via-coral to-amber font-black text-white text-[10px]">
+                CC
+              </div>
+              <span className="font-black text-ink">Coleciona cards</span>
+            </div>
+          </header>
 
-        {mobileMenuOpen && (
-          <div className="fixed inset-0 z-50 md:hidden">
-            <button
-              type="button"
-              className="absolute inset-0 bg-slate-950/40"
-              onClick={() => setMobileMenuOpen(false)}
-              aria-label="Fechar menu"
-            />
+          <main className="mx-auto w-full max-w-7xl gap-5 px-5 py-6">
+            {route.publicCollection && (
+              <PublicCollectionPage
+                shareToken={route.publicCollection}
+                session={session}
+                onSession={handleSession}
+                onUnauthorized={handleUnauthorized}
+                hideHeader
+              />
+            )}
 
-            <aside className="absolute right-0 top-0 flex h-full w-72 max-w-[85vw] flex-col bg-white p-5 shadow-2xl">
-              <div className="mb-6 flex items-center justify-between">
-                <div>
-                  <strong className="text-lg text-ink">Menu</strong>
-                  <p className="text-xs font-medium text-slate-500">
-                    {session.user.email}
-                  </p>
+            {!session && !route.publicCollection && (
+              <div className="flex h-full min-h-[60vh] flex-col items-center justify-center text-center">
+                <div className="grid h-20 w-20 place-items-center rounded-3xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white text-3xl shadow-glow mb-6">
+                  CC
                 </div>
-
-                <button
-                  type="button"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-night"
-                  aria-label="Fechar menu"
-                >
-                  <X size={20} />
-                </button>
+                <h2 className="text-3xl font-black text-ink mb-2">Bem-vindo ao Coleciona cards</h2>
+                <p className="text-slate-500 max-w-md mb-8">
+                  Organize sua coleção de Pokémon TCG, acompanhe preços do mercado brasileiro e crie decks incríveis.
+                </p>
+                <AuthPanel
+                  onSession={handleSession}
+                />
               </div>
+            )}
 
-              <div className="flex flex-col gap-3">
-                <NavButton
-                  active={view === "home"}
-                  icon={<Home size={16} />}
-                  onClick={() => navigate({ view: "home" })}
-                >
-                  Inicio
-                </NavButton>
+            {!route.publicCollection && view === "home" && session && (
+              <div className="flex flex-col gap-4">
+                <HeroPanel
+                  navigate={navigate}
+                  session={session}
+                  onSession={handleSession}
+                  onUnauthorized={handleUnauthorized}
+                  onAdded={refreshCollection}
+                />
 
-                <NavButton
-                  active={view === "cards"}
-                  icon={<LibraryBig size={16} />}
-                  onClick={() => navigate({ view: "cards" })}
-                >
-                  Cartas
-                </NavButton>
-
-                <NavButton
-                  active={view === "collections"}
-                  icon={<FolderOpen size={16} />}
-                  onClick={() => navigate({ view: "collections" })}
-                >
-                  Colecoes
-                </NavButton>
-
-                <NavButton
-                  active={view === "decks"}
-                  icon={<Swords size={16} />}
-                  onClick={() => navigate({ view: "decks" })}
-                >
-                  Decks
-                </NavButton>
-
-                <Button
-                  type="button"
-                  onClick={logout}
-                  icon={<LogOut size={16} />}
-                >
-                  Sair
-                </Button>
-
-                <ThemeToggle theme={theme} onToggle={toggleTheme} />
+                <CollectionList
+                  session={session}
+                  onSession={handleSession}
+                  onUnauthorized={handleUnauthorized}
+                  refreshKey={refreshKey}
+                  limit={10}
+                  title="Ultimas adicionadas"
+                  description="As 10 cartas mais recentes do seu inventario."
+                  modalItemId={route.card ?? null}
+                  onModalItemChange={(card) => navigate({ view: "home", card })}
+                  showCounts={false}
+                />
               </div>
-            </aside>
-          </div>
-        )}
+            )}
 
-        <div className="mx-auto grid max-w-7xl gap-5 px-5 py-6">
-          {view === "home" && (
-            <>
-              <HeroPanel
-                navigate={navigate}
+            {!route.publicCollection && view === "cards" && session && (
+              <div className="flex flex-col gap-4">
+                <HeroPanel
+                  session={session}
+                  onSession={handleSession}
+                  onUnauthorized={handleUnauthorized}
+                  onAdded={refreshCollection}
+                  compact
+                />
+
+                <CardSearch
+                  title="Cadastro manual"
+                  session={session}
+                  onSession={handleSession}
+                  onUnauthorized={handleUnauthorized}
+                  onAdded={refreshCollection}
+                />
+
+                <CollectionList
+                  session={session}
+                  onSession={handleSession}
+                  onUnauthorized={handleUnauthorized}
+                  refreshKey={refreshKey}
+                  title="Todas as cartas"
+                  description="Inventario geral das cartas que voce possui."
+                  modalItemId={route.card ?? null}
+                  onModalItemChange={(card) => navigate({ view: "cards", card })}
+                />
+              </div>
+            )}
+
+            {!route.publicCollection && view === "collections" && session && (
+              <CollectionsPage
                 session={session}
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
-                onAdded={refreshCollection}
+                collectionRoute={route.collection ?? null}
+                onCollectionRouteChange={(collection) =>
+                  navigate({ view: "collections", collection })
+                }
               />
+            )}
 
-              <CollectionList
+            {view === "decks" && session && (
+              <DecksPage
                 session={session}
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
-                refreshKey={refreshKey}
-                limit={10}
-                title="Ultimas adicionadas"
-                description="As 10 cartas mais recentes do seu inventario."
-                modalItemId={route.card ?? null}
-                onModalItemChange={(card) => navigate({ view: "home", card })}
-                showCounts={false}
               />
-            </>
-          )}
+            )}
 
-          {view === "cards" && (
-            <>
-              <HeroPanel
+            {view === "profile" && session && (
+              <ProfilePage
                 session={session}
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
-                onAdded={refreshCollection}
-                compact
+                onBack={() => navigate({ view: "home" })}
+                initialTab={route.collection}
               />
-
-              <CardSearch
-                title="Cadastro manual"
-                session={session}
-                onSession={handleSession}
-                onUnauthorized={handleUnauthorized}
-                onAdded={refreshCollection}
-              />
-
-              <CollectionList
-                session={session}
-                onSession={handleSession}
-                onUnauthorized={handleUnauthorized}
-                refreshKey={refreshKey}
-                title="Todas as cartas"
-                description="Inventario geral das cartas que voce possui."
-                modalItemId={route.card ?? null}
-                onModalItemChange={(card) => navigate({ view: "cards", card })}
-              />
-            </>
-          )}
-
-          {view === "collections" && (
-            <CollectionsPage
-              session={session}
-              onSession={handleSession}
-              onUnauthorized={handleUnauthorized}
-              collectionRoute={route.collection ?? null}
-              onCollectionRouteChange={(collection) =>
-                navigate({ view: "collections", collection })
-              }
-            />
-          )}
-
-          {view === "decks" && (
-            <DecksPage
-              session={session}
-              onSession={handleSession}
-              onUnauthorized={handleUnauthorized}
-            />
-          )}
-
-          {view === "profile" && (
-            <ProfilePage
-              session={session}
-              onSession={handleSession}
-              onUnauthorized={handleUnauthorized}
-              onBack={() => navigate({ view: "home" })}
-              initialTab={route.collection}
-            />
-          )}
-        </div>
-      </main>
+            )}
+          </main>
+      </div>
+    </div>
       <SpeedInsights />
     </>
-  );
-}
-
-function ThemeToggle({
-  theme,
-  onToggle,
-}: {
-  theme: ThemeMode;
-  onToggle: () => void;
-}) {
-  const dark = theme === "dark";
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className="btn border border-line bg-white/80 text-night shadow-sm hover:border-lilac/40"
-      aria-label={dark ? "Ativar modo claro" : "Ativar modo escuro"}
-      title={dark ? "Modo claro" : "Modo escuro"}
-    >
-      {dark ? <Sun size={16} /> : <Moon size={16} />}
-      <span>{dark ? "Claro" : "Escuro"}</span>
-    </button>
-  );
-}
-
-function NavButton({
-  active,
-  icon,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  icon: ReactNode;
-  children: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`btn ${
-        active
-          ? "bg-night text-white shadow-soft"
-          : "border border-line bg-white/80 text-night shadow-sm hover:border-lilac/40"
-      }`}
-    >
-      {icon}
-      {children}
-    </button>
   );
 }
 
@@ -527,14 +354,14 @@ function parseRoute(): AppRoute {
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
   const view: View =
-    page === "cards" || page === "collections" || page === "decks"
+    page === "cards" || page === "collections" || page === "decks" || page === "profile"
       ? page
       : "home";
 
   return {
     view,
     publicCollection: null,
-    collection: view === "collections" ? params.get("collection") : null,
+    collection: (view === "collections" || view === "profile") ? params.get("collection") : null,
     card: params.get("card"),
   };
 }
@@ -550,7 +377,7 @@ function routeToUrl(route: AppRoute): string {
     params.set("page", route.view);
   }
 
-  if (route.view === "collections" && route.collection) {
+  if ((route.view === "collections" || route.view === "profile") && route.collection) {
     params.set("collection", route.collection);
   }
 

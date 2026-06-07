@@ -2,6 +2,7 @@ import {
   BadRequestException,
   Injectable,
   NotFoundException,
+  UnauthorizedException,
 } from "@nestjs/common";
 import { randomBytes } from "node:crypto";
 import {
@@ -17,6 +18,7 @@ import {
 } from "@poke-organizer/shared";
 import { Prisma } from "@prisma/client";
 import { CatalogService } from "../cards/catalog.service";
+import { AuthService } from "../auth/auth.service";
 import {
   fromPrismaLanguage,
   toCardSummary,
@@ -36,6 +38,7 @@ import {
   CreateCollectionBidDto,
   CreateCollectionCartOfferDto,
   DecideCollectionCartOfferDto,
+  ClearCollectionDto,
 } from "./dto";
 import type { CollectionFolderSort } from "./dto";
 
@@ -76,7 +79,21 @@ export class CollectionService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly catalog: CatalogService,
+    private readonly auth: AuthService,
   ) {}
+
+  async clearCollection(userId: string, dto: ClearCollectionDto) {
+    const isPasswordValid = await this.auth.verifyPassword(userId, dto.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException("Senha incorreta");
+    }
+
+    await this.prisma.collectionItem.deleteMany({
+      where: { userId },
+    });
+
+    return { ok: true };
+  }
 
   async list(userId: string, limit?: number): Promise<CollectionItem[]> {
     const items = await this.prisma.collectionItem.findMany({
@@ -127,8 +144,8 @@ export class CollectionService {
       bidderName: "Você",
       amount: Number(bid.amountBrl),
       quantity: bid.quantity,
+      folderId: bid.folderItem.folder.shareToken ?? bid.folderItem.folderId,
       createdAt: bid.createdAt.toISOString(),
-      // Add folder item info if needed, but the interface might need updating
     }));
   }
 
@@ -263,6 +280,28 @@ export class CollectionService {
           soldAt: isSoldRequest ? new Date() : item.soldAt,
         },
       });
+    });
+
+    return this.getFolder(userId, folderId);
+  }
+
+  async undoFolderItemSale(
+    userId: string,
+    folderId: string,
+    folderItemId: string,
+  ): Promise<CollectionFolderDetail> {
+    await this.assertOwnsFolder(userId, folderId);
+    await this.assertFolderItem(folderId, folderItemId);
+
+    await this.prisma.collectionFolderItem.update({
+      where: { id: folderItemId },
+      data: {
+        isSold: false,
+        soldQuantity: 0,
+        soldPriceBrl: null,
+        soldAt: null,
+        soldToUserId: null,
+      },
     });
 
     return this.getFolder(userId, folderId);
@@ -546,6 +585,14 @@ export class CollectionService {
     await this.assertOwnsFolder(userId, id);
     await this.prisma.collectionFolder.delete({ where: { id } });
     return { ok: true };
+  }
+
+  async removeItemFromFolder(userId: string, folderId: string, folderItemId: string) {
+    await this.assertOwnsFolder(userId, folderId);
+    await this.prisma.collectionFolderItem.delete({
+      where: { id: folderItemId, folderId },
+    });
+    return this.getFolder(userId, folderId);
   }
 
   async add(

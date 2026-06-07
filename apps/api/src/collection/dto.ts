@@ -217,6 +217,12 @@ export class DecideCollectionCartOfferDto {
   status!: "accepted" | "rejected";
 }
 
+export class ClearCollectionDto {
+  @ApiProperty()
+  @IsString()
+  password!: string;
+}
+
 export const COLLECTION_FOLDER_SORTS = [
   "value-desc",
   "value-asc",

@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Copy,
   Eye,
+  Filter,
   FolderPlus,
   Gavel,
   Layers3,
@@ -29,6 +30,8 @@ import { Panel } from "../ui/Panel";
 import { CollectionItemCard } from "../collection/CollectionItemCard";
 import { CardDetailModal, type UpdateCardDetails } from "../CardDetailModal";
 import { PaginationControls } from "../ui/PaginationControls";
+import { Modal } from "../ui/Modal";
+import { FilterField, FilterGroup } from "../ui/Filters";
 
 type Props = {
   session: Session;
@@ -66,6 +69,7 @@ export function CollectionsPage({
   const [rarityFilter, setRarityFilter] = useState(() => localStorage.getItem("cp_rarityFilter") ?? "");
   const [variantFilter, setVariantFilter] = useState(() => localStorage.getItem("cp_variantFilter") ?? "");
   const [sort, setSort] = useState<CollectionFolderSort>(() => (localStorage.getItem("cp_sort") as CollectionFolderSort) ?? "newest");
+  const [showSold, setShowSold] = useState(() => localStorage.getItem("cp_showSold") === "true");
   const [pickerQuery, setPickerQuery] = useState("");
   const [pickerTypeFilter, setPickerTypeFilter] = useState("");
   const [pickerRarityFilter, setPickerRarityFilter] = useState("");
@@ -82,13 +86,16 @@ export function CollectionsPage({
   const [showOffersModal, setShowOffersModal] = useState(false);
   const [selectedAuctionItem, setSelectedAuctionItem] = useState<CollectionItem | null>(null);
   const [sellingItem, setSellingItem] = useState<CollectionItem | null>(null);
+  const [itemToRemove, setItemToRemove] = useState<CollectionItem | null>(null);
+  const [showPickerModal, setShowPickerModal] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("cp_typeFilter", typeFilter);
     localStorage.setItem("cp_rarityFilter", rarityFilter);
     localStorage.setItem("cp_variantFilter", variantFilter);
     localStorage.setItem("cp_sort", sort);
-  }, [typeFilter, rarityFilter, variantFilter, sort]);
+    localStorage.setItem("cp_showSold", String(showSold));
+  }, [typeFilter, rarityFilter, variantFilter, sort, showSold]);
 
   async function load() {
     setLoading(true);
@@ -177,6 +184,28 @@ export function CollectionsPage({
     setSelectedItemIds(new Set());
     resetFilters();
     resetPicker();
+  }
+
+  async function undoFolderItemSale(folderItemId: string) {
+    if (!activeFolder) return;
+    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.undoCollectionItemSale(token, activeFolder.id, folderItemId),
+    );
+    setActiveFolder(detail);
+    setActiveName(detail.name);
+    setMessage("Venda cancelada.");
+  }
+
+  async function removeFolderItemInstant(folderItemId: string) {
+    if (!activeFolder) return;
+    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.removeCollectionFolderItem(token, activeFolder.id, folderItemId),
+    );
+    setActiveFolder(detail);
+    setActiveName(detail.name);
+    setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
+    setItemToRemove(null);
+    setMessage("Carta removida da colecao.");
   }
 
   async function createFolder(event: FormEvent) {
@@ -478,7 +507,7 @@ export function CollectionsPage({
   const selectedItems = useMemo(
     () =>
       screen === "detail" && activeFolder
-        ? activeFolder.items
+        ? activeFolder.items.filter((item) => selectedItemIds.has(item.id))
         : inventory.filter((item) => selectedItemIds.has(item.id)),
     [activeFolder, inventory, screen, selectedItemIds],
   );
@@ -516,6 +545,7 @@ export function CollectionsPage({
   );
   const visibleItems = useMemo(() => {
     const filtered = selectedItems.filter((item) => {
+      if (activeFolder?.isStore && item.store?.isSold && !showSold) return false;
       if (typeFilter && !item.card.types.includes(typeFilter)) return false;
       if (rarityFilter && item.card.rarity !== rarityFilter) return false;
       if (variantFilter && item.variant !== variantFilter) return false;
@@ -523,7 +553,7 @@ export function CollectionsPage({
     });
 
     return sortItems(filtered, sort);
-  }, [rarityFilter, selectedItems, sort, typeFilter, variantFilter]);
+  }, [rarityFilter, selectedItems, sort, typeFilter, variantFilter, activeFolder?.isStore, showSold]);
   const pickerItems = useMemo(() => {
     const query = normalizeText(pickerQuery);
     const hasPickerFilter = Boolean(
@@ -606,7 +636,7 @@ export function CollectionsPage({
 
   useEffect(() => {
     setDetailPage(1);
-  }, [rarityFilter, sort, typeFilter, variantFilter]);
+  }, [rarityFilter, sort, typeFilter, variantFilter, showSold]);
 
   useEffect(() => {
     const totalPages = Math.max(
@@ -685,6 +715,8 @@ export function CollectionsPage({
           onToggleItem={toggleItem}
           onOpenCard={setSelectedItem}
           onSubmit={createFolder}
+          showPickerModal={showPickerModal}
+          onTogglePickerModal={setShowPickerModal}
         />
       )}
 
@@ -705,6 +737,8 @@ export function CollectionsPage({
           rarityFilter={rarityFilter}
           variantFilter={variantFilter}
           sort={sort}
+          showSold={showSold}
+          onShowSoldChange={setShowSold}
           pickerQuery={pickerQuery}
           pickerTypeOptions={pickerTypeOptions}
           pickerRarityOptions={pickerRarityOptions}
@@ -732,6 +766,7 @@ export function CollectionsPage({
           onToggleStore={(isStore) => void updateFolderStore(isStore)}
           onUpdateSale={(folderItemId, payload) => void updateFolderItemSale(folderItemId, payload)}
           onFinishAuction={(folderItemId) => void finishAuction(folderItemId)}
+          onUndoSale={(folderItemId: string) => void undoFolderItemSale(folderItemId)}
           onCopyShareLink={() => void copyShareLink()}
           onTypeFilter={setTypeFilter}
           onRarityFilter={setRarityFilter}
@@ -745,12 +780,48 @@ export function CollectionsPage({
           onPickerSort={setPickerSort}
           onShowAllChange={setShowAllPickerItems}
           onPickerPageChange={setPickerPage}
-          onToggleItem={toggleItem}
+          onToggleItem={(itemId) => {
+            const item = activeFolder.items.find((i) => i.id === itemId);
+            if (item) setItemToRemove(item);
+          }}
           onOpenCard={setSelectedItem}
+          showPickerModal={showPickerModal}
+          onTogglePickerModal={setShowPickerModal}
           setSelectedAuctionItem={setSelectedAuctionItem}
           setSellingItem={setSellingItem}
-          />
-          )}
+        />
+      )}
+
+      {itemToRemove && (
+        <Modal
+          title="Remover carta da coleção"
+          onClose={() => setItemToRemove(null)}
+          maxWidthClass="max-w-md"
+        >
+          <div className="grid gap-4 p-5">
+            <p className="section-copy">
+              Tem certeza que deseja remover a carta <span className="font-bold text-ink">"{itemToRemove.card.name}"</span> desta coleção?
+            </p>
+            <div className="flex gap-3">
+              <Button type="button" className="flex-1" onClick={() => setItemToRemove(null)}>
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                className="flex-1 bg-red-600 hover:bg-red-700"
+                onClick={() => {
+                  if (itemToRemove.folderItemId) {
+                    void removeFolderItemInstant(itemToRemove.folderItemId);
+                  }
+                }}
+              >
+                Remover
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {message && <p className="success-note">{message}</p>}
       {error && <p className="danger-note">{error}</p>}
@@ -1300,6 +1371,8 @@ function CollectionCreateScreen({
   onToggleItem,
   onOpenCard,
   onSubmit,
+  showPickerModal,
+  onTogglePickerModal,
 }: {
   name: string;
   selectedCount: number;
@@ -1328,6 +1401,8 @@ function CollectionCreateScreen({
   onToggleItem: (itemId: string) => void;
   onOpenCard: (item: CollectionItem) => void;
   onSubmit: (event: FormEvent) => void;
+  showPickerModal: boolean;
+  onTogglePickerModal: (open: boolean) => void;
 }) {
   return (
     <>
@@ -1365,38 +1440,64 @@ function CollectionCreateScreen({
             <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
               {selectedCount} cartas - {formatBrl(selectedTotalValue)}
             </div>
-          </div>
-        </form>
-      </Panel>
+            </div>
 
-      <CardPickerPanel
-        title="Selecionar cartas"
-        description="Busque por nome, numero ou colecao. Se preferir, mostre todas as cartas do inventario."
-        pickerQuery={pickerQuery}
-        pickerTypeOptions={pickerTypeOptions}
-        pickerRarityOptions={pickerRarityOptions}
-        pickerVariantOptions={pickerVariantOptions}
-        pickerTypeFilter={pickerTypeFilter}
-        pickerRarityFilter={pickerRarityFilter}
-        pickerVariantFilter={pickerVariantFilter}
-        pickerSort={pickerSort}
-        showAllPickerItems={showAllPickerItems}
-        pickerItems={pickerItems}
-        pickerPage={pickerPage}
-        selectedItemIds={selectedItemIds}
-        onQueryChange={onQueryChange}
-        onPickerTypeFilter={onPickerTypeFilter}
-        onPickerRarityFilter={onPickerRarityFilter}
-        onPickerVariantFilter={onPickerVariantFilter}
-        onPickerSort={onPickerSort}
-        onShowAllChange={onShowAllChange}
-        onPickerPageChange={onPickerPageChange}
-        onToggleItem={onToggleItem}
-        onOpenCard={onOpenCard}
-      />
-    </>
-  );
-}
+            <div className="mt-4 flex justify-center">
+              <Button
+                type="button"
+                variant="primary"
+                className="px-8 shadow-glow"
+                icon={<Plus size={20} />}
+                onClick={() => onTogglePickerModal(true)}
+              >
+                Selecionar cartas
+              </Button>
+            </div>
+            </form>
+            </Panel>
+
+            {showPickerModal && (
+            <Modal title="Selecionar cartas" onClose={() => onTogglePickerModal(false)}>
+            <CardPickerPanel
+            title="Selecionar cartas"
+            description="Busque por nome, numero ou colecao. Se preferir, mostre todas as cartas do inventario."
+            pickerQuery={pickerQuery}
+            pickerTypeOptions={pickerTypeOptions}
+            pickerRarityOptions={pickerRarityOptions}
+            pickerVariantOptions={pickerVariantOptions}
+            pickerTypeFilter={pickerTypeFilter}
+            pickerRarityFilter={pickerRarityFilter}
+            pickerVariantFilter={pickerVariantFilter}
+            pickerSort={pickerSort}
+            showAllPickerItems={showAllPickerItems}
+            pickerItems={pickerItems}
+            pickerPage={pickerPage}
+            selectedItemIds={selectedItemIds}
+            onQueryChange={onQueryChange}
+            onPickerTypeFilter={onPickerTypeFilter}
+            onPickerRarityFilter={onPickerRarityFilter}
+            onPickerVariantFilter={onPickerVariantFilter}
+            onPickerSort={onPickerSort}
+            onShowAllChange={onShowAllChange}
+            onPickerPageChange={onPickerPageChange}
+            onToggleItem={onToggleItem}
+            onOpenCard={onOpenCard}
+            action={
+              <Button
+                type="button"
+                variant="primary"
+                icon={<Plus size={16} />}
+                onClick={() => onTogglePickerModal(false)}
+              >
+                Adicionar a colecao
+              </Button>
+            }
+            />
+            </Modal>
+            )}
+            </>
+            );
+            }
 
 function CollectionDetailScreen({
   activeName,
@@ -1414,6 +1515,8 @@ function CollectionDetailScreen({
   rarityFilter,
   variantFilter,
   sort,
+  showSold,
+  onShowSoldChange,
   pickerQuery,
   pickerTypeOptions,
   pickerRarityOptions,
@@ -1452,8 +1555,11 @@ function CollectionDetailScreen({
   onPickerPageChange,
   onToggleItem,
   onOpenCard,
+  showPickerModal,
+  onTogglePickerModal,
   setSelectedAuctionItem,
   setSellingItem,
+  onUndoSale,
 }: {
   activeName: string;
   selectedItems: CollectionItem[];
@@ -1470,6 +1576,8 @@ function CollectionDetailScreen({
   rarityFilter: string;
   variantFilter: string;
   sort: CollectionFolderSort;
+  showSold: boolean;
+  onShowSoldChange: (value: boolean) => void;
   pickerQuery: string;
   pickerTypeOptions: string[];
   pickerRarityOptions: string[];
@@ -1494,6 +1602,7 @@ function CollectionDetailScreen({
   onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null }) => void;
   onFinishAuction: (folderItemId: string) => void;
   onCopyShareLink: () => void;
+  onUndoSale: (folderItemId: string) => void;
   onTypeFilter: (value: string) => void;
   onRarityFilter: (value: string) => void;
   onVariantFilter: (value: string) => void;
@@ -1508,9 +1617,12 @@ function CollectionDetailScreen({
   onPickerPageChange: (page: number) => void;
   onToggleItem: (itemId: string) => void;
   onOpenCard: (item: CollectionItem) => void;
-  setSelectedAuctionItem: (item: CollectionItem) => void;
-  setSellingItem: (item: CollectionItem) => void;
+  showPickerModal: boolean;
+  onTogglePickerModal: (open: boolean) => void;
+  setSelectedAuctionItem: (item: CollectionItem | null) => void;
+  setSellingItem: (item: CollectionItem | null) => void;
 }) {
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
   const paginatedVisibleItems = useMemo(
     () =>
       visibleItems.slice(
@@ -1659,60 +1771,114 @@ function CollectionDetailScreen({
             )}
           </div>
 
-          <div className="grid gap-4 rounded-[24px] border border-line/70 bg-field/45 p-4 sm:grid-cols-2 lg:grid-cols-4">
-            <FilterField label="Tipo">
-              <select
-                className="premium-select"
-                value={typeFilter}
-                onChange={(event) => onTypeFilter(event.target.value)}
-              >
-                <option value="">Todos os tipos</option>
-                {typeOptions.map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-            </FilterField>
-            <FilterField label="Raridade">
-              <select
-                className="premium-select"
-                value={rarityFilter}
-                onChange={(event) => onRarityFilter(event.target.value)}
-              >
-                <option value="">Todas as raridades</option>
-                {rarityOptions.map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-            </FilterField>
-            <FilterField label="Variante">
-              <select
-                className="premium-select"
-                value={variantFilter}
-                onChange={(event) => onVariantFilter(event.target.value)}
-              >
-                <option value="">Todas as variantes</option>
-                {variantOptions.map((value) => (
-                  <option key={value}>{value}</option>
-                ))}
-              </select>
-            </FilterField>
-            <FilterField label="Ordenação">
-              <select
-                className="premium-select"
-                value={sort}
-                onChange={(event) =>
-                  onSort(event.target.value as CollectionFolderSort)
-                }
-              >
-                <option value="newest">Última adicionada</option>
-                <option value="oldest">Mais antiga</option>
-                <option value="value-desc">Maior valor</option>
-                <option value="value-asc">Menor valor</option>
-                <option value="price-change-desc">Maior alta</option>
-                <option value="price-change-asc">Maior queda</option>
-              </select>
-            </FilterField>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setShowFiltersModal(true)}
+              icon={<Filter size={18} />}
+              className={(typeFilter || rarityFilter || variantFilter) ? "border-brand/40 bg-brand/5 text-brand" : ""}
+            >
+              Filtros e Ordenação
+            </Button>
           </div>
+
+          {showFiltersModal && (
+            <Modal title="Filtros e Ordenação" onClose={() => setShowFiltersModal(false)} maxWidthClass="max-w-xl">
+              <div className="grid gap-5 p-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FilterField label="Tipo">
+                    <select
+                      className="premium-select w-full"
+                      value={typeFilter}
+                      onChange={(event) => onTypeFilter(event.target.value)}
+                    >
+                      <option value="">Todos os tipos</option>
+                      {typeOptions.map((value) => (
+                        <option key={value}>{value}</option>
+                      ))}
+                    </select>
+                  </FilterField>
+                  <FilterField label="Raridade">
+                    <select
+                      className="premium-select w-full"
+                      value={rarityFilter}
+                      onChange={(event) => onRarityFilter(event.target.value)}
+                    >
+                      <option value="">Todas as raridades</option>
+                      {rarityOptions.map((value) => (
+                        <option key={value}>{value}</option>
+                      ))}
+                    </select>
+                  </FilterField>
+                  <FilterField label="Variante">
+                    <select
+                      className="premium-select w-full"
+                      value={variantFilter}
+                      onChange={(event) => onVariantFilter(event.target.value)}
+                    >
+                      <option value="">Todas as variantes</option>
+                      {variantOptions.map((value) => (
+                        <option key={value}>{value}</option>
+                      ))}
+                    </select>
+                  </FilterField>
+                  <FilterField label="Ordenação">
+                    <select
+                      className="premium-select w-full"
+                      value={sort}
+                      onChange={(event) =>
+                        onSort(event.target.value as CollectionFolderSort)
+                      }
+                    >
+                      <option value="newest">Última adicionada</option>
+                      <option value="oldest">Mais antiga</option>
+                      <option value="value-desc">Maior valor</option>
+                      <option value="value-asc">Menor valor</option>
+                      <option value="price-change-desc">Maior alta</option>
+                      <option value="price-change-asc">Maior queda</option>
+                    </select>
+                  </FilterField>
+                  {isStore && (
+                    <FilterField label="Ver vendidas">
+                      <div className="flex h-[46px] items-center">
+                        <input
+                          type="checkbox"
+                          checked={showSold}
+                          onChange={(e) => onShowSoldChange(e.target.checked)}
+                          className="h-6 w-6 rounded-lg border-line text-brand focus:ring-brand/30"
+                        />
+                      </div>
+                    </FilterField>
+                  )}
+                </div>
+                
+                <div className="flex gap-3 pt-2">
+                  <Button 
+                    type="button" 
+                    className="flex-1"
+                    variant="ghost"
+                    onClick={() => {
+                      onTypeFilter("");
+                      onRarityFilter("");
+                      onVariantFilter("");
+                      onSort("newest");
+                    }}
+                  >
+                    Limpar filtros
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="brand" 
+                    className="flex-1"
+                    onClick={() => setShowFiltersModal(false)}
+                  >
+                    Aplicar filtros
+                  </Button>
+                </div>
+              </div>
+            </Modal>
+          )}
 
           <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
             {visibleItems.length} de {unsoldCount} cartas visiveis
@@ -1747,6 +1913,16 @@ function CollectionDetailScreen({
                             Marcar vendido
                           </Button>
                         )}
+                        {item.store?.isSold && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            className="h-8 w-full text-[10px] text-slate-500 hover:text-red-500"
+                            onClick={() => onUndoSale(item.folderItemId!)}
+                          >
+                            Desfazer venda
+                          </Button>
+                        )}
                         {item.store?.highestBid && !item.store?.isSold && (
                           <Button
                             type="button"
@@ -1774,44 +1950,63 @@ function CollectionDetailScreen({
               Nenhuma carta aparece com os filtros atuais.
             </EmptyState>
           )}
+
+          <div className="mt-8 flex justify-center">
+            <Button
+              type="button"
+              variant="primary"
+              className="px-8 shadow-glow"
+              icon={<Plus size={20} />}
+              onClick={() => onTogglePickerModal(true)}
+            >
+              Adicionar carta
+            </Button>
+          </div>
         </div>
       </Panel>
 
-      <CardPickerPanel
-        title="Adicionar cartas"
-        description="Busque cartas do inventario, marque novas entradas e salve as alteracoes."
-        pickerQuery={pickerQuery}
-        pickerTypeOptions={pickerTypeOptions}
-        pickerRarityOptions={pickerRarityOptions}
-        pickerVariantOptions={pickerVariantOptions}
-        pickerTypeFilter={pickerTypeFilter}
-        pickerRarityFilter={pickerRarityFilter}
-        pickerVariantFilter={pickerVariantFilter}
-        pickerSort={pickerSort}
-        showAllPickerItems={showAllPickerItems}
-        pickerItems={pickerItems}
-        pickerPage={pickerPage}
-        selectedItemIds={selectedItemIds}
-        onQueryChange={onQueryChange}
-        onPickerTypeFilter={onPickerTypeFilter}
-        onPickerRarityFilter={onPickerRarityFilter}
-        onPickerVariantFilter={onPickerVariantFilter}
-        onPickerSort={onPickerSort}
-        onShowAllChange={onShowAllChange}
-        onPickerPageChange={onPickerPageChange}
-        onToggleItem={onToggleItem}
-        onOpenCard={onOpenCard}
-        action={
-          <Button
-            type="button"
-            variant="primary"
-            icon={<Save size={16} />}
-            onClick={onSave}
-          >
-            Salvar selecao
-          </Button>
-        }
-      />
+      {showPickerModal && (
+        <Modal title="Adicionar cartas" onClose={() => onTogglePickerModal(false)}>
+          <CardPickerPanel
+            title="Adicionar cartas"
+            description="Busque cartas do inventario, marque novas entradas e salve as alteracoes."
+            pickerQuery={pickerQuery}
+            pickerTypeOptions={pickerTypeOptions}
+            pickerRarityOptions={pickerRarityOptions}
+            pickerVariantOptions={pickerVariantOptions}
+            pickerTypeFilter={pickerTypeFilter}
+            pickerRarityFilter={pickerRarityFilter}
+            pickerVariantFilter={pickerVariantFilter}
+            pickerSort={pickerSort}
+            showAllPickerItems={showAllPickerItems}
+            pickerItems={pickerItems}
+            pickerPage={pickerPage}
+            selectedItemIds={selectedItemIds}
+            onQueryChange={onQueryChange}
+            onPickerTypeFilter={onPickerTypeFilter}
+            onPickerRarityFilter={onPickerRarityFilter}
+            onPickerVariantFilter={onPickerVariantFilter}
+            onPickerSort={onPickerSort}
+            onShowAllChange={onShowAllChange}
+            onPickerPageChange={onPickerPageChange}
+            onToggleItem={onToggleItem}
+            onOpenCard={onOpenCard}
+            action={
+              <Button
+                type="button"
+                variant="primary"
+                icon={<Save size={16} />}
+                onClick={() => {
+                  onSave();
+                  onTogglePickerModal(false);
+                }}
+              >
+                Adicionar selecionadas
+              </Button>
+            }
+          />
+        </Modal>
+      )}
     </>
   );
 }
@@ -1911,10 +2106,10 @@ function CardPickerPanel({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 rounded-[24px] border border-line/70 bg-field/45 p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <FilterGroup className="mt-3">
         <FilterField label="Tipo">
           <select
-            className="premium-select"
+            className="premium-select w-full"
             value={pickerTypeFilter}
             onChange={(event) => onPickerTypeFilter(event.target.value)}
           >
@@ -1926,7 +2121,7 @@ function CardPickerPanel({
         </FilterField>
         <FilterField label="Raridade">
           <select
-            className="premium-select"
+            className="premium-select w-full"
             value={pickerRarityFilter}
             onChange={(event) => onPickerRarityFilter(event.target.value)}
           >
@@ -1938,7 +2133,7 @@ function CardPickerPanel({
         </FilterField>
         <FilterField label="Variante">
           <select
-            className="premium-select"
+            className="premium-select w-full"
             value={pickerVariantFilter}
             onChange={(event) => onPickerVariantFilter(event.target.value)}
           >
@@ -1948,15 +2143,15 @@ function CardPickerPanel({
             ))}
           </select>
         </FilterField>
-        <FilterField label="Ordenacao">
+        <FilterField label="Ordenação">
           <select
-            className="premium-select"
+            className="premium-select w-full"
             value={pickerSort}
             onChange={(event) =>
               onPickerSort(event.target.value as CollectionFolderSort)
             }
           >
-            <option value="newest">Ultima adicionada</option>
+            <option value="newest">Última adicionada</option>
             <option value="oldest">Mais antiga</option>
             <option value="value-desc">Maior valor</option>
             <option value="value-asc">Menor valor</option>
@@ -1964,7 +2159,7 @@ function CardPickerPanel({
             <option value="price-change-asc">Maior queda</option>
           </select>
         </FilterField>
-      </div>
+      </FilterGroup>
 
       {pickerItems.length ? (
         <>
@@ -1996,8 +2191,6 @@ function CardPickerPanel({
     </Panel>
   );
 }
-
-
 
 function ScreenHeader({
   eyebrow,
@@ -2108,23 +2301,6 @@ function InfoPill({ label, value }: { label: string; value: string }) {
       <span className="text-slate-400">{label}: </span>
       {value}
     </span>
-  );
-}
-
-function FilterField({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="grid gap-2">
-      <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-        {label}
-      </span>
-      {children}
-    </label>
   );
 }
 

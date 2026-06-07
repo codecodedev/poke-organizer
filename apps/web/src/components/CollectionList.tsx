@@ -2,9 +2,12 @@ import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
   Coins,
   Download,
+  Filter,
   Layers3,
   RefreshCw,
   Search,
+  Settings,
+  Trash2,
   Upload,
 } from "lucide-react";
 import {
@@ -23,6 +26,8 @@ import { Panel } from "./ui/Panel";
 import { StatCard } from "./ui/StatCard";
 import { CollectionItemCard } from "./collection/CollectionItemCard";
 import { PaginationControls } from "./ui/PaginationControls";
+
+import { FilterField, FilterGroup } from "./ui/Filters";
 
 type Props = {
   session: Session;
@@ -95,7 +100,23 @@ export function CollectionList({
   const [page, setPage] = useState(1);
   const [backupRows, setBackupRows] = useState<CollectionBackupRow[]>([]);
   const [importing, setImporting] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const [clearPassword, setClearPassword] = useState("");
+  const [isClearModalOpen, setIsClearModalOpen] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const settingsRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (settingsRef.current && !settingsRef.current.contains(event.target as Node)) {
+        setShowSettings(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const showFilters = !limit;
   const typeOptions = useMemo(
@@ -160,6 +181,23 @@ export function CollectionList({
       setItems(nextItems);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function clearCollection() {
+    if (!clearPassword) return;
+    setClearing(true);
+    try {
+      await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.clearCollection(token, { password: clearPassword }),
+      );
+      setItems([]);
+      setIsClearModalOpen(false);
+      setClearPassword("");
+    } catch (err) {
+      // API feedback will show the error
+    } finally {
+      setClearing(false);
     }
   }
 
@@ -292,139 +330,217 @@ export function CollectionList({
 
   return (
     <Panel>
-      <div className="mb-5 grid gap-4 lg:grid-cols-[1fr_auto] lg:items-start">
+      <div className="mb-5 flex items-start justify-between gap-4">
         <div>
           <h2 className="section-title">{title}</h2>
           <p className="section-copy mt-1">{description}</p>
-          {showCounts && (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-              <StatCard
-                label={limit ? "Itens exibidos" : "Cartas totais"}
-                value={String(displayedCount)}
-                tone="aqua"
-                icon={<Layers3 size={18} />}
-              />
-              <StatCard
-                label="Cartas unicas"
-                value={String(uniqueCards)}
-                tone="lilac"
-                icon={<Layers3 size={18} />}
-              />
-              <StatCard
-                label={limit ? "Valor exibido" : "Valor total"}
-                value={formatBrl(totalValue)}
-                tone="leaf"
-                icon={<Coins size={18} />}
-              />
-            </div>
-          )}
         </div>
-        <div className="flex flex-wrap gap-2 lg:justify-end">
-          {!limit && (
-            <>
-              <Button
-                type="button"
-                onClick={exportCsv}
-                icon={<Download size={16} />}
-                disabled={items.length === 0}
-              >
-                Baixar CSV
-              </Button>
-              <Button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                icon={<Upload size={16} />}
-              >
-                Restaurar CSV
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="hidden"
-                onChange={(event) => void handleBackupFile(event.target.files?.[0] ?? null)}
-              />
-            </>
-          )}
+
+        <div className="flex items-center gap-2">
           <Button
             type="button"
+            variant="ghost"
             onClick={() => void load()}
-            icon={<RefreshCw size={16} />}
+            title="Recarregar"
+            className="h-10 w-10 p-0 flex items-center justify-center rounded-xl"
           >
-            Recarregar
+            <RefreshCw size={18} className={loading ? "animate-spin" : ""} />
           </Button>
+
+          {!limit && (
+            <div className="relative" ref={settingsRef}>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowSettings(!showSettings)}
+                title="Configurações da coleção"
+                className="h-10 w-10 p-0 flex items-center justify-center rounded-xl"
+              >
+                <Settings size={18} />
+              </Button>
+
+              {showSettings && (
+                <div className="absolute right-0 top-full z-40 mt-2 w-48 animate-soft-pop overflow-hidden rounded-2xl border border-line bg-white shadow-card backdrop-blur-md">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      exportCsv();
+                      setShowSettings(false);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-700 hover:bg-field/50"
+                  >
+                    <Download size={16} />
+                    Baixar CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fileInputRef.current?.click();
+                      setShowSettings(false);
+                    }}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-700 hover:bg-field/50"
+                  >
+                    <Upload size={16} />
+                    Restaurar CSV
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsClearModalOpen(true);
+                      setShowSettings(false);
+                    }}
+                    className="flex w-full items-center gap-3 border-t border-line/40 px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 size={16} />
+                    Apagar tudo
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
-      {showFilters && items.length > 0 && (
-        <div className="mb-5 grid gap-3 rounded-[24px] border border-line/70 bg-field/45 p-4 sm:grid-cols-2 lg:grid-cols-5">
-          <FilterField label="Busca">
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                size={17}
-              />
-              <input
-                className="premium-input w-full pl-11"
-                value={searchTerm}
-                placeholder="Nome ou numero"
-                onChange={(event) => setSearchTerm(event.target.value)}
-              />
-            </div>
-          </FilterField>
-          <FilterField label="Tipo">
-            <select
-              className="premium-select"
-              value={typeFilter}
-              onChange={(event) => setTypeFilter(event.target.value)}
-            >
-              <option value="">Todos os tipos</option>
-              {typeOptions.map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-          </FilterField>
-          <FilterField label="Raridade">
-            <select
-              className="premium-select"
-              value={rarityFilter}
-              onChange={(event) => setRarityFilter(event.target.value)}
-            >
-              <option value="">Todas as raridades</option>
-              {rarityOptions.map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-          </FilterField>
-          <FilterField label="Variante">
-            <select
-              className="premium-select"
-              value={variantFilter}
-              onChange={(event) => setVariantFilter(event.target.value)}
-            >
-              <option value="">Todas as variantes</option>
-              {variantOptions.map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-          </FilterField>
-          <FilterField label="Ordenacao">
-            <select
-              className="premium-select"
-              value={sort}
-              onChange={(event) =>
-                setSort(event.target.value as CollectionFolderSort)
-              }
-            >
-              <option value="newest">Ultima adicionada</option>
-              <option value="oldest">Mais antiga</option>
-              <option value="value-desc">Maior valor</option>
-              <option value="value-asc">Menor valor</option>
-              <option value="price-change-desc">Maior alta</option>
-              <option value="price-change-asc">Maior queda</option>
-            </select>
-          </FilterField>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(event) => void handleBackupFile(event.target.files?.[0] ?? null)}
+      />
+
+      {showCounts && (
+        <div className="mb-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+          <StatCard
+            label={limit ? "Itens exibidos" : "Cartas totais"}
+            value={String(displayedCount)}
+            tone="aqua"
+            icon={<Layers3 size={18} />}
+          />
+          <StatCard
+            label="Cartas unicas"
+            value={String(uniqueCards)}
+            tone="lilac"
+            icon={<Layers3 size={18} />}
+          />
+          <StatCard
+            label={limit ? "Valor exibido" : "Valor total"}
+            value={formatBrl(totalValue)}
+            tone="leaf"
+            icon={<Coins size={18} />}
+          />
         </div>
+      )}
+
+      {showFilters && items.length > 0 && (
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[240px]">
+            <Search
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              size={17}
+            />
+            <input
+              className="premium-input w-full pl-11"
+              value={searchTerm}
+              placeholder="Busca rapida por nome ou numero..."
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => setShowFiltersModal(true)}
+            icon={<Filter size={18} />}
+            className={(typeFilter || rarityFilter || variantFilter) ? "border-brand/40 bg-brand/5 text-brand" : ""}
+          >
+            Filtros e Ordenação
+          </Button>
+        </div>
+      )}
+
+      {showFiltersModal && (
+        <Modal title="Filtros e Ordenação" onClose={() => setShowFiltersModal(false)} maxWidthClass="max-w-xl">
+          <div className="grid gap-5 p-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FilterField label="Tipo">
+                <select
+                  className="premium-select w-full"
+                  value={typeFilter}
+                  onChange={(event) => setTypeFilter(event.target.value)}
+                >
+                  <option value="">Todos os tipos</option>
+                  {typeOptions.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </FilterField>
+              <FilterField label="Raridade">
+                <select
+                  className="premium-select w-full"
+                  value={rarityFilter}
+                  onChange={(event) => setRarityFilter(event.target.value)}
+                >
+                  <option value="">Todas as raridades</option>
+                  {rarityOptions.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </FilterField>
+              <FilterField label="Variante">
+                <select
+                  className="premium-select w-full"
+                  value={variantFilter}
+                  onChange={(event) => setVariantFilter(event.target.value)}
+                >
+                  <option value="">Todas as variantes</option>
+                  {variantOptions.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </FilterField>
+              <FilterField label="Ordenação">
+                <select
+                  className="premium-select w-full"
+                  value={sort}
+                  onChange={(event) =>
+                    setSort(event.target.value as CollectionFolderSort)
+                  }
+                >
+                  <option value="newest">Última adicionada</option>
+                  <option value="oldest">Mais antiga</option>
+                  <option value="value-desc">Maior valor</option>
+                  <option value="value-asc">Menor valor</option>
+                  <option value="price-change-desc">Maior alta</option>
+                  <option value="price-change-asc">Maior queda</option>
+                </select>
+              </FilterField>
+            </div>
+            
+            <div className="flex gap-3 pt-2">
+              <Button 
+                type="button" 
+                className="flex-1"
+                variant="ghost"
+                onClick={() => {
+                  setTypeFilter("");
+                  setRarityFilter("");
+                  setVariantFilter("");
+                  setSort("newest");
+                }}
+              >
+                Limpar filtros
+              </Button>
+              <Button 
+                type="button" 
+                variant="brand" 
+                className="flex-1"
+                onClick={() => setShowFiltersModal(false)}
+              >
+                Aplicar filtros
+              </Button>
+            </div>
+          </div>
+        </Modal>
       )}
 
       {loading ? (
@@ -502,6 +618,54 @@ export function CollectionList({
               />
             </div>
             {importing && <p className="section-copy">Restaurando backup...</p>}
+          </div>
+        </Modal>
+      )}
+      {isClearModalOpen && (
+        <Modal
+          title="Apagar todas as cartas"
+          subtitle="Essa acao e irreversivel e removera permanentemente todas as cartas da sua colecao."
+          onClose={() => setIsClearModalOpen(false)}
+          maxWidthClass="max-w-md"
+        >
+          <div className="grid gap-4 p-5">
+            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+              Atenção: todas as cartas serão deletadas de forma definitiva.
+            </div>
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-bold text-slate-700">Confirme sua senha</label>
+              <input
+                type="password"
+                className="premium-input w-full"
+                placeholder="Sua senha da conta"
+                value={clearPassword}
+                onChange={(e) => setClearPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !clearing && clearPassword) {
+                    void clearCollection();
+                  }
+                }}
+              />
+            </div>
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={() => setIsClearModalOpen(false)}
+                disabled={clearing}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                variant="brand"
+                className="flex-1 bg-red-600 !from-red-600 !to-red-500"
+                onClick={() => void clearCollection()}
+                disabled={clearing || !clearPassword}
+              >
+                {clearing ? "Apagando..." : "Confirmar e apagar"}
+              </Button>
+            </div>
           </div>
         </Modal>
       )}
@@ -741,19 +905,4 @@ function downloadTextFile(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
-function FilterField({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactNode;
-}) {
-  return (
-    <label className="grid gap-2">
-      <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-        {label}
-      </span>
-      {children}
-    </label>
-  );
-}
+

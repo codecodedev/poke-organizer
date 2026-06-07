@@ -133,4 +133,10 @@ export class AuthService {
 
     return { accessToken, refreshToken };
   }
+
+  async verifyPassword(userId: string, password: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) return false;
+    return argon2.verify(user.passwordHash, password);
+  }
 }

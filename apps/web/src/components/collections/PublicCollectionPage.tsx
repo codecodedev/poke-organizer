@@ -14,6 +14,8 @@ import { CardDetailModal } from "../CardDetailModal";
 import { PaginationControls } from "../ui/PaginationControls";
 import { Panel } from "../ui/Panel";
 import { Button } from "../ui/Button";
+import { ThemeToggle } from "../ui/ThemeToggle";
+import { FilterContainer, FilterSelect } from "../ui/Filters";
 
 const PUBLIC_COLLECTION_PAGE_SIZE = 24;
 
@@ -22,9 +24,12 @@ type Props = {
   session: Session | null;
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
+  hideHeader?: boolean;
+  theme?: "light" | "dark";
+  onToggleTheme?: () => void;
 };
 
-export function PublicCollectionPage({ shareToken, session, onSession, onUnauthorized }: Props) {
+export function PublicCollectionPage({ shareToken, session, onSession, onUnauthorized, hideHeader, theme, onToggleTheme }: Props) {
   const [collection, setCollection] = useState<PublicCollectionDetail | null>(
     null,
   );
@@ -34,12 +39,14 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
   const [rarityFilter, setRarityFilter] = useState(() => localStorage.getItem("pc_rarityFilter") ?? "");
   const [variantFilter, setVariantFilter] = useState(() => localStorage.getItem("pc_variantFilter") ?? "");
   const [sort, setSort] = useState<CollectionFolderSort>(() => (localStorage.getItem("pc_sort") as CollectionFolderSort) ?? "newest");
+  const [showSold, setShowSold] = useState(() => localStorage.getItem("pc_showSold") === "true");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [selectedAuctionItem, setSelectedAuctionItem] = useState<CollectionItem | null>(null);
   const [showProposalModal, setShowProposalModal] = useState(false);
+  const [showMyProposalsModal, setShowMyProposalsModal] = useState(false);
   const [myProposals, setMyProposals] = useState<CollectionCartOffer[]>([]);
 
   useEffect(() => {
@@ -47,7 +54,8 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
     localStorage.setItem("pc_rarityFilter", rarityFilter);
     localStorage.setItem("pc_variantFilter", variantFilter);
     localStorage.setItem("pc_sort", sort);
-  }, [typeFilter, rarityFilter, variantFilter, sort]);
+    localStorage.setItem("pc_showSold", String(showSold));
+  }, [typeFilter, rarityFilter, variantFilter, sort, showSold]);
 
   useEffect(() => {
     let cancelled = false;
@@ -90,6 +98,10 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
 
   const items = collection?.items ?? [];
   const unsoldItems = useMemo(() => items.filter((i) => !i.store?.isSold), [items]);
+  const totalValue = useMemo(() => unsoldItems.reduce(
+    (sum, item) => sum + (item.price?.amount ?? 0) * item.quantity,
+    0,
+  ), [unsoldItems]);
   const typeOptions = useMemo(
     () => unique(items.flatMap((item) => item.card.types)),
     [items],
@@ -108,6 +120,9 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
     const filtered = items.filter((item) => {
       // Se for vitrine (NAO for loja), nao mostra vendidos pro publico
       if (!collection?.isStore && item.store?.isSold) return false;
+
+      // Se for loja, respeita o filtro de vendidos
+      if (collection?.isStore && item.store?.isSold && !showSold) return false;
 
       if (typeFilter && !item.card.types.includes(typeFilter)) return false;
       if (rarityFilter && item.card.rarity !== rarityFilter) return false;
@@ -130,11 +145,11 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
     });
 
     return sortItems(filtered, sort);
-  }, [items, query, rarityFilter, sort, typeFilter, variantFilter, collection?.isStore]);
+  }, [items, query, rarityFilter, sort, typeFilter, variantFilter, collection?.isStore, showSold]);
 
   useEffect(() => {
     setPage(1);
-  }, [query, rarityFilter, sort, typeFilter, variantFilter]);
+  }, [query, rarityFilter, sort, typeFilter, variantFilter, showSold]);
 
   useEffect(() => {
     const totalPages = Math.max(
@@ -144,10 +159,6 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
     setPage((current) => Math.min(current, totalPages));
   }, [visibleItems.length]);
 
-  const totalValue = items.reduce(
-    (sum, item) => sum + (item.price?.amount ?? 0) * item.quantity,
-    0,
-  );
   const paginatedItems = visibleItems.slice(
     (page - 1) * PUBLIC_COLLECTION_PAGE_SIZE,
     page * PUBLIC_COLLECTION_PAGE_SIZE,
@@ -190,24 +201,42 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
   }
 
   return (
-    <main className="app-shell">
-      <header className="border-b border-white/70 bg-white/75 backdrop-blur-xl">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-5 py-4">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white shadow-glow">
-            CC
-          </div>
-          <div className="min-w-0">
-            <h1 className="truncate text-xl font-black text-ink">
-              Coleciona cards
-            </h1>
-            <p className="truncate text-sm font-medium text-slate-600">
-              Colecao compartilhada
-            </p>
-          </div>
-        </div>
-      </header>
+    <main className={hideHeader ? "" : "app-shell"}>
+      {!hideHeader && (
+        <header className="sticky top-0 z-30 border-b border-white/70 bg-white/75 backdrop-blur-xl">
+          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white shadow-glow">
+                CC
+              </div>
+              <div className="min-w-0">
+                <h1 className="truncate text-xl font-black text-ink">
+                  Coleciona cards
+                </h1>
+                <p className="truncate text-sm font-medium text-slate-600">
+                  Colecao compartilhada
+                </p>
+              </div>
+            </div>
 
-      <div className="mx-auto grid max-w-7xl gap-5 px-5 py-6">
+            <div className="flex items-center gap-3">
+              {theme && onToggleTheme && (
+                <ThemeToggle theme={theme} onToggle={onToggleTheme} />
+              )}
+              {!session && (
+                <Button
+                  variant="brand"
+                  onClick={() => window.location.href = "/"}
+                >
+                  Entrar
+                </Button>
+              )}
+            </div>
+          </div>
+        </header>
+      )}
+
+      <div className={hideHeader ? "grid gap-5" : "mx-auto grid max-w-7xl gap-5 px-5 py-6"}>
         {loading && (
           <Panel>
             <p className="section-copy">Carregando colecao...</p>
@@ -244,7 +273,17 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                     {formatBrl(totalValue)}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  {myProposals.length > 0 && (
+                    <Button
+                      variant="primary"
+                      className="border-brand/40 bg-brand/5 text-brand"
+                      icon={<ShoppingBag size={18} />}
+                      onClick={() => setShowMyProposalsModal(true)}
+                    >
+                      Minhas propostas
+                    </Button>
+                  )}
                   {collection.isStore && (
                     <Button
                       variant="primary"
@@ -263,51 +302,9 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
               {message && <p className="success-note mt-4">{message}</p>}
             </Panel>
 
-            {myProposals.length > 0 && (
-              <div className="rounded-[28px] border border-brand/20 bg-brand/5 p-6 shadow-sm">
-                <div className="flex items-center gap-2 mb-4">
-                  <ShoppingBag size={18} className="text-brand" />
-                  <h3 className="font-black text-ink">Minhas Propostas nesta coleção</h3>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2">
-                  {myProposals.map((offer) => (
-                    <div
-                      key={offer.id}
-                      className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/60 bg-white/50 p-4"
-                    >
-                      <div className="min-w-0">
-                        <p className="text-xs font-black text-slate-500 uppercase tracking-widest mb-1">
-                          Enviada em {new Date(offer.createdAt).toLocaleDateString()}
-                        </p>
-                        <p className="font-black text-ink">Total: {formatBrl(offer.totalOffer)}</p>
-                        <p className="text-[10px] font-bold text-slate-400 mt-1">
-                          {offer.items.length} carta(s) selecionada(s)
-                        </p>
-                      </div>
-                      <span
-                        className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ${
-                          offer.status === "accepted"
-                            ? "bg-leaf text-white"
-                            : offer.status === "rejected"
-                              ? "bg-red-500 text-white"
-                              : "bg-amber-100 text-amber-800"
-                        }`}
-                      >
-                        {offer.status === "accepted"
-                          ? "Aceita"
-                          : offer.status === "rejected"
-                            ? "Recusada"
-                            : "Pendente"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             <Panel>
-              <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1.5fr_1fr_1fr_1fr_1.2fr] p-1">
-                <label className="grid gap-2 md:col-span-2 lg:col-span-1 xl:col-span-1">
+              <FilterContainer>
+                <label className="grid gap-2 sm:col-span-2 lg:col-span-1 xl:col-span-1">
                   <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
                     Busca
                   </span>
@@ -350,7 +347,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                     Ordenação
                   </span>
                   <select
-                    className="premium-select"
+                    className="premium-select w-full"
                     value={sort}
                     onChange={(event) =>
                       setSort(event.target.value as CollectionFolderSort)
@@ -364,7 +361,22 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                     <option value="price-change-asc">Maior queda</option>
                   </select>
                 </label>
-              </div>
+                {collection.isStore && (
+                  <label className="grid gap-2">
+                    <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500 text-center text-nowrap">
+                      Ver vendidas
+                    </span>
+                    <div className="flex h-[46px] items-center justify-center">
+                      <input
+                        type="checkbox"
+                        checked={showSold}
+                        onChange={(e) => setShowSold(e.target.checked)}
+                        className="h-6 w-6 rounded-lg border-line text-brand focus:ring-brand/30"
+                      />
+                    </div>
+                  </label>
+                )}
+              </FilterContainer>
 
               <div className="mt-6 rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
                 {visibleItems.length} de {items.length} cartas visíveis
@@ -406,7 +418,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                 </>
               ) : (
                 <div className="mt-5 rounded-[24px] border border-line/80 bg-white/70 p-5 text-sm font-bold text-slate-500 shadow-sm">
-                  Nenhuma carta aparece com os filtros atuais.
+                  Nenhuma carta aparece com los filtros atuais.
                 </div>
               )}
             </Panel>
@@ -439,7 +451,86 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
           session={session}
         />
       )}
+
+      {showMyProposalsModal && (
+        <MyProposalsModal
+          proposals={myProposals}
+          onClose={() => setShowMyProposalsModal(false)}
+        />
+      )}
     </main>
+  );
+}
+
+function MyProposalsModal({
+  proposals,
+  onClose,
+}: {
+  proposals: CollectionCartOffer[];
+  onClose: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+      <div
+        className="animate-soft-pop flex h-full max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-card"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-line/70 px-6 py-5">
+          <div>
+            <h2 className="text-xl font-black text-ink">Minhas Propostas</h2>
+            <p className="text-sm font-semibold text-slate-500">Histórico de propostas nesta coleção.</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-auto p-6">
+          <div className="grid gap-3">
+            {proposals.map((offer) => (
+              <div
+                key={offer.id}
+                className="rounded-2xl border border-line/70 bg-field/30 p-5"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">
+                      Enviada em {new Date(offer.createdAt).toLocaleDateString()}
+                    </p>
+                    <p className="font-black text-ink">Total: {formatBrl(offer.totalOffer)}</p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {offer.items.map((item) => (
+                        <span key={item.id} className="rounded-lg bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600 border border-line/50">
+                          {item.quantity}x {item.item.card.name}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${
+                      offer.status === "accepted"
+                        ? "bg-leaf text-white"
+                        : offer.status === "rejected"
+                          ? "bg-red-500 text-white"
+                          : "bg-amber-100 text-amber-800"
+                    }`}
+                  >
+                    {offer.status === "accepted"
+                      ? "Aceita"
+                      : offer.status === "rejected"
+                        ? "Recusada"
+                        : "Pendente"}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -819,38 +910,6 @@ function ProposalModal({
         </div>
       </div>
     </div>
-  );
-}
-
-function FilterSelect({
-  label,
-  value,
-  onChange,
-  options,
-  emptyLabel,
-}: {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  options: string[];
-  emptyLabel: string;
-}) {
-  return (
-    <label className="grid gap-2">
-      <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-        {label}
-      </span>
-      <select
-        className="premium-select"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">{emptyLabel}</option>
-        {options.map((option) => (
-          <option key={option}>{option}</option>
-        ))}
-      </select>
-    </label>
   );
 }
 
