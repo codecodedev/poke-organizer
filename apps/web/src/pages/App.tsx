@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  BarChart3,
+  Eye,
   FolderOpen,
+  Gavel,
   Home,
   LibraryBig,
   LogOut,
@@ -11,6 +14,7 @@ import {
   Sparkles,
   Swords,
   Sun,
+  TrendingUp,
   User as UserIcon,
   X,
 } from "lucide-react";
@@ -20,12 +24,14 @@ import { CollectionList } from "../components/CollectionList";
 import { CollectionsPage } from "../components/collections/CollectionsPage";
 import { DecksPage } from "../components/decks/DecksPage";
 import { PublicCollectionPage } from "../components/collections/PublicCollectionPage";
-import { api, type Session } from "../lib/api";
+import { api, HttpError, type Session } from "../lib/api";
 import { clearSession, loadSession, saveSession } from "../lib/session";
 import { AuthPanel } from "../components/AuthPanel";
 import { Button } from "../components/ui/Button";
 import { RequestFeedback } from "../components/ui/RequestFeedback";
 import { SpeedInsights } from "@vercel/speed-insights/react";
+import type { HomeSummary } from "@poke-organizer/shared";
+import { formatBrl } from "../lib/format";
 
 import { NotificationBell } from "../components/ui/NotificationBell";
 import { ProfilePage } from "../components/ProfilePage";
@@ -203,28 +209,15 @@ export function App() {
             )}
 
             {!route.publicCollection && view === "home" && session && (
-              <div className="flex flex-col gap-4">
-                <HeroPanel
-                  navigate={navigate}
-                  session={session}
-                  onSession={handleSession}
-                  onUnauthorized={handleUnauthorized}
-                  onAdded={refreshCollection}
-                />
-
-                <CollectionList
-                  session={session}
-                  onSession={handleSession}
-                  onUnauthorized={handleUnauthorized}
-                  refreshKey={refreshKey}
-                  limit={10}
-                  title="Ultimas adicionadas"
-                  description="As 10 cartas mais recentes do seu inventario."
-                  modalItemId={route.card ?? null}
-                  onModalItemChange={(card) => navigate({ view: "home", card })}
-                  showCounts={false}
-                />
-              </div>
+              <HomeView
+                session={session}
+                onSession={handleSession}
+                onUnauthorized={handleUnauthorized}
+                navigate={navigate}
+                refreshKey={refreshKey}
+                onAdded={refreshCollection}
+                cardRoute={route.card ?? null}
+              />
             )}
 
             {!route.publicCollection && view === "cards" && session && (
@@ -394,4 +387,174 @@ function loadTheme(): ThemeMode {
   const stored = window.localStorage.getItem("poke-organizer-theme");
   if (stored === "light" || stored === "dark") return stored;
   return "dark";
+}
+
+function HomeView({
+  session,
+  onSession,
+  onUnauthorized,
+  navigate,
+  refreshKey,
+  onAdded,
+  cardRoute,
+}: {
+  session: Session;
+  onSession: (session: Session) => void;
+  onUnauthorized: () => Promise<Session | null>;
+  navigate: (route: AppRoute) => void;
+  refreshKey: number;
+  onAdded: () => void;
+  cardRoute: string | null;
+}) {
+  const [summary, setSummary] = useState<HomeSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const data = await api.getHomeSummary(session.accessToken);
+        setSummary(data);
+      } catch (err) {
+        if (err instanceof HttpError && err.status === 401) {
+          const next = await onUnauthorized();
+          if (next) {
+            const data = await api.getHomeSummary(next.accessToken);
+            setSummary(data);
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [session.accessToken, onUnauthorized, refreshKey]);
+
+  return (
+    <div className="flex flex-col gap-6">
+      <HeroPanel
+        navigate={navigate}
+        session={session}
+        onSession={onSession}
+        onUnauthorized={onUnauthorized}
+        onAdded={onAdded}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+        <div className="flex flex-col gap-6">
+          <CollectionList
+            session={session}
+            onSession={onSession}
+            onUnauthorized={onUnauthorized}
+            refreshKey={refreshKey}
+            limit={5}
+            title="Ultimas adicionadas"
+            description="As cartas mais recentes do seu inventario."
+            modalItemId={cardRoute}
+            onModalItemChange={(card) => navigate({ view: "home", card })}
+            showCounts={false}
+          />
+
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="glass-panel p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-amber/10 text-amber">
+                  <Gavel size={18} />
+                </div>
+                <h3 className="font-bold text-ink">Seus lances recentes</h3>
+              </div>
+              {!summary?.recentBids.length && !loading ? (
+                <p className="py-4 text-center text-slate-400 text-sm italic">Nenhum lance realizado ainda.</p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {summary?.recentBids.map((bid) => (
+                    <div key={bid.id} className="flex items-center justify-between rounded-xl border border-line bg-white/50 p-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Lance em {bid.folderId}</p>
+                        <p className="font-bold text-ink">{formatBrl(bid.amount)}</p>
+                      </div>
+                      <span className="text-[10px] text-slate-400">{new Date(bid.createdAt).toLocaleDateString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="glass-panel p-5">
+              <div className="mb-4 flex items-center gap-2">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-brand/10 text-brand">
+                  <ShoppingBag size={18} />
+                </div>
+                <h3 className="font-bold text-ink">Suas propostas</h3>
+              </div>
+              {!summary?.recentProposals.length && !loading ? (
+                <p className="py-4 text-center text-slate-400 text-sm italic">Nenhuma proposta enviada ainda.</p>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  {summary?.recentProposals.map((offer) => (
+                    <div key={offer.id} className="flex items-center justify-between rounded-xl border border-line bg-white/50 p-3">
+                      <div>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Proposta para {offer.buyerName}</p>
+                        <p className="font-bold text-ink">{formatBrl(offer.totalOffer)}</p>
+                      </div>
+                      <div className="text-right">
+                        <span className={`text-[10px] font-bold uppercase ${offer.status === 'accepted' ? 'text-emerald-500' : offer.status === 'rejected' ? 'text-rose-500' : 'text-amber-500'}`}>
+                          {offer.status === 'accepted' ? 'Aceita' : offer.status === 'rejected' ? 'Recusada' : 'Pendente'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-6">
+          <div className="glass-panel overflow-hidden p-5">
+            <div className="mb-5 flex items-center gap-2">
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-coral/10 text-coral">
+                <TrendingUp size={18} />
+              </div>
+              <h3 className="font-bold text-ink">Coleções em alta</h3>
+            </div>
+            
+            <div className="flex flex-col gap-4">
+              {summary?.ranking.map((folder, index) => (
+                <button
+                  key={folder.id}
+                  onClick={() => navigate({ view: "home", publicCollection: folder.shareToken })}
+                  className="group flex flex-col gap-2 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-100 text-[10px] font-black text-slate-400 group-hover:bg-brand group-hover:text-white transition-colors">
+                      #{index + 1}
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <p className="truncate font-bold text-ink text-sm group-hover:text-brand transition-colors">
+                        {folder.name}
+                      </p>
+                      <div className="flex items-center gap-3 text-[10px] text-slate-400">
+                        <span className="flex items-center gap-1">
+                          <Eye size={12} /> {folder.viewCount}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <LibraryBig size={12} /> {folder.itemCount} cartas
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-1 w-full rounded-full bg-slate-100 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-brand to-coral" 
+                      style={{ width: `${Math.min(100, (folder.viewCount / (summary.ranking[0]?.viewCount || 1)) * 100)}%` }} 
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

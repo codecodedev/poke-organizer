@@ -22,7 +22,7 @@ export function AudioRegistrationPanel(props: Props) {
           </div>
           <div>
             <p className="text-base font-black text-ink">Cadastro por voz</p>
-            <p className="mt-1 text-sm leading-5 text-slate-600">A maneira mais facil de cadastrar uma grande quantidade de cartas.</p>
+            <p className="mt-1 text-sm leading-5 text-slate-600">A maneira mais rápida de cadastrar uma grande quantidade de cartas.</p>
           </div>
         </div>
         <Button type="button" variant="brand" icon={<Sparkles size={18} />} className="w-full" onClick={() => setOpen(true)}>

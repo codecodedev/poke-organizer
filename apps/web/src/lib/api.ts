@@ -18,6 +18,7 @@ import type {
   DeckSuggestion,
   DeckSummary,
   DeckValidationSnapshot,
+  HomeSummary,
   PriceEstimate,
   PublicCollectionDetail,
   RecognitionCandidate,
@@ -367,6 +368,9 @@ export const api = {
   },
   listMyBids(token: string) {
     return request<CollectionItemBid[]>("/collection/my-bids", { token });
+  },
+  getHomeSummary(token: string) {
+    return request<HomeSummary>("/collection/summary", { token });
   },
   listNotifications(token: string) {
     return request<any[]>("/notifications", { token });

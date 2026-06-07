@@ -196,15 +196,32 @@ model CollectionFolder {
   isPublic  Boolean                @default(false)
   isStore   Boolean                @default(false)
   shareToken String?               @unique
+  viewCount Int                    @default(0)
   createdAt DateTime               @default(now())
   updatedAt DateTime               @updatedAt
   user      User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
   items     CollectionFolderItem[]
   cartOffers CollectionCartOffer[]
+  views      CollectionView[]
 
   @@index([userId])
   @@index([shareToken])
+  @@index([viewCount(sort: Desc)])
   @@unique([userId, name])
+  @@schema("public")
+}
+
+model CollectionView {
+  id        String           @id @default(cuid())
+  folderId  String
+  viewerId  String?
+  ip        String?
+  userAgent String?
+  viewedAt  DateTime         @default(now())
+  folder    CollectionFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
+
+  @@index([folderId, viewedAt])
+  @@index([ip, folderId, viewedAt])
   @@schema("public")
 }
 
@@ -478,6 +495,23 @@ model LigaSyncJobEdition {
   job           LigaSyncJob @relation(fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId, status])
+  @@index([code])
+  @@schema("pricing")
+}
+
+model LigaEditionCache {
+  id          String   @id @default(cuid())
+  edid        String
+  code        String
+  name        String
+  year        Int?
+  searchUrl   String
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([edid, code])
+  @@index([year])
   @@index([code])
   @@schema("pricing")
 }

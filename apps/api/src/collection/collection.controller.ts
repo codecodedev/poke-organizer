@@ -1,7 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
+import { FastifyRequest } from "fastify";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequestUser } from "../common/current-user.decorator";
-import { JwtAuthGuard } from "../common/jwt-auth.guard";
+import { JwtAuthGuard, OptionalJwtAuthGuard } from "../common/jwt-auth.guard";
 import { CollectionService } from "./collection.service";
 import {
   AddCollectionItemDto,
@@ -25,6 +26,11 @@ import {
 @Controller("collection")
 export class CollectionController {
   constructor(private readonly collection: CollectionService) {}
+
+  @Get("summary")
+  getSummary(@CurrentUser() user: RequestUser) {
+    return this.collection.getHomeSummary(user.id);
+  }
 
   @Delete("clear")
   clear(@CurrentUser() user: RequestUser, @Body() dto: ClearCollectionDto) {
@@ -153,8 +159,21 @@ export class PublicCollectionController {
   constructor(private readonly collection: CollectionService) {}
 
   @Get(":shareToken")
-  getPublicCollection(@Param("shareToken") shareToken: string, @Query() query: CollectionFolderQueryDto) {
-    return this.collection.getPublicFolder(shareToken, query);
+  @UseGuards(OptionalJwtAuthGuard)
+  getPublicCollection(
+    @Param("shareToken") shareToken: string,
+    @Query() query: CollectionFolderQueryDto,
+    @Req() req: FastifyRequest,
+    @CurrentUser() user?: RequestUser,
+  ) {
+    const ip = (req.headers["x-forwarded-for"] as string) || req.ip;
+    const userAgent = (req.headers["user-agent"] as string) || "unknown";
+
+    return this.collection.getPublicFolder(shareToken, query, {
+      ip,
+      userAgent,
+      userId: user?.id,
+    });
   }
 
   @Post(":shareToken/items/:folderItemId/bids")

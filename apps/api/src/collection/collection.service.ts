@@ -557,6 +557,7 @@ export class CollectionService {
   async getPublicFolder(
     shareToken: string,
     query: CollectionFolderQueryDto = {},
+    viewerInfo?: { ip?: string; userAgent?: string; userId?: string },
   ): Promise<PublicCollectionDetail> {
     const folder = await this.prisma.collectionFolder.findFirst({
       where: { shareToken, isPublic: true },
@@ -574,10 +575,78 @@ export class CollectionService {
       throw new NotFoundException("Public collection not found");
     }
 
+    if (viewerInfo && folder.userId !== viewerInfo.userId) {
+      await this.recordView(folder.id, viewerInfo);
+    }
+
     return {
       ...(await this.mapFolderDetail(folder, query.sort)),
       isPublic: true,
       ownerName: folder.user.name?.trim() || "Colecionador",
+      viewCount: folder.viewCount,
+    };
+  }
+
+  private async recordView(
+    folderId: string,
+    info: { ip?: string; userAgent?: string; userId?: string },
+  ) {
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+
+    const recentView = await this.prisma.collectionView.findFirst({
+      where: {
+        folderId,
+        viewedAt: { gte: yesterday },
+        OR: [
+          info.userId ? { viewerId: info.userId } : undefined,
+          info.ip ? { ip: info.ip } : undefined,
+        ].filter((x): x is NonNullable<typeof x> => !!x),
+      },
+    });
+
+    if (!recentView) {
+      await this.prisma.$transaction([
+        this.prisma.collectionView.create({
+          data: {
+            folderId,
+            viewerId: info.userId,
+            ip: info.ip,
+            userAgent: info.userAgent,
+          },
+        }),
+        this.prisma.collectionFolder.update({
+          where: { id: folderId },
+          data: { viewCount: { increment: 1 } },
+        }),
+      ]);
+    }
+  }
+
+  async getRanking(limit = 5): Promise<CollectionFolderSummary[]> {
+    const folders = await this.prisma.collectionFolder.findMany({
+      where: { isPublic: true },
+      include: {
+        items: { include: folderItemInclude },
+      },
+      orderBy: { viewCount: "desc" },
+      take: limit,
+    });
+    return Promise.all(folders.map((folder) => this.mapFolderSummary(folder)));
+  }
+
+  async getHomeSummary(userId: string) {
+    const [recentItems, recentBids, recentProposals, ranking] = await Promise.all([
+      this.list(userId, 5),
+      this.listMyBids(userId),
+      this.listMyProposals(userId),
+      this.getRanking(5),
+    ]);
+
+    return {
+      recentItems,
+      recentBids: recentBids.slice(0, 5),
+      recentProposals: recentProposals.slice(0, 5),
+      ranking,
     };
   }
 

@@ -147,6 +147,7 @@ export type CollectionFolderSummary = {
   isPublic: boolean;
   isStore: boolean;
   shareToken?: string | null;
+  viewCount: number;
   itemCount: number;
   totalValue: number;
   createdAt: string;
@@ -160,6 +161,14 @@ export type CollectionFolderDetail = CollectionFolderSummary & {
 export type PublicCollectionDetail = CollectionFolderDetail & {
   isPublic: true;
   ownerName: string;
+  viewCount: number;
+};
+
+export type HomeSummary = {
+  recentItems: CollectionItem[];
+  recentBids: CollectionItemBid[];
+  recentProposals: CollectionCartOffer[];
+  ranking: CollectionFolderSummary[];
 };
 
 export type CollectionOfferStatus = "pending" | "accepted" | "rejected";
