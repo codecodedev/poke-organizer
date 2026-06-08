@@ -215,6 +215,32 @@ export function CollectionsPage({
     setMessage("Carta removida da colecao.");
   }
 
+  async function addFolderItemInstant(itemId: string) {
+    if (!activeFolder) return;
+    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.updateCollectionFolder(token, activeFolder.id, {
+        itemIds: [...activeFolder.items.map(i => i.id), itemId]
+      }),
+    );
+    setActiveFolder(detail);
+    setActiveName(detail.name);
+    setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
+    setMessage("Carta adicionada a colecao.");
+  }
+
+  async function toggleFolderItemInstant(itemId: string) {
+    if (!activeFolder) return;
+    const isPresent = selectedItemIds.has(itemId);
+    if (isPresent) {
+      const item = activeFolder.items.find(i => i.id === itemId);
+      if (item?.folderItemId) {
+        await removeFolderItemInstant(item.folderItemId);
+      }
+    } else {
+      await addFolderItemInstant(itemId);
+    }
+  }
+
   async function createFolder(event: FormEvent) {
     event.preventDefault();
     const name = newName.trim();
@@ -799,10 +825,11 @@ export function CollectionsPage({
           onPickerSort={setPickerSort}
           onShowAllChange={setShowAllPickerItems}
           onPickerPageChange={setPickerPage}
-          onToggleItem={(itemId) => {
+          onRemoveItem={(itemId) => {
             const item = activeFolder.items.find((i) => i.id === itemId);
             if (item) setItemToRemove(item);
           }}
+          onToggleItem={(itemId) => void toggleFolderItemInstant(itemId)}
           onOpenCard={setSelectedItem}
           showPickerModal={showPickerModal}
           onTogglePickerModal={setShowPickerModal}
@@ -1596,10 +1623,10 @@ function CollectionCreateScreen({
             </Panel>
 
             {showPickerModal && (
-            <Modal title="Selecionar cartas" onClose={() => onTogglePickerModal(false)}>
+            <Modal title="Selecionar cartas" onClose={() => onTogglePickerModal(false)} maxWidthClass="max-w-6xl">
             <CardPickerPanel
             title="Selecionar cartas"
-            description="Busque por nome, numero ou colecao. Se preferir, mostre todas as cartas do inventario."
+            description="As cartas marcadas são incluídas na nova coleção instantaneamente. Use a busca ou mostre todo o inventário."
             pickerQuery={pickerQuery}
             pickerTypeOptions={pickerTypeOptions}
             pickerRarityOptions={pickerRarityOptions}
@@ -1621,16 +1648,6 @@ function CollectionCreateScreen({
             onPickerPageChange={onPickerPageChange}
             onToggleItem={onToggleItem}
             onOpenCard={onOpenCard}
-            action={
-              <Button
-                type="button"
-                variant="primary"
-                icon={<Plus size={16} />}
-                onClick={() => onTogglePickerModal(false)}
-              >
-                Adicionar a colecao
-              </Button>
-            }
             />
             </Modal>
             )}
@@ -1752,6 +1769,7 @@ function CollectionDetailScreen({
   onPickerSort: (value: CollectionFolderSort) => void;
   onShowAllChange: (value: boolean) => void;
   onPickerPageChange: (page: number) => void;
+  onRemoveItem: (itemId: string) => void;
   onToggleItem: (itemId: string) => void;
   onOpenCard: (item: CollectionItem) => void;
   showPickerModal: boolean;
@@ -2047,7 +2065,7 @@ function CollectionDetailScreen({
                         ? (amount) => debouncedUpdates(item.folderItemId!, amount)
                         : undefined
                     }
-                    onRemove={(nextItem) => onToggleItem(nextItem.id)}
+                    onRemove={(nextItem) => onRemoveItem(nextItem.id)}
                     removeLabel="Remover da colecao"
                   >
                     {isStore && item.folderItemId && (
@@ -2106,10 +2124,10 @@ function CollectionDetailScreen({
       </Panel>
 
       {showPickerModal && (
-        <Modal title="Adicionar cartas" onClose={() => onTogglePickerModal(false)}>
+        <Modal title="Adicionar cartas" onClose={() => onTogglePickerModal(false)} maxWidthClass="max-w-6xl">
           <CardPickerPanel
             title="Adicionar cartas"
-            description="Busque cartas do inventario, marque novas entradas e salve as alteracoes."
+            description="Busque cartas do inventario e marque as entradas. As cartas sao adicionadas instantaneamente."
             pickerQuery={pickerQuery}
             pickerTypeOptions={pickerTypeOptions}
             pickerRarityOptions={pickerRarityOptions}
@@ -2131,19 +2149,6 @@ function CollectionDetailScreen({
             onPickerPageChange={onPickerPageChange}
             onToggleItem={onToggleItem}
             onOpenCard={onOpenCard}
-            action={
-              <Button
-                type="button"
-                variant="primary"
-                icon={<Save size={16} />}
-                onClick={() => {
-                  onSave();
-                  onTogglePickerModal(false);
-                }}
-              >
-                Adicionar selecionadas
-              </Button>
-            }
           />
         </Modal>
       )}
@@ -2202,6 +2207,7 @@ function CardPickerPanel({
   onOpenCard: (item: CollectionItem) => void;
   action?: ReactNode;
 }) {
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
   const paginatedPickerItems = useMemo(
     () =>
       pickerItems.slice(
@@ -2221,7 +2227,7 @@ function CardPickerPanel({
         {action}
       </div>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto] lg:items-center">
+      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-center">
         <label className="relative block">
           <Search
             className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
@@ -2236,7 +2242,16 @@ function CardPickerPanel({
         </label>
         <Button
           type="button"
-          icon={<Plus size={16} />}
+          variant="ghost"
+          onClick={() => setShowFiltersModal(true)}
+          icon={<Filter size={18} />}
+          className={(pickerTypeFilter || pickerRarityFilter || pickerVariantFilter) ? "border-brand/40 bg-brand/5 text-brand" : ""}
+        >
+          Filtros e Ordenação
+        </Button>
+        <Button
+          type="button"
+          icon={showAllPickerItems ? <X size={16} /> : <Plus size={16} />}
           onClick={() => onShowAllChange(!showAllPickerItems)}
         >
           {showAllPickerItems ? "Ocultar lista" : "Mostrar todas"}
@@ -2246,60 +2261,90 @@ function CardPickerPanel({
         </div>
       </div>
 
-      <FilterGroup className="mt-3">
-        <FilterField label="Tipo">
-          <select
-            className="premium-select w-full"
-            value={pickerTypeFilter}
-            onChange={(event) => onPickerTypeFilter(event.target.value)}
-          >
-            <option value="">Todos os tipos</option>
-            {pickerTypeOptions.map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Raridade">
-          <select
-            className="premium-select w-full"
-            value={pickerRarityFilter}
-            onChange={(event) => onPickerRarityFilter(event.target.value)}
-          >
-            <option value="">Todas as raridades</option>
-            {pickerRarityOptions.map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Variante">
-          <select
-            className="premium-select w-full"
-            value={pickerVariantFilter}
-            onChange={(event) => onPickerVariantFilter(event.target.value)}
-          >
-            <option value="">Todas as variantes</option>
-            {pickerVariantOptions.map((value) => (
-              <option key={value}>{value}</option>
-            ))}
-          </select>
-        </FilterField>
-        <FilterField label="Ordenação">
-          <select
-            className="premium-select w-full"
-            value={pickerSort}
-            onChange={(event) =>
-              onPickerSort(event.target.value as CollectionFolderSort)
-            }
-          >
-            <option value="newest">Última adicionada</option>
-            <option value="oldest">Mais antiga</option>
-            <option value="value-desc">Maior valor</option>
-            <option value="value-asc">Menor valor</option>
-            <option value="price-change-desc">Maior alta</option>
-            <option value="price-change-asc">Maior queda</option>
-          </select>
-        </FilterField>
-      </FilterGroup>
+      {showFiltersModal && (
+        <Modal title="Filtros e Ordenação" onClose={() => setShowFiltersModal(false)} maxWidthClass="max-w-xl" zIndexClass="z-[70]">
+          <div className="grid gap-5 p-5">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <FilterField label="Tipo">
+                <select
+                  className="premium-select w-full"
+                  value={pickerTypeFilter}
+                  onChange={(event) => onPickerTypeFilter(event.target.value)}
+                >
+                  <option value="">Todos os tipos</option>
+                  {pickerTypeOptions.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </FilterField>
+              <FilterField label="Raridade">
+                <select
+                  className="premium-select w-full"
+                  value={pickerRarityFilter}
+                  onChange={(event) => onPickerRarityFilter(event.target.value)}
+                >
+                  <option value="">Todas as raridades</option>
+                  {pickerRarityOptions.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </FilterField>
+              <FilterField label="Variante">
+                <select
+                  className="premium-select w-full"
+                  value={pickerVariantFilter}
+                  onChange={(event) => onPickerVariantFilter(event.target.value)}
+                >
+                  <option value="">Todas as variantes</option>
+                  {pickerVariantOptions.map((value) => (
+                    <option key={value}>{value}</option>
+                  ))}
+                </select>
+              </FilterField>
+              <FilterField label="Ordenação">
+                <select
+                  className="premium-select w-full"
+                  value={pickerSort}
+                  onChange={(event) =>
+                    onPickerSort(event.target.value as CollectionFolderSort)
+                  }
+                >
+                  <option value="newest">Última adicionada</option>
+                  <option value="oldest">Mais antiga</option>
+                  <option value="value-desc">Maior valor</option>
+                  <option value="value-asc">Menor valor</option>
+                  <option value="price-change-desc">Maior alta</option>
+                  <option value="price-change-asc">Maior queda</option>
+                </select>
+              </FilterField>
+            </div>
+            
+            <div className="flex gap-3 pt-2">
+              <Button 
+                type="button" 
+                className="flex-1"
+                variant="ghost"
+                onClick={() => {
+                  onPickerTypeFilter("");
+                  onPickerRarityFilter("");
+                  onPickerVariantFilter("");
+                  onPickerSort("newest");
+                }}
+              >
+                Limpar filtros
+              </Button>
+              <Button 
+                type="button" 
+                variant="brand" 
+                className="flex-1"
+                onClick={() => setShowFiltersModal(false)}
+              >
+                Aplicar filtros
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {pickerItems.length ? (
         <>

@@ -151,6 +151,12 @@ export class CollectionController {
     return this.collection.removeFolder(user.id, id);
   }
 
+  @Get("market-search")
+  @UseGuards(OptionalJwtAuthGuard)
+  searchMarket(@Query("query") query: string) {
+    return this.collection.searchMarket(query);
+  }
+
   @Patch(":id")
   update(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateCollectionItemDto) {
     return this.collection.update(user.id, id, dto);

@@ -8,9 +8,10 @@ type ModalProps = {
   children: ReactNode;
   onClose: () => void;
   maxWidthClass?: string;
+  zIndexClass?: string;
 };
 
-export function Modal({ title, subtitle, children, onClose, maxWidthClass = "max-w-3xl" }: ModalProps) {
+export function Modal({ title, subtitle, children, onClose, maxWidthClass = "max-w-3xl", zIndexClass = "z-50" }: ModalProps) {
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -21,7 +22,7 @@ export function Modal({ title, subtitle, children, onClose, maxWidthClass = "max
 
   return createPortal(
     <div
-      className="fixed inset-0 z-50 grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm"
+      className={`fixed inset-0 ${zIndexClass} grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm`}
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"

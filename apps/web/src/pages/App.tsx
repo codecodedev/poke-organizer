@@ -38,10 +38,11 @@ import { formatBrl } from "../lib/format";
 
 import { NotificationBell } from "../components/ui/NotificationBell";
 import { ProfilePage } from "../components/ProfilePage";
+import { BuyPage } from "../components/BuyPage";
 import { Sidebar } from "../components/layout/Sidebar";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 
-type View = "home" | "cards" | "collections" | "decks" | "proposals" | "profile";
+type View = "home" | "cards" | "collections" | "decks" | "buy" | "proposals" | "profile";
 type ThemeMode = "light" | "dark";
 type AppRoute = {
   view: View;
@@ -303,6 +304,15 @@ export function App() {
               />
             )}
 
+            {!isPublicView && view === "buy" && session && (
+              <BuyPage
+                session={session}
+                onSession={handleSession}
+                onUnauthorized={handleUnauthorized}
+                onNavigate={(route) => navigate(route)}
+              />
+            )}
+
             {!isPublicView && view === "proposals" && session && (
               <ProfilePage
                 session={session}
@@ -394,7 +404,7 @@ function parseRoute(): AppRoute {
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
   const view: View =
-    page === "cards" || page === "collections" || page === "decks" || page === "proposals" || page === "profile"
+    page === "cards" || page === "collections" || page === "decks" || page === "buy" || page === "proposals" || page === "profile"
       ? page
       : "home";
 
@@ -617,6 +627,9 @@ function HomeView({
                         {folder.name}
                       </p>
                       <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                        <span className="flex items-center gap-1 font-black text-slate-400 uppercase tracking-tighter">
+                          {folder.userName || "Usuário"}
+                        </span>
                         <span className="flex items-center gap-1">
                           <Eye size={12} /> {folder.viewCount}
                         </span>

@@ -441,6 +441,9 @@ export const api = {
   listMyProposals(token: string) {
     return request<CollectionCartOffer[]>("/collection/my-proposals", { token });
   },
+  searchMarket(query: string, token?: string) {
+    return request<{ items: any[]; auctions: any[] }>(`/collection/market-search?query=${encodeURIComponent(query)}`, { token });
+  },
   getHomeSummary(token: string) {
     return request<HomeSummary>("/collection/summary", { token });
   },

@@ -109,11 +109,12 @@ export class CollectionService {
     const folders = await this.prisma.collectionFolder.findMany({
       where: { userId },
       include: {
+        user: true,
         items: { include: folderItemInclude },
       },
       orderBy: { name: "asc" },
     });
-    return Promise.all(folders.map((folder) => this.mapFolderSummary(folder)));
+    return Promise.all(folders.map((folder) => this.mapFolderSummary(folder as any)));
   }
 
   async listMyProposals(userId: string): Promise<CollectionCartOffer[]> {
@@ -599,12 +600,82 @@ export class CollectionService {
     const folders = await this.prisma.collectionFolder.findMany({
       where: { OR: accessConditions },
       include: {
+        user: true,
         items: { include: folderItemInclude },
       },
       orderBy: { viewCount: "desc" },
       take: limit,
     });
-    return Promise.all(folders.map((folder) => this.mapFolderSummary(folder)));
+    return Promise.all(folders.map((folder) => this.mapFolderSummary(folder as any)));
+  }
+
+  async searchMarket(query: string) {
+    if (!query || query.length < 2) return { items: [], auctions: [] };
+
+    const normalized = query.trim().toLowerCase();
+    
+    // Search public store items
+    const storeItems = await this.prisma.collectionFolderItem.findMany({
+      where: {
+        folder: { isPublic: true, isStore: true },
+        isSold: false,
+        collectionItem: {
+          card: {
+            OR: [
+              { name: { contains: normalized, mode: "insensitive" } },
+              { number: { contains: normalized, mode: "insensitive" } },
+            ],
+          },
+        },
+      },
+      include: {
+        folder: { include: { user: true } },
+        collectionItem: { include: collectionItemInclude },
+      },
+      take: 20,
+    });
+
+    // Search active auctions (since listActiveAuctions already exists, we filter here or query prisma)
+    const auctions = await this.prisma.auction.findMany({
+      where: {
+        status: "OPEN",
+        endsAt: { gt: new Date() },
+        card: {
+          OR: [
+            { name: { contains: normalized, mode: "insensitive" } },
+            { number: { contains: normalized, mode: "insensitive" } },
+          ],
+        },
+      },
+      include: {
+        card: true,
+        seller: true,
+        bids: { orderBy: { amountBrl: "desc" }, take: 1 },
+      },
+      take: 20,
+    });
+
+    return {
+      items: storeItems.map(item => ({
+        ...this.mapItem(item.collectionItem, item),
+        folderId: item.folderId,
+        folderName: item.folder.name,
+        shareToken: item.folder.shareToken,
+        sellerName: item.folder.user.name || item.folder.user.email,
+      })),
+      auctions: auctions.map(a => ({
+        id: a.id,
+        shareToken: a.shareToken,
+        title: a.title,
+        status: a.status.toLowerCase(),
+        minBid: Number(a.minBidBrl),
+        currentBid: a.bids[0] ? Number(a.bids[0].amountBrl) : null,
+        bidCount: 0, // Simplified for search
+        endsAt: a.endsAt.toISOString(),
+        card: toCardSummary(a.card),
+        sellerName: a.seller.name || a.seller.email,
+      })),
+    };
   }
 
   async getHomeSummary(userId: string) {
@@ -964,7 +1035,7 @@ export class CollectionService {
   }
 
   private async mapFolderSummary(
-    folder: FolderWithItems,
+    folder: FolderWithItems & { user: { name: string | null; email: string } },
   ): Promise<CollectionFolderSummary> {
     const items = folder.items.map((entry) => entry.collectionItem);
     const totalValue = items.reduce(
@@ -976,6 +1047,7 @@ export class CollectionService {
     return {
       id: folder.id,
       name: folder.name,
+      userName: folder.user.name?.trim() || folder.user.email,
       isPublic: folder.isPublic,
       isStore: folder.isStore,
       shareToken: folder.shareToken,

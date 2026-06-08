@@ -113,6 +113,21 @@ export function CollectionItemCard({
             </span>
           </div>
         )}
+        {onRemove && (
+          <div className="absolute bottom-2 right-2 z-30 opacity-0 transition duration-200 group-hover:opacity-100">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onRemove(item);
+              }}
+              className="grid h-9 w-9 place-items-center rounded-2xl border border-rose-500/20 bg-black/60 text-rose-500 shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:bg-rose-500/20"
+              aria-label={removeLabel}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-1 px-1 py-2">
@@ -177,22 +192,6 @@ export function CollectionItemCard({
       {children && (
         <div className="mt-1 border-t border-white/5 pt-2" onClick={(e) => e.stopPropagation()}>
           {children}
-        </div>
-      )}
-
-      {onRemove && (
-        <div className="absolute bottom-[75px] right-3 z-30 opacity-0 transition duration-200 group-hover:opacity-100">
-          <button
-            type="button"
-            onClick={(event) => {
-              event.stopPropagation();
-              onRemove(item);
-            }}
-            className="grid h-9 w-9 place-items-center rounded-2xl border border-rose-500/20 bg-black/60 text-rose-500 shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:bg-rose-500/20"
-            aria-label={removeLabel}
-          >
-            <Trash2 size={16} />
-          </button>
         </div>
       )}
     </article>
