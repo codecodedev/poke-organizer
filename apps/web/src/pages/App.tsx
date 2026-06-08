@@ -42,6 +42,7 @@ import { ProfilePage } from "../components/ProfilePage";
 import { BuyPage } from "../components/BuyPage";
 import { Sidebar } from "../components/layout/Sidebar";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
+import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 
 type View = "home" | "cards" | "collections" | "decks" | "buy" | "proposals" | "profile";
 type ThemeMode = "light" | "dark";
@@ -60,6 +61,7 @@ export function App() {
   const [route, setRoute] = useState<AppRoute>(() => parseRoute());
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   const view = route.view;
 
@@ -137,6 +139,7 @@ export function App() {
     clearSession();
     setSession(null);
     setSidebarOpen(false);
+    setShowLogoutConfirm(false);
   }
 
   function refreshCollection() {
@@ -154,7 +157,7 @@ export function App() {
             session={session}
             activeView={view}
             onNavigate={(nextView) => navigate({ view: nextView })}
-            onLogout={logout}
+            onLogout={() => setShowLogoutConfirm(true)}
             theme={theme}
             onToggleTheme={toggleTheme}
             isOpen={sidebarOpen}
@@ -166,7 +169,7 @@ export function App() {
 
         <div className={`flex flex-1 flex-col transition-all duration-300 ${session ? (sidebarOpen ? "md:ml-[280px]" : "md:ml-20") : ""}`}>
           {(session || isPublicView) && (
-            <header className={`sticky top-0 z-30 flex h-20 items-center border-b border-white/5 bg-white/5 px-5 backdrop-blur-xl dark:bg-black/20 ${session ? 'md:hidden' : ''}`}>
+            <header className={`sticky top-0 z-20 flex h-20 items-center border-b border-white/5 bg-white/5 px-5 backdrop-blur-xl dark:bg-black/20 ${session ? 'md:hidden' : ''}`}>
               {/* Left: Sidebar Toggle (Mobile only) */}
               <div className="flex w-1/4 items-center justify-start md:hidden">
                 {session && (
@@ -335,6 +338,16 @@ export function App() {
             )}
           </main>
       </div>
+      {showLogoutConfirm && (
+        <ConfirmationModal
+          title="Sair da conta"
+          description="Você tem certeza que deseja sair da sua conta?"
+          confirmLabel="Sair agora"
+          cancelLabel="Continuar logado"
+          onConfirm={logout}
+          onCancel={() => setShowLogoutConfirm(false)}
+        />
+      )}
     </div>
       <SpeedInsights />
     </>

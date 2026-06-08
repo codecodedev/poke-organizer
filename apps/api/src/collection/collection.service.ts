@@ -393,7 +393,10 @@ export class CollectionService {
     const itemsById = new Map(dto.items.map((item) => [item.folderItemId, item]));
     const calculatedTotal = folderItems.reduce((sum, item) => {
       const offerItem = itemsById.get(item.id);
-      return sum + this.assertPositiveMoney(offerItem?.amount ?? 0) * (offerItem?.quantity ?? 1);
+      const amount = dto.isGlobalOffer 
+         ? Math.max(0, offerItem?.amount ?? 0)
+         : this.assertPositiveMoney(offerItem?.amount ?? 0);
+      return sum + amount * (offerItem?.quantity ?? 1);
     }, 0);
 
     const totalOfferBrl = dto.isGlobalOffer && dto.totalOffer !== undefined
@@ -413,7 +416,9 @@ export class CollectionService {
             return {
               folderItemId: item.id,
               quantity: offerItem.quantity ?? 1,
-              amountBrl: this.assertPositiveMoney(offerItem.amount),
+              amountBrl: dto.isGlobalOffer 
+                ? Math.max(0, offerItem.amount) 
+                : this.assertPositiveMoney(offerItem.amount),
             };
           }),
         },
@@ -422,6 +427,15 @@ export class CollectionService {
         buyer: true,
         folder: true,
         items: { include: { folderItem: { include: folderItemInclude } } },
+      },
+    });
+
+    await this.prisma.notification.create({
+      data: {
+        userId: folder.userId,
+        title: "Nova Proposta Recebida!",
+        message: `${offer.buyer.name || offer.buyer.email} enviou uma proposta na coleção "${folder.name}".`,
+        link: `/collections/${folder.id}`,
       },
     });
 
@@ -505,6 +519,15 @@ export class CollectionService {
             userId: offer.buyerId,
             title: "Proposta Aceita!",
             message: `Sua proposta na coleção "${offer.folder.name}" foi aceita pelo vendedor.`,
+            link: `/profile?tab=proposals`,
+          },
+        });
+      } else if (status === "REJECTED") {
+        await tx.notification.create({
+          data: {
+            userId: offer.buyerId,
+            title: "Proposta Recusada",
+            message: `Sua proposta na coleção "${offer.folder.name}" foi recusada pelo vendedor.`,
             link: `/profile?tab=proposals`,
           },
         });

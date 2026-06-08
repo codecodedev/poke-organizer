@@ -53,6 +53,12 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
       return {};
     }
   });
+  const [isGlobalMode, setIsGlobalMode] = useState(() => {
+    return localStorage.getItem(`cart_global_mode_${shareToken}`) === "true";
+  });
+  const [globalTotal, setGlobalTotal] = useState(() => {
+    return localStorage.getItem(`cart_global_total_${shareToken}`) || "";
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showMyProposalsModal, setShowMyProposalsModal] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -61,6 +67,14 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
   useEffect(() => {
     localStorage.setItem(`cart_${shareToken}`, JSON.stringify(cart));
   }, [cart, shareToken]);
+
+  useEffect(() => {
+    localStorage.setItem(`cart_global_mode_${shareToken}`, String(isGlobalMode));
+  }, [isGlobalMode, shareToken]);
+
+  useEffect(() => {
+    localStorage.setItem(`cart_global_total_${shareToken}`, globalTotal);
+  }, [globalTotal, shareToken]);
 
   useEffect(() => {
     localStorage.setItem("pc_typeFilter", typeFilter);
@@ -202,7 +216,11 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
       
       // Clear saved cart
       localStorage.removeItem(`cart_${shareToken}`);
+      localStorage.removeItem(`cart_global_mode_${shareToken}`);
+      localStorage.removeItem(`cart_global_total_${shareToken}`);
       setCart({});
+      setIsGlobalMode(false);
+      setGlobalTotal("");
       
       // Refresh user proposals
       const allMyProposals = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
@@ -434,6 +452,10 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
         <ProposalCart
           cart={cart}
           setCart={setCart}
+          isGlobalMode={isGlobalMode}
+          setIsGlobalMode={setIsGlobalMode}
+          globalTotal={globalTotal}
+          setGlobalTotal={setGlobalTotal}
           onSubmit={submitProposal}
           isSubmitting={isSubmitting}
           folderName={collection.name}

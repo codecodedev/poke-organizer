@@ -13,6 +13,10 @@ type CartItem = {
 type Props = {
   cart: Record<string, CartItem>;
   setCart: React.Dispatch<React.SetStateAction<Record<string, CartItem>>>;
+  isGlobalMode: boolean;
+  setIsGlobalMode: (val: boolean) => void;
+  globalTotal: string;
+  setGlobalTotal: (val: string) => void;
   onSubmit: (proposalItems: { folderItemId: string; amount: number; quantity: number }[], message: string, totalOffer?: number, isGlobalOffer?: boolean) => Promise<void>;
   isSubmitting: boolean;
   folderName: string;
@@ -20,11 +24,21 @@ type Props = {
   theme?: "light" | "dark";
 };
 
-export function ProposalCart({ cart, setCart, onSubmit, isSubmitting, folderName, session, theme }: Props) {
+export function ProposalCart({ 
+  cart, 
+  setCart, 
+  isGlobalMode, 
+  setIsGlobalMode, 
+  globalTotal, 
+  setGlobalTotal, 
+  onSubmit, 
+  isSubmitting, 
+  folderName, 
+  session, 
+  theme 
+}: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [message, setMessage] = useState("");
-  const [globalTotal, setGlobalTotal] = useState<string>("");
-  const [isGlobalMode, setIsGlobalMode] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [hasNewItems, setHasNewItems] = useState(false);
@@ -117,7 +131,7 @@ export function ProposalCart({ cart, setCart, onSubmit, isSubmitting, folderName
     <>
       {/* Mobile Overlay - Only when expanded */}
       <div 
-        className={`fixed inset-0 z-[20] bg-black/60 backdrop-blur-sm transition-opacity duration-300 sm:hidden ${
+        className={`fixed inset-0 z-[25] bg-black/60 backdrop-blur-sm transition-opacity duration-300 sm:hidden ${
           isExpanded ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setIsExpanded(false)}
@@ -130,10 +144,10 @@ export function ProposalCart({ cart, setCart, onSubmit, isSubmitting, folderName
         }
       `}>
         {/* Main Container */}
-        <div className={`relative flex flex-col w-full transition-all duration-300 overflow-hidden shadow-[0_20px_50px_rgba(0,0,0,0.3)]
+        <div className={`relative flex flex-col w-full transition-all duration-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)]
           ${isExpanded
-            ? "h-[600px] max-h-[90vh] sm:max-h-[80vh] rounded-t-[32px] sm:rounded-[32px] bg-white dark:bg-zinc-950 backdrop-blur-xl border-t sm:border border-white/10"
-            : "h-16 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t sm:border border-white/10 sm:rounded-full sm:w-auto"
+            ? "h-[600px] max-h-[90vh] sm:max-h-[80vh] rounded-t-[32px] sm:rounded-[32px] bg-white dark:bg-zinc-950 backdrop-blur-xl border-t sm:border border-white/10 overflow-hidden"
+            : "h-16 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t sm:border border-white/10 sm:rounded-full sm:w-auto overflow-visible"
           }
           ${isGlobalMode && isExpanded ? "border-t-2 border-brand sm:border-t" : ""}
         `}>
@@ -148,18 +162,15 @@ export function ProposalCart({ cart, setCart, onSubmit, isSubmitting, folderName
             onClick={() => setIsExpanded(!isExpanded)}
           >
             {/* Expanded Header or Mobile Minimized Header */}
-            <div className={`flex items-center gap-3 ${!isExpanded && "hidden sm:hidden"} ${isExpanded && "flex"} w-full sm:w-auto`}>
-              <div className="relative">
-                <div className={`grid h-10 w-10 place-items-center rounded-2xl text-white keep-white shadow-glow transition-colors ${isGlobalMode ? "bg-brand" : "bg-brand sm:bg-ink sm:dark:bg-white sm:dark:text-ink"}`}>
+            <div className={`flex relative items-center gap-3 ${!isExpanded && "hidden sm:hidden"} ${isExpanded && "flex"} w-full sm:w-auto`}>
+              <div className="">
+                <div className={`grid h-10 w-10 place-items-center rounded-2xl text-white shadow-glow transition-colors ${isGlobalMode ? "bg-brand dark:bg-white" : "bg-white dark:bg-white dark:text-white"}`}>
                   <ShoppingBag size={20} />
                 </div>
-                <span className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-magenta text-[10px] font-black text-white keep-white ring-2 ring-white dark:ring-black">
-                  {totalItems}
-                </span>
               </div>
               <div className="min-w-0 flex-1">
                 <h3 className="text-sm font-black text-ink dark:text-white truncate">Carrinho: {folderName}</h3>
-                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none mt-0.5">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5">
                   Finalize sua proposta
                 </p>
               </div>
@@ -168,22 +179,24 @@ export function ProposalCart({ cart, setCart, onSubmit, isSubmitting, folderName
             {/* Desktop Bubble Content (Only visible when NOT expanded) */}
             {!isExpanded && (
               <div className="hidden sm:flex items-center gap-3">
-                <div className={`grid h-12 w-12 place-items-center rounded-full transition-all duration-300 ${
-                  hasNewItems 
-                    ? "bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.4)] scale-110" 
-                    : "bg-brand shadow-glow"
-                }`}>
-                  <ShoppingBag size={24} className="text-white keep-white" />
+                <div className="relative">
+                  <div className={`grid h-12 w-12 place-items-center rounded-full transition-all duration-300 ${
+                    hasNewItems 
+                      ? "bg-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.4)] scale-110" 
+                      : "bg-brand shadow-glow"
+                  }`}>
+                    <ShoppingBag size={24} className="text-white" />
+                  </div>
+                  {totalItems > 0 && hasNewItems && (
+                    <span className="absolute -left-1 -top-1 grid h-6 w-6 place-items-center rounded-full text-xs font-black text-white bg-rose-500 ring-4 ring-white dark:ring-zinc-900 animate-soft-pop">
+                      {totalItems}
+                    </span>
+                  )}
                 </div>
                 <div className="text-left">
                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 leading-none mb-0.5">Total Carrinho</p>
                   <p className="text-xs font-black text-ink dark:text-white">{totalItems} itens • {formatBrl(displayTotal)}</p>
                 </div>
-                {totalItems > 0 && hasNewItems && (
-                  <span className="absolute -left-1 -top-1 grid h-6 w-6 place-items-center rounded-full text-xs font-black text-white bg-rose-500 ring-4 ring-white dark:ring-zinc-900 animate-soft-pop keep-white">
-                    {totalItems}
-                  </span>
-                )}
               </div>
             )}
 
@@ -192,7 +205,7 @@ export function ProposalCart({ cart, setCart, onSubmit, isSubmitting, folderName
               <div className="flex sm:hidden w-full items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="relative">
-                    <div className={`grid h-10 w-10 place-items-center rounded-2xl text-white keep-white shadow-glow transition-all duration-300 ${
+                    <div className={`grid h-10 w-10 place-items-center rounded-2xl text-white shadow-glow transition-all duration-300 ${
                       hasNewItems ? "bg-rose-500" : "bg-brand"
                     }`}>
                       <ShoppingBag size={20} />
@@ -227,7 +240,7 @@ export function ProposalCart({ cart, setCart, onSubmit, isSubmitting, folderName
           </div>
 
           {/* Expanded Content View */}
-          <div className={`flex-1 overflow-y-auto p-5 scrollbar-hide transition-opacity duration-300 ${isExpanded ? "opacity-100 delay-150" : "opacity-0 pointer-events-none"}`}>
+          <div className={`flex-1 overflow-y-auto p-5 scrollbar-hide transition-all duration-500 ${isExpanded ? "opacity-100" : "opacity-0 pointer-events-none h-0"}`}>
             <div className="space-y-4">
               {cartList.map((entry) => {
                 const originalPrice = entry.item.store?.effectivePrice ?? entry.item.price?.amount ?? 0;
@@ -350,7 +363,7 @@ export function ProposalCart({ cart, setCart, onSubmit, isSubmitting, folderName
           </div>
 
           {/* Expanded Footer Area */}
-          <div className={`shrink-0 border-t border-white/5 bg-white/50 p-5 backdrop-blur-md dark:bg-black/40 transition-opacity duration-300 ${isExpanded ? "opacity-100 delay-150" : "opacity-0 pointer-events-none"}`}>
+          <div className={`border-t border-white/5 bg-white/50 p-5 backdrop-blur-md dark:bg-black/40 transition-all duration-500 ${isExpanded ? "opacity-100" : "opacity-0 pointer-events-none h-0 p-0"}`}>
             <div className="mb-4 flex items-center justify-between px-1">
               <span className="text-sm font-black text-slate-500 uppercase tracking-widest dark:text-slate-400">Total da Proposta</span>
               <span className={`text-2xl font-black transition-colors ${isGlobalMode ? "text-brand" : "text-ink dark:text-white"}`}>

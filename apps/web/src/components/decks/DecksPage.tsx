@@ -28,6 +28,7 @@ import { withAuthRetry } from "../../lib/authRetry";
 import { Button } from "../ui/Button";
 import { Modal } from "../ui/Modal";
 import { Panel } from "../ui/Panel";
+import { ConfirmationModal } from "../ui/ConfirmationModal";
 
 type Props = {
   session: Session;
@@ -53,6 +54,7 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
   const [query, setQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
   const [showGenerator, setShowGenerator] = useState(false);
+  const [deckToRemove, setDeckToRemove] = useState<DeckDetail | null>(null);
 
   async function load() {
     setLoading(true);
@@ -309,7 +311,7 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
                       className="grid h-9 w-9 place-items-center rounded-2xl border border-line bg-white/80 text-slate-600"
                       onClick={(event) => {
                         event.stopPropagation();
-                        void deleteDeck(deck);
+                        setDeckToRemove(deck);
                       }}
                       aria-label="Excluir deck"
                     >
@@ -500,6 +502,19 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
           onUnauthorized={onUnauthorized}
           onClose={() => setShowGenerator(false)}
           onSaveSuggestion={saveSuggestion}
+        />
+      )}
+
+      {deckToRemove && (
+        <ConfirmationModal
+          title="Excluir deck"
+          description={`Tem certeza que deseja excluir o deck "${deckToRemove.name}"?`}
+          confirmLabel="Excluir"
+          onConfirm={() => {
+            void deleteDeck(deckToRemove);
+            setDeckToRemove(null);
+          }}
+          onCancel={() => setDeckToRemove(null)}
         />
       )}
     </>

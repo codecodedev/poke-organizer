@@ -27,6 +27,7 @@ import { Panel } from "./ui/Panel";
 import { StatCard } from "./ui/StatCard";
 import { CollectionItemCard } from "./collection/CollectionItemCard";
 import { PaginationControls } from "./ui/PaginationControls";
+import { ConfirmationModal } from "./ui/ConfirmationModal";
 
 import { FilterField, FilterGroup } from "./ui/Filters";
 
@@ -107,6 +108,7 @@ export function CollectionList({
   const [showSettings, setShowSettings] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [auctionItem, setAuctionItem] = useState<CollectionItem | null>(null);
+  const [itemToRemove, setItemToRemove] = useState<CollectionItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
@@ -208,6 +210,7 @@ export function CollectionList({
       api.deleteCollection(token, item.id),
     );
     setItems((current) => current.filter((entry) => entry.id !== item.id));
+    setItemToRemove(null);
   }
 
   async function updateItemDetails(itemId: string, details: UpdateCardDetails) {
@@ -567,7 +570,7 @@ export function CollectionList({
                   item={item}
                   price={item.price ?? undefined}
                   onOpen={openItem}
-                  onRemove={(nextItem) => void remove(nextItem)}
+                  onRemove={(nextItem) => setItemToRemove(nextItem)}
                 />
               );
             })}
@@ -688,6 +691,16 @@ export function CollectionList({
             </div>
           </div>
         </Modal>
+      )}
+      {itemToRemove && (
+        <ConfirmationModal
+          title="Remover carta"
+          description={`Você tem certeza que deseja remover ${itemToRemove.card.name} da sua coleção?`}
+          confirmLabel="Remover"
+          cancelLabel="Cancelar"
+          onConfirm={() => void remove(itemToRemove)}
+          onCancel={() => setItemToRemove(null)}
+        />
       )}
     </Panel>
   );

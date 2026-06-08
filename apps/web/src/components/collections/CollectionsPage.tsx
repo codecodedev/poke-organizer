@@ -23,6 +23,7 @@ import type {
   CollectionFolderSummary,
   CollectionItem,
 } from "@poke-organizer/shared";
+import { formatCardVariant } from "@poke-organizer/shared";
 import { api, type Session } from "../../lib/api";
 import { withAuthRetry } from "../../lib/authRetry";
 import { formatBrl } from "../../lib/format";
@@ -32,6 +33,7 @@ import { CollectionItemCard } from "../collection/CollectionItemCard";
 import { CardDetailModal, type UpdateCardDetails } from "../CardDetailModal";
 import { PaginationControls } from "../ui/PaginationControls";
 import { Modal } from "../ui/Modal";
+import { ConfirmationModal } from "../ui/ConfirmationModal";
 import { FilterField, FilterGroup } from "../ui/Filters";
 
 type Props = {
@@ -89,6 +91,7 @@ export function CollectionsPage({
   const [selectedAuctionItem, setSelectedAuctionItem] = useState<CollectionItem | null>(null);
   const [sellingItem, setSellingItem] = useState<CollectionItem | null>(null);
   const [itemToRemove, setItemToRemove] = useState<CollectionItem | null>(null);
+  const [showFolderRemoveConfirm, setShowFolderRemoveConfirm] = useState(false);
   const [showPickerModal, setShowPickerModal] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [undoingItem, setUndoingItem] = useState<CollectionItem | null>(null);
@@ -807,7 +810,7 @@ export function CollectionsPage({
           onBack={backToList}
           onNameChange={setActiveName}
           onSave={() => void saveFolder()}
-          onRemoveFolder={() => void removeFolder()}
+          onRemoveFolder={() => setShowFolderRemoveConfirm(true)}
           onToggleSharing={(isPublic) => void updateFolderSharing(isPublic)}
           onToggleStore={(isStore) => void updateFolderStore(isStore)}
           onUpdateSale={(folderItemId, payload) => void updateFolderItemSale(folderItemId, payload)}
@@ -839,34 +842,30 @@ export function CollectionsPage({
       )}
 
       {itemToRemove && (
-        <Modal
+        <ConfirmationModal
           title="Remover carta da coleção"
-          onClose={() => setItemToRemove(null)}
-          maxWidthClass="max-w-md"
-        >
-          <div className="grid gap-4 p-5">
-            <p className="section-copy">
-              Tem certeza que deseja remover a carta <span className="font-bold text-ink">"{itemToRemove.card.name}"</span> desta coleção?
-            </p>
-            <div className="flex gap-3">
-              <Button type="button" className="flex-1" onClick={() => setItemToRemove(null)}>
-                Cancelar
-              </Button>
-              <Button
-                type="button"
-                variant="primary"
-                className="flex-1 bg-red-600 hover:bg-red-700"
-                onClick={() => {
-                  if (itemToRemove.folderItemId) {
-                    void removeFolderItemInstant(itemToRemove.folderItemId);
-                  }
-                }}
-              >
-                Remover
-              </Button>
-            </div>
-          </div>
-        </Modal>
+          description={`Tem certeza que deseja remover a carta "${itemToRemove.card.name}" desta coleção?`}
+          confirmLabel="Remover"
+          onConfirm={() => {
+            if (itemToRemove.folderItemId) {
+              void removeFolderItemInstant(itemToRemove.folderItemId);
+            }
+          }}
+          onCancel={() => setItemToRemove(null)}
+        />
+      )}
+
+      {showFolderRemoveConfirm && (
+        <ConfirmationModal
+          title="Excluir coleção"
+          description={`Tem certeza que deseja excluir a coleção "${activeFolder?.name}"? Esta ação não pode ser desfeita.`}
+          confirmLabel="Excluir coleção"
+          onConfirm={() => {
+            void removeFolder();
+            setShowFolderRemoveConfirm(false);
+          }}
+          onCancel={() => setShowFolderRemoveConfirm(false)}
+        />
       )}
 
       {message && <p className="success-note">{message}</p>}
@@ -1262,19 +1261,20 @@ function OffersModal({
               <div key={offer.id} className="rounded-2xl border border-line/70 bg-field/45 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-black text-ink">{offer.buyerName}</p>
-                    <div className="flex items-center gap-2">
-                      <p className="text-xs font-semibold text-slate-500">
-                        {offer.items.length} carta(s) • {formatBrl(offer.totalOffer)} • {formatOfferStatus(offer.status)}
-                      </p>
+                    <p className="font-black text-slate-500 text-xs tracking-wider uppercase mb-1">De: {offer.buyerName}</p>
+                    <div className="flex items-center gap-3">
+                      <p className="text-2xl font-black text-ink dark:text-white">{formatBrl(offer.totalOffer)}</p>
                       {offer.isGlobalOffer && (
-                        <span className="rounded-lg bg-brand px-1.5 py-0.5 text-[9px] font-black text-white uppercase tracking-tighter shadow-sm">
-                          Global
+                        <span className="rounded-lg bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/30 dark:border-amber-500/30 dark:text-amber-300 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest shadow-sm">
+                          Valor Fechado
                         </span>
                       )}
                     </div>
+                    <p className="mt-1 text-xs font-bold text-slate-400">
+                      {offer.items.length} carta(s) • {formatOfferStatus(offer.status)}
+                    </p>
                     {offer.message && (
-                      <p className="mt-2 rounded-xl bg-white/60 p-3 text-sm italic text-slate-600 border border-line/40">
+                      <p className="mt-3 rounded-xl bg-white/60 dark:bg-black/20 p-3 text-sm italic text-slate-600 dark:text-slate-300 border border-line/40 dark:border-white/5">
                         "{offer.message}"
                       </p>
                     )}
@@ -1283,14 +1283,14 @@ function OffersModal({
                     <div className="flex flex-wrap gap-2">
                       <Button
                         type="button"
-                        className="h-9 bg-leaf text-white hover:bg-emerald-600"
+                        className="h-9 bg-leaf text-white hover:bg-emerald-600 shadow-sm"
                         onClick={() => onDecide(offer.id, "accepted")}
                       >
                         Aceitar
                       </Button>
                       <Button
                         type="button"
-                        className="h-9 bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
+                        className="h-9 bg-red-50 text-red-600 border-red-100 hover:bg-red-100 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/50"
                         onClick={() => onDecide(offer.id, "rejected")}
                       >
                         Rejeitar
@@ -1298,11 +1298,19 @@ function OffersModal({
                     </div>
                   )}
                 </div>
-                <div className="mt-4 space-y-2 border-t border-line/40 pt-3">
+                <div className="mt-4 space-y-2 border-t border-line/40 pt-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Itens da proposta</p>
                   {offer.items.map((entry) => (
-                    <div key={entry.item.id} className="flex items-center justify-between text-xs font-bold">
-                      <span className="text-slate-600">{entry.quantity}x {entry.item.card.name}</span>
-                      <span className="text-ink">{formatBrl(entry.amount)}</span>
+                    <div key={entry.item.id} className="flex items-center justify-between text-xs font-bold dark:bg-white/40 p-2 rounded-lg">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-slate-600 dark:text-slate-300">
+                          {entry.quantity}x {entry.item.card.name}
+                        </span>
+                        <span className="text-[10px] font-semibold text-slate-400">
+                          {entry.item.condition} • {getLanguageFlag(entry.item.language)} {entry.item.language} • {formatCardVariant(entry.item.variant)}
+                        </span>
+                      </div>
+                      <span className="text-ink dark:text-white shrink-0">{offer.isGlobalOffer ? "-" : formatBrl(entry.amount)}</span>
                     </div>
                   ))}
                 </div>
@@ -2478,10 +2486,23 @@ function latestPriceChange(item: CollectionItem): number {
   return latest ? latest.amount - latest.previousAmount : 0;
 }
 
-function formatOfferStatus(status: CollectionCartOffer["status"]): string {
+function formatOfferStatus(status: string): string {
   if (status === "accepted") return "aceita";
   if (status === "rejected") return "rejeitada";
   return "pendente";
+}
+
+function getLanguageFlag(language: string): string {
+  switch (language) {
+    case "pt-BR":
+      return "🇧🇷";
+    case "en":
+      return "🇺🇸";
+    case "ja":
+      return "🇯🇵";
+    default:
+      return "🏳️";
+  }
 }
 
 function publicCollectionUrl(shareToken: string): string {

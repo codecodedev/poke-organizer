@@ -106,6 +106,14 @@ export class AuctionService {
         where: { id },
         data: { currentBidBrl: dto.amountBrl },
       }),
+      this.prisma.notification.create({
+        data: {
+          userId: auction.sellerId,
+          title: "Novo Lance no Leilão!",
+          message: `O seu leilão recebeu um novo lance de R$ ${dto.amountBrl.toFixed(2)}.`,
+          link: `/profile?tab=auctions`,
+        },
+      }),
     ]);
 
     return this.getById(id);

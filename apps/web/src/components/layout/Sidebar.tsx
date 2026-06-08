@@ -141,9 +141,9 @@ export function Sidebar({
                 }`}
                 title={!isOpen ? item.label : undefined}
               >
-                <span className={`shrink-0 ${activeView === item.id ? 'text-black dark:text-white' : ''}`}>{item.icon}</span>
+                <span className={`shrink-0 ${activeView === item.id ? 'text-black dark:text-black' : ''}`}>{item.icon}</span>
                 <span
-                  className={`truncate transition-opacity duration-200 ${
+                  className={`truncate transition-opacity duration-200 ${activeView === item.id ? 'text-black dark:text-black' : ''} ${
                     isOpen ? "opacity-100" : "opacity-0 md:hidden"
                   }`}
                 >
