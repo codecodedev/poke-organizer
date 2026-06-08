@@ -52,6 +52,12 @@ const folderItemInclude = {
   folder: true,
 } satisfies Prisma.CollectionFolderItemInclude;
 
+const auctionInclude = {
+  collectionItem: { include: { card: true } },
+  seller: true,
+  bids: { orderBy: { amountBrl: "desc" as const }, take: 1 },
+} satisfies Prisma.AuctionInclude;
+
 type CollectionItemWithCard = Prisma.CollectionItemGetPayload<{
   include: typeof collectionItemInclude;
 }>;
@@ -59,6 +65,10 @@ type FolderWithItems = Prisma.CollectionFolderGetPayload<{
   include: {
     items: { include: typeof folderItemInclude };
   };
+}>;
+
+type AuctionWithRelations = Prisma.AuctionGetPayload<{
+  include: typeof auctionInclude;
 }>;
 
 type FolderItemWithStore = Prisma.CollectionFolderItemGetPayload<{
@@ -640,20 +650,18 @@ export class CollectionService {
       where: {
         status: "OPEN",
         endsAt: { gt: new Date() },
-        card: {
-          OR: [
-            { name: { contains: normalized, mode: "insensitive" } },
-            { number: { contains: normalized, mode: "insensitive" } },
-          ],
+        collectionItem: {
+          card: {
+            OR: [
+              { name: { contains: normalized, mode: "insensitive" } },
+              { number: { contains: normalized, mode: "insensitive" } },
+            ],
+          },
         },
       },
-      include: {
-        card: true,
-        seller: true,
-        bids: { orderBy: { amountBrl: "desc" }, take: 1 },
-      },
+      include: auctionInclude,
       take: 20,
-    });
+    }) as AuctionWithRelations[];
 
     return {
       items: storeItems.map(item => ({
@@ -669,11 +677,12 @@ export class CollectionService {
         title: a.title,
         status: a.status.toLowerCase(),
         minBid: Number(a.minBidBrl),
-        currentBid: a.bids[0] ? Number(a.bids[0].amountBrl) : null,
+        currentBid: a.bids && a.bids[0] ? Number(a.bids[0].amountBrl) : null,
         bidCount: 0, // Simplified for search
         endsAt: a.endsAt.toISOString(),
-        card: toCardSummary(a.card),
+        card: toCardSummary(a.collectionItem.card),
         sellerName: a.seller.name || a.seller.email,
+        sellerSlug: a.seller.profileSlug,
       })),
     };
   }
@@ -759,11 +768,13 @@ export class CollectionService {
         language,
         cardPriceId,
         notes: dto.notes ?? null,
+        customPrice: dto.customPrice ?? null,
       },
       update: {
         quantity: { increment: dto.quantity ?? 1 },
         cardPriceId: existing?.cardPriceId ?? cardPriceId,
         notes: dto.notes ?? undefined,
+        customPrice: dto.customPrice ?? undefined,
       },
       include: collectionItemInclude,
     });
@@ -801,6 +812,7 @@ export class CollectionService {
         foil: dto.foil,
         language: dto.language ? toPrismaLanguage(dto.language) : undefined,
         notes: dto.notes,
+        customPrice: dto.customPrice,
       },
       include: collectionItemInclude,
     });
@@ -1009,6 +1021,9 @@ export class CollectionService {
       ? null
       : Number(folderItem.manualPriceBrl);
     const catalogPrice = this.mapCardPrice(item.price);
+    const customPrice = item.customPrice === null || item.customPrice === undefined
+      ? null
+      : Number(item.customPrice);
 
     return {
       id: item.id,
@@ -1020,10 +1035,11 @@ export class CollectionService {
       foil: item.foil,
       language: fromPrismaLanguage(item.language),
       notes: item.notes,
+      customPrice,
       price: catalogPrice,
       store: folderItem ? {
         manualPrice,
-        effectivePrice: manualPrice ?? catalogPrice?.amount ?? null,
+        effectivePrice: manualPrice ?? customPrice ?? catalogPrice?.amount ?? null,
         isSold: folderItem.isSold,
         soldPrice: folderItem.soldPriceBrl === null ? null : Number(folderItem.soldPriceBrl),
         soldQuantity: folderItem.soldQuantity,
@@ -1039,8 +1055,12 @@ export class CollectionService {
   ): Promise<CollectionFolderSummary> {
     const items = folder.items.map((entry) => entry.collectionItem);
     const totalValue = items.reduce(
-      (sum, item) =>
-        sum + (this.mapCardPrice(item.price)?.amount ?? 0) * item.quantity,
+      (sum, item) => {
+        const itemPrice = item.customPrice !== null && item.customPrice !== undefined
+          ? Number(item.customPrice)
+          : (this.mapCardPrice(item.price)?.amount ?? 0);
+        return sum + itemPrice * item.quantity;
+      },
       0,
     );
 
@@ -1056,7 +1076,7 @@ export class CollectionService {
       totalValue,
       createdAt: folder.createdAt.toISOString(),
       updatedAt: folder.updatedAt.toISOString(),
-    };
+    } as CollectionFolderSummary;
   }
 
   private async mapFolderDetail(
@@ -1066,7 +1086,7 @@ export class CollectionService {
     const items = folder.items.map((entry) => this.mapItem(entry.collectionItem, entry));
     const sortedItems = this.sortFolderItems(items, sort);
     const totalValue = items.reduce(
-      (sum, item) => sum + (item.price?.amount ?? 0) * item.quantity,
+      (sum, item) => sum + (item.store?.effectivePrice ?? item.customPrice ?? item.price?.amount ?? 0) * item.quantity,
       0,
     );
 
@@ -1201,6 +1221,9 @@ function normalizeCardNumber(number: string): string {
 }
 
 function latestPriceChange(item: CollectionItem): number {
+  if (item.customPrice !== null && item.customPrice !== undefined) {
+    return 0;
+  }
   const history = item.price?.history ?? [];
   const latest = history[history.length - 1];
   return latest ? latest.amount - latest.previousAmount : 0;

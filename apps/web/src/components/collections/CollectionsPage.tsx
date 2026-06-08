@@ -641,7 +641,7 @@ export function CollectionsPage({
       selectedItems.reduce(
         (sum, item) =>
           sum +
-          (item.price?.amount ?? 0) *
+          (item.customPrice ?? item.price?.amount ?? 0) *
             (item.quantity - (item.store?.soldQuantity ?? 0)),
         0,
       ),
@@ -807,7 +807,7 @@ export function CollectionsPage({
           onBack={backToList}
           onNameChange={setActiveName}
           onSave={() => void saveFolder()}
-          onRemove={() => void removeFolder()}
+          onRemoveFolder={() => void removeFolder()}
           onToggleSharing={(isPublic) => void updateFolderSharing(isPublic)}
           onToggleStore={(isStore) => void updateFolderStore(isStore)}
           onUpdateSale={(folderItemId, payload) => void updateFolderItemSale(folderItemId, payload)}
@@ -825,7 +825,7 @@ export function CollectionsPage({
           onPickerSort={setPickerSort}
           onShowAllChange={setShowAllPickerItems}
           onPickerPageChange={setPickerPage}
-          onRemoveItem={(itemId) => {
+          onRemoveCollectionItem={(itemId) => {
             const item = activeFolder.items.find((i) => i.id === itemId);
             if (item) setItemToRemove(item);
           }}
@@ -1691,7 +1691,7 @@ function CollectionDetailScreen({
   onBack,
   onNameChange,
   onSave,
-  onRemove,
+  onRemoveFolder,
   onToggleSharing,
   onToggleStore,
   onUpdateSale,
@@ -1708,6 +1708,7 @@ function CollectionDetailScreen({
   onPickerSort,
   onShowAllChange,
   onPickerPageChange,
+  onRemoveCollectionItem,
   onToggleItem,
   onOpenCard,
   showPickerModal,
@@ -1751,7 +1752,7 @@ function CollectionDetailScreen({
   onBack: () => void;
   onNameChange: (value: string) => void;
   onSave: () => void;
-  onRemove: () => void;
+  onRemoveFolder: () => void;
   onToggleSharing: (isPublic: boolean) => void;
   onToggleStore: (isStore: boolean) => void;
   onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null }) => void;
@@ -1769,7 +1770,7 @@ function CollectionDetailScreen({
   onPickerSort: (value: CollectionFolderSort) => void;
   onShowAllChange: (value: boolean) => void;
   onPickerPageChange: (page: number) => void;
-  onRemoveItem: (itemId: string) => void;
+  onRemoveCollectionItem: (itemId: string) => void;
   onToggleItem: (itemId: string) => void;
   onOpenCard: (item: CollectionItem) => void;
   showPickerModal: boolean;
@@ -1821,7 +1822,7 @@ function CollectionDetailScreen({
                 <Button
                   type="button"
                   icon={<Trash2 size={16} />}
-                  onClick={onRemove}
+                  onClick={onRemoveFolder}
                 >
                   Excluir
                 </Button>
@@ -2065,7 +2066,7 @@ function CollectionDetailScreen({
                         ? (amount) => debouncedUpdates(item.folderItemId!, amount)
                         : undefined
                     }
-                    onRemove={(nextItem) => onRemoveItem(nextItem.id)}
+                    onRemove={(nextItem) => onRemoveCollectionItem(nextItem.id)}
                     removeLabel="Remover da colecao"
                   >
                     {isStore && item.folderItemId && (
@@ -2441,11 +2442,15 @@ function sortItems(
 ): CollectionItem[] {
   if (sort === "value-desc")
     return [...items].sort(
-      (left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0),
+      (left, right) =>
+        (right.customPrice ?? right.price?.amount ?? 0) -
+        (left.customPrice ?? left.price?.amount ?? 0),
     );
   if (sort === "value-asc")
     return [...items].sort(
-      (left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0),
+      (left, right) =>
+        (left.customPrice ?? left.price?.amount ?? 0) -
+        (right.customPrice ?? right.price?.amount ?? 0),
     );
   if (sort === "price-change-desc")
     return [...items].sort(
@@ -2465,6 +2470,9 @@ function sortItems(
 }
 
 function latestPriceChange(item: CollectionItem): number {
+  if (item.customPrice !== null && item.customPrice !== undefined) {
+    return 0;
+  }
   const history = item.price?.history ?? [];
   const latest = history[history.length - 1];
   return latest ? latest.amount - latest.previousAmount : 0;

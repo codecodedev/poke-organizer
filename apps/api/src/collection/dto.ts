@@ -56,6 +56,12 @@ export class AddCollectionItemDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  customPrice?: number;
 }
 
 export class UpdateCollectionItemDto {
@@ -89,6 +95,13 @@ export class UpdateCollectionItemDto {
   @IsOptional()
   @IsString()
   notes?: string | null;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Transform(({ value }) => (value === null || value === "" ? null : Number(value)))
+  customPrice?: number | null;
 }
 
 export class ListCollectionQueryDto {

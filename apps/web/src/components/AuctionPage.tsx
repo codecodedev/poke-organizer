@@ -1,3 +1,4 @@
+// Auction detail page component
 import { useEffect, useState } from "react";
 import { Gavel, History, Timer, User, X } from "lucide-react";
 import type { AuctionDetail } from "@poke-organizer/shared";

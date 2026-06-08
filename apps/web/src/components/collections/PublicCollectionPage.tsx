@@ -112,7 +112,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
   const items = collection?.items ?? [];
   const unsoldItems = useMemo(() => items.filter((i) => !i.store?.isSold), [items]);
   const totalValue = useMemo(() => unsoldItems.reduce(
-    (sum, item) => sum + (item.price?.amount ?? 0) * item.quantity,
+    (sum, item) => sum + (item.store?.effectivePrice ?? item.customPrice ?? item.price?.amount ?? 0) * item.quantity,
     0,
   ), [unsoldItems]);
   const typeOptions = useMemo(
@@ -649,11 +649,15 @@ function sortItems(
 ): CollectionItem[] {
   if (sort === "value-desc")
     return [...items].sort(
-      (left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0),
+      (left, right) =>
+        (right.customPrice ?? right.price?.amount ?? 0) -
+        (left.customPrice ?? left.price?.amount ?? 0),
     );
   if (sort === "value-asc")
     return [...items].sort(
-      (left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0),
+      (left, right) =>
+        (left.customPrice ?? left.price?.amount ?? 0) -
+        (right.customPrice ?? right.price?.amount ?? 0),
     );
   if (sort === "price-change-desc")
     return [...items].sort(
@@ -673,6 +677,9 @@ function sortItems(
 }
 
 function latestPriceChange(item: CollectionItem): number {
+  if (item.customPrice !== null && item.customPrice !== undefined) {
+    return 0;
+  }
   const history = item.price?.history ?? [];
   const latest = history[history.length - 1];
   return latest ? latest.amount - latest.previousAmount : 0;

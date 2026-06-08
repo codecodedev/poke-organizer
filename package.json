@@ -18,7 +18,10 @@
     "docker:up": "docker compose up --build postgres api web",
     "docker:up:pricing": "docker compose --profile docker-pricing up --build pricing-service",
     "docker:down": "docker compose down",
-    "docker:create-migrate": "docker compose exec -w /workspace/apps/api api npx prisma migrate dev --name"
+    "docker:create-migrate": "docker compose exec -w /workspace/apps/api api npx prisma migrate dev --name",
+    "docker:run-migrate": "docker compose exec -w /workspace/apps/api api npx prisma migrate dev",
+    "docker:generate": "docker compose exec -w /workspace/apps/api api npx prisma generate"
+
   },
   "devDependencies": {
     "@types/node": "^22.10.7",

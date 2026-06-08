@@ -131,6 +131,7 @@ export class AuctionService {
       id: a.id,
       sellerId: a.sellerId,
       sellerName: a.seller.name || a.seller.email,
+      sellerSlug: a.seller.profileSlug,
       card: toCardSummary(a.collectionItem.card),
       collectionItem: {
           id: a.collectionItem.id,

@@ -99,8 +99,10 @@ export class UserService {
 
   private mapFolder(f: any) {
     const totalValue = f.items.reduce((sum: number, item: any) => {
-        // Very simplified value calculation for summary
-        return sum + (Number(item.collectionItem.price?.amountBrl) || 0) * item.collectionItem.quantity;
+        const price = item.collectionItem.customPrice !== null && item.collectionItem.customPrice !== undefined
+          ? Number(item.collectionItem.customPrice)
+          : (Number(item.collectionItem.price?.amountBrl) || 0);
+        return sum + price * item.collectionItem.quantity;
     }, 0);
 
     return {

@@ -1,3 +1,4 @@
+// Shared types and utilities for Poke Organizer
 export const CARD_CONDITIONS = ["NM", "LP", "MP", "HP", "DMG"] as const;
 export type CardCondition = (typeof CARD_CONDITIONS)[number];
 
@@ -98,6 +99,7 @@ export type CollectionItem = {
   foil: boolean;
   language: CardLanguage;
   notes?: string | null;
+  customPrice?: number | null;
   price?: PriceEstimate | null;
   store?: CollectionItemStore | null;
   createdAt: string;
@@ -132,6 +134,7 @@ export type CollectionFolderSort =
 export type CollectionFolderSummary = {
   id: string;
   name: string;
+  userName?: string;
   isPublic: boolean;
   isStore: boolean;
   shareToken?: string | null;
@@ -163,6 +166,7 @@ export type AuctionSummary = {
   id: string;
   sellerId: string;
   sellerName: string;
+  sellerSlug?: string | null;
   card: CardSummary;
   collectionItem: CollectionItem;
   title?: string | null;

@@ -40,18 +40,19 @@ export function CollectionItemCard({
   const isSold = Boolean(item.store?.isSold);
   const soldPrice = item.store?.soldPrice ?? 0;
   const manualPrice = item.store?.manualPrice;
+  const customPrice = item.customPrice;
   const marketPrice = price?.amount ?? 0;
 
   const displayPrice = isSold
     ? soldPrice
-    : manualPrice ?? marketPrice;
+    : manualPrice ?? customPrice ?? marketPrice;
 
   const kind = variantKind(item.variant);
   const latestChange = latestPriceChange(price);
 
   // So mostra variacao se for o preco de mercado puro
   const showPriceChange =
-    latestChange !== 0 && !isSold && manualPrice === null;
+    latestChange !== 0 && !isSold && manualPrice === null && (customPrice === null || customPrice === undefined);
 
   return (
     <article
@@ -96,6 +97,15 @@ export function CollectionItemCard({
           x{item.quantity}
         </span>
       )}
+
+      <div className={`absolute z-30 flex gap-1 ${item.variant === "normal"? "left-4 top-4":"left-5 top-14"}`}>
+        <span
+          className="grid h-8 w-8 place-items-center rounded-xl border border-white/10 bg-black/40 text-lg shadow-sm backdrop-blur"
+          title={`Idioma: ${item.language}`}
+        >
+          {getLanguageFlag(item.language)}
+        </span>
+      </div>
 
       <div className="relative">
         <CardVariantImage
@@ -202,4 +212,17 @@ function latestPriceChange(price?: PriceEstimate): number {
   const history = price?.history ?? [];
   const latest = history[history.length - 1];
   return latest ? latest.amount - latest.previousAmount : 0;
+}
+
+function getLanguageFlag(language: string): string {
+  switch (language) {
+    case "pt-BR":
+      return "🇧🇷";
+    case "en":
+      return "🇺🇸";
+    case "ja":
+      return "🇯🇵";
+    default:
+      return "🏳️";
+  }
 }

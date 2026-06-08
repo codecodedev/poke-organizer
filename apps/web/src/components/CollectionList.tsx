@@ -156,7 +156,7 @@ export function CollectionList({
   const totalValue = useMemo(
     () =>
       visibleItems.reduce((sum, item) => {
-        const price = item.price?.amount ?? 0;
+        const price = item.customPrice ?? item.price?.amount ?? 0;
         return sum + price * item.quantity;
       }, 0),
     [visibleItems],
@@ -737,11 +737,15 @@ function sortItems(
 ): CollectionItem[] {
   if (sort === "value-desc")
     return [...items].sort(
-      (left, right) => (right.price?.amount ?? 0) - (left.price?.amount ?? 0),
+      (left, right) =>
+        (right.customPrice ?? right.price?.amount ?? 0) -
+        (left.customPrice ?? left.price?.amount ?? 0),
     );
   if (sort === "value-asc")
     return [...items].sort(
-      (left, right) => (left.price?.amount ?? 0) - (right.price?.amount ?? 0),
+      (left, right) =>
+        (left.customPrice ?? left.price?.amount ?? 0) -
+        (right.customPrice ?? right.price?.amount ?? 0),
     );
   if (sort === "price-change-desc")
     return [...items].sort(
@@ -761,6 +765,9 @@ function sortItems(
 }
 
 function latestPriceChange(item: CollectionItem): number {
+  if (item.customPrice !== null && item.customPrice !== undefined) {
+    return 0;
+  }
   const history = item.price?.history ?? [];
   const latest = history[history.length - 1];
   return latest ? latest.amount - latest.previousAmount : 0;

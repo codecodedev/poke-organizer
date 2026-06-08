@@ -43,6 +43,7 @@ export type AddCardDetails = {
   foil: boolean;
   language: CardLanguage;
   notes?: string;
+  customPrice?: number | null;
 };
 
 export type UpdateCardDetails = Omit<AddCardDetails, "cardId">;
@@ -79,6 +80,8 @@ export function CardDetailModal({
   const [variant, setVariant] = useState(DEFAULT_CARD_VARIANT);
   const [language, setLanguage] = useState<CardLanguage>("unknown");
   const [notes, setNotes] = useState("");
+  const [customPrice, setCustomPrice] = useState<number | null>(null);
+  const [showPriceWarning, setShowPriceWarning] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [price, setPrice] = useState<PriceEstimate | null>(null);
@@ -121,6 +124,8 @@ export function CardDetailModal({
     );
     setLanguage(collectionItem?.language ?? card.language);
     setNotes(collectionItem?.notes ?? "");
+    setCustomPrice(collectionItem?.customPrice ?? null);
+    setShowPriceWarning(false);
     setError(null);
     setSubmitMessage(null);
 
@@ -210,6 +215,7 @@ export function CardDetailModal({
         foil: isFoilVariant(variant),
         language,
         notes: notes.trim() || undefined,
+        customPrice,
       };
 
       if (onAdd) {
@@ -269,7 +275,15 @@ export function CardDetailModal({
 
         <div className={`grid gap-8 p-5 ${showRightColumn ? 'lg:grid-cols-[1fr_400px]' : ''}`}>
           <div className="min-w-0">
-            <div className={`mx-auto w-full mb-8 ${showRightColumn ? 'max-w-[390px]' : 'max-w-[320px]'}`}>
+            <div className={`mx-auto w-full mb-8 ${showRightColumn ? 'max-w-[390px]' : 'max-w-[320px]'} relative`}>
+                <div className="absolute left-4 top-4 z-30 flex gap-1">
+                  <span
+                    className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-black/40 text-2xl shadow-sm backdrop-blur"
+                    title={`Idioma: ${language}`}
+                  >
+                    {getLanguageFlag(language)}
+                  </span>
+                </div>
                 <CardVariantImage
                 src={card.imageLarge ?? card.imageSmall}
                 alt={card.name}
@@ -413,6 +427,44 @@ export function CardDetailModal({
                       readOnly
                     />
                   </label>
+
+                  <label className="text-sm font-black text-slate-700">
+                    Preço Customizado (Opcional)
+                    <div className="relative mt-2">
+                      <DollarSign
+                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        size={17}
+                      />
+                      <input
+                        className="premium-input w-full pl-11"
+                        type="number"
+                        step="0.01"
+                        min={0}
+                        value={customPrice ?? ""}
+                        onChange={(event) => {
+                          const val =
+                            event.target.value === ""
+                              ? null
+                              : Number(event.target.value);
+                          if (
+                            val !== null &&
+                            !showPriceWarning &&
+                            val !== collectionItem?.customPrice
+                          ) {
+                            setShowPriceWarning(true);
+                          }
+                          setCustomPrice(val);
+                        }}
+                        placeholder="Usar valor do mercado"
+                      />
+                    </div>
+                  </label>
+
+                  {showPriceWarning && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800 animate-soft-pop">
+                      Aviso: Ao definir um preço customizado, esta carta não seguirá mais as flutuações automáticas do mercado.
+                    </div>
+                  )}
 
                   <label className="text-sm font-black text-slate-700">
                     Notas
@@ -614,4 +666,17 @@ function Detail({
       </div>
     </div>
   );
+}
+
+function getLanguageFlag(language: string): string {
+  switch (language) {
+    case "pt-BR":
+      return "🇧🇷";
+    case "en":
+      return "🇺🇸";
+    case "ja":
+      return "🇯🇵";
+    default:
+      return "🏳️";
+  }
 }
