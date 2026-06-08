@@ -14,7 +14,7 @@ export function Panel({ title, description, action, children, className = "" }: 
     <section className={`glass-panel panel-padding ${className}`}>
       {(title || description || action) && (
         <div className="mb-4 flex items-start gap-3">
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-aqua/20 text-cyan-700">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-aqua/20 text-cyan">
             <Keyboard size={22} />
           </div>
           <div>

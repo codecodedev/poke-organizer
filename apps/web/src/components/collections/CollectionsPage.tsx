@@ -1379,7 +1379,7 @@ function CollectionsListScreen({
                 >
                   <span className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br transition ${
                     folder.isStore 
-                      ? "from-aqua/20 to-cyan/10 text-cyan-800" 
+                      ? "from-aqua/50 to-cyan/10 text-sky-700" 
                       : "from-lilac/20 to-aqua/20 text-violet-800"
                   }`}>
                     {folder.isStore ? <ShoppingBag size={20} /> : <Layers3 size={20} />}
@@ -1394,7 +1394,7 @@ function CollectionsListScreen({
                     <span
                       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
                         folder.isStore
-                          ? "border-aqua/25 bg-aqua/10 text-cyan-800"
+                          ? "border-aqua/25 bg-aqua/10 text-sky-700"
                           : "border-brand/25 bg-brand/10 text-violet-800"
                       }`}
                     >

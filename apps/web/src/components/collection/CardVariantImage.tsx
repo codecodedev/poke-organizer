@@ -24,12 +24,6 @@ export function CardVariantImage({ src, alt, variant, className = "", imageClass
       ) : (
         <div className="relative z-10 grid h-full place-items-center px-3 text-center text-xs font-black text-slate-400">{alt}</div>
       )}
-      {
-       kind !== "normal" && (
-      <span className={`variant-badge variant-badge--${kind}`} title={label} aria-label={`Variante ${label}`}>
-          <VariantIcon kind={kind} />
-        </span>
-      )} 
     </div>
   );
 }

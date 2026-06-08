@@ -6,6 +6,7 @@ import {
   TrendingDown,
   TrendingUp,
   Trash2,
+  Sparkles,
 } from "lucide-react";
 import {
   type CollectionItem,
@@ -98,9 +99,20 @@ export function CollectionItemCard({
         </span>
       )}
 
-      <div className={`absolute z-30 flex gap-1 ${item.variant === "normal"? "left-4 top-4":"left-5 top-14"}`}>
+      <div className={`absolute z-30 flex flex-col gap-2 left-5 top-5`}>
+        {item.variant !== "normal" && (
+          <span
+            className="grid h-7 sm:h-8 w-7 sm:w-8 place-items-center rounded-xl border border-white/10 bg-black/40 text-sm shadow-sm backdrop-blur text-butter"
+            title={`Variante: ${item.variant}`}
+          >
+            <Sparkles size={16} fill="currentColor" />
+          </span>
+        )}
+      </div>
+
+      <div className={`absolute z-30 flex flex-col gap-2 ${item.variant === "normal"? "left-4 top-4":"left-5 top-14"}`}>
         <span
-          className="grid h-8 w-8 place-items-center rounded-xl border border-white/10 bg-black/40 text-lg shadow-sm backdrop-blur"
+          className="grid h-7 sm:h-8 w-7 sm:w-8 place-items-center rounded-xl border border-white/10 bg-black/40 text-lg shadow-sm backdrop-blur"
           title={`Idioma: ${item.language}`}
         >
           {getLanguageFlag(item.language)}
@@ -144,7 +156,7 @@ export function CollectionItemCard({
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {onPriceChange && !isSold ? (
             <div className="flex flex-1 items-center" onClick={(e) => e.stopPropagation()}>
-              <span className="text-sm font-black text-white mr-1">R$</span>
+              <span className="text-sm font-black text-slate-500 mr-1">R$</span>
               <input
                 className="w-full bg-white/5 border border-white/10 p-1.5 pl-3 rounded-xl text-sm font-black text-white outline-none focus:ring-1 focus:ring-cyan/50 transition"
                 type="number"
@@ -158,7 +170,7 @@ export function CollectionItemCard({
               />
             </div>
           ) : (
-            <p className={`truncate text-sm font-black ${isSold ? "text-emerald-400" : "text-white"}`}>
+            <p className={`truncate text-sm font-black ${isSold ? "text-emerald-800" : "text-slate-500"}`}>
               {formatBrl(displayPrice)}
             </p>
           )}

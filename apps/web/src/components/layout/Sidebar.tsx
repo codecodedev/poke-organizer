@@ -86,7 +86,7 @@ export function Sidebar({
         <div className="flex h-24 items-center justify-between gap-3 px-5">
           <div className="flex items-center gap-3 min-w-0">
             <img 
-              src={dark ? "/images/logo-dark-bg.png" : "/images/logo-light-bg.png"} 
+              src={dark ? "/images/logo-light-bg.png" : "/images/logo-dark-bg.png"} 
               alt="Logo" 
               className="h-12 w-12 shrink-0 object-contain animate-soft-pop scale-[2.5]"
             />

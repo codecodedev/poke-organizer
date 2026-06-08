@@ -276,14 +276,6 @@ export function CardDetailModal({
         <div className={`grid gap-8 p-5 ${showRightColumn ? 'lg:grid-cols-[1fr_400px]' : ''}`}>
           <div className="min-w-0">
             <div className={`mx-auto w-full mb-8 ${showRightColumn ? 'max-w-[390px]' : 'max-w-[320px]'} relative`}>
-                <div className="absolute left-4 top-4 z-30 flex gap-1">
-                  <span
-                    className="grid h-10 w-10 place-items-center rounded-2xl border border-white/10 bg-black/40 text-2xl shadow-sm backdrop-blur"
-                    title={`Idioma: ${language}`}
-                  >
-                    {getLanguageFlag(language)}
-                  </span>
-                </div>
                 <CardVariantImage
                 src={card.imageLarge ?? card.imageSmall}
                 alt={card.name}
@@ -413,7 +405,7 @@ export function CardDetailModal({
                     >
                       {CARD_LANGUAGES.map((item) => (
                         <option key={item} value={item}>
-                          {item}
+                          {getLanguageFlag(item)} {item === "unknown" ? "Desconhecido" : item}
                         </option>
                       ))}
                     </select>
@@ -432,7 +424,7 @@ export function CardDetailModal({
                     Preço Customizado (Opcional)
                     <div className="relative mt-2">
                       <DollarSign
-                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400"
                         size={17}
                       />
                       <input
@@ -461,8 +453,13 @@ export function CardDetailModal({
                   </label>
 
                   {showPriceWarning && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-bold text-amber-800 animate-soft-pop">
-                      Aviso: Ao definir um preço customizado, esta carta não seguirá mais as flutuações automáticas do mercado.
+                    <div className="rounded-xl border-2 border-amber/60 bg-amber/10 p-4 text-xs font-black text-ink dark:text-amber-200 dark:bg-amber-900/30 dark:border-amber-500/50 animate-soft-pop shadow-sm flex items-start gap-3">
+                      <div className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400">
+                        <Shield size={18} />
+                      </div>
+                      <p className="leading-relaxed">
+                        Atenção: Ao definir um preço customizado, esta carta não seguirá mais as flutuações automáticas do mercado.
+                      </p>
                     </div>
                   )}
 
@@ -654,13 +651,15 @@ function Detail({
   value: string;
 }) {
   return (
-    <div className="card-detail-attribute flex gap-3 rounded-[18px] border border-line/80 bg-white/70 p-3 shadow-sm">
-      <div className="detail-icon mt-1 text-lilac">{icon}</div>
+    <div className="card-detail-attribute flex gap-3 rounded-[18px] border border-line/80 bg-white/70 p-3 shadow-sm dark:bg-zinc-900/50 dark:border-white/10">
+      <div className="detail-icon flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-lilac/10 text-violet-600 dark:bg-lilac/20 dark:text-lilac shadow-sm border border-line/40 dark:border-white/5">
+        {icon}
+      </div>
       <div className="min-w-0">
-        <dt className="text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+        <dt className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">
           {label}
         </dt>
-        <dd className="mt-1 break-words text-sm font-black text-ink">
+        <dd className="mt-0.5 break-words text-sm font-black text-ink dark:text-white">
           {value}
         </dd>
       </div>

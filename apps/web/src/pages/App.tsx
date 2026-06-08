@@ -183,7 +183,7 @@ export function App() {
               {/* Center: Logo */}
               <div className="flex flex-1 items-center justify-center gap-2 sm:gap-3">
                 <img 
-                  src={theme === "dark" ? "/images/logo-dark-bg.png" : "/images/logo-light-bg.png"} 
+                  src={theme === "dark" ? "/images/logo-light-bg.png" : "/images/logo-dark-bg.png"} 
                   alt="Logo" 
                   className="h-8 w-8 sm:h-10 sm:w-10 object-contain scale-[2.5]"
                 />
@@ -609,7 +609,7 @@ function HomeView({
               <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
                 <TrendingUp size={18} />
               </div>
-              <h3 className="font-bold text-white">Coleções em alta</h3>
+              <h3 className="font-bold text-ink dark:text-white">Coleções em alta</h3>
             </div>
             
             <div className="flex flex-col gap-4">
@@ -620,13 +620,24 @@ function HomeView({
                   className="group flex flex-col gap-2 text-left"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="grid h-7 w-7 place-items-center rounded-full bg-white/5 text-[10px] font-black text-slate-500 group-hover:bg-cyan group-hover:text-black transition-colors">
+                    <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 dark:bg-white/5 text-[10px] font-black text-slate-500 group-hover:bg-cyan group-hover:text-white dark:group-hover:text-black transition-colors">
                       #{index + 1}
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <p className="truncate font-bold text-white text-sm group-hover:text-cyan transition-colors">
-                        {folder.name}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-bold text-ink dark:text-white text-sm group-hover:text-cyan transition-colors">
+                          {folder.name}
+                        </p>
+                        {folder.isStore ? (
+                          <span className="shrink-0 flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+                            <ShoppingBag size={10} /> Loja
+                          </span>
+                        ) : (
+                          <span className="shrink-0 flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                            <LibraryBig size={10} /> Vitrine
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-3 text-[10px] text-slate-500">
                         <span className="flex items-center gap-1 font-black text-slate-400 uppercase tracking-tighter">
                           {folder.userName || "Usuário"}

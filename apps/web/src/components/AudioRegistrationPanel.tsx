@@ -21,7 +21,7 @@ export function AudioRegistrationPanel(props: Props) {
             <Mic size={22} />
           </div>
           <div>
-            <p className="text-base font-black text-white">Cadastro por voz</p>
+            <p className="text-base font-black text-slate-900">Cadastro por voz</p>
             <p className="mt-1 text-sm leading-5 text-slate-400">A maneira mais rápida de cadastrar uma grande quantidade de cartas.</p>
           </div>
         </div>

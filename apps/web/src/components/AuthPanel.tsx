@@ -39,7 +39,7 @@ export function AuthPanel({ onSession, theme = "dark" }: Props) {
     <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center gap-12 px-5 py-12">
       <div className="flex flex-col items-center text-center">
         <img 
-          src={dark ? "/images/logo-dark-bg.png" : "/images/logo-light-bg.png"} 
+          src={dark ? "/images/logo-light-bg.png" : "/images/logo-dark-bg.png"} 
           alt="Coleciona Cards" 
           className="mb-6 h-36 w-auto animate-soft-pop scale-[2.5]"
         />

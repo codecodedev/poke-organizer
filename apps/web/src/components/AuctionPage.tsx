@@ -72,18 +72,18 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
       <div className="space-y-6 min-w-0">
         <Panel className="dark:bg-black/20 dark:border-white/5">
           <div className="flex flex-col sm:flex-row gap-6">
-            <div className="relative w-full sm:w-48 aspect-[3/4] overflow-hidden rounded-[24px] bg-field shadow-lg dark:bg-white/5">
+            <div className="relative w-full sm:max-w-56 overflow-hidden rounded-[24px] bg-field shadow-lg dark:bg-white/5">
               {auction.card.imageLarge && (
-                <img src={auction.card.imageLarge} className="h-full w-full object-contain" alt="" />
+                <img src={auction.card.imageLarge} className="h-full w-full object-fill" alt="" />
               )}
             </div>
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                 <span className="rounded-lg bg-amber-100 px-2 py-1 text-[10px] font-black text-amber-700 uppercase tracking-wider flex items-center gap-1 dark:bg-amber-400/20 dark:text-amber-400">
+                 <span className="rounded-lg bg-amber-100 px-2 py-1 text-[10px] font-black text-slate-500 uppercase tracking-wider flex items-center gap-1 dark:bg-amber-400/20 dark:text-amber-400">
                    <Gavel size={12} /> Leilão
                  </span>
                  <span className={`rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-wider ${
-                   isOpen ? "bg-leaf/10 text-leaf dark:bg-leaf/20" : "bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-slate-400"
+                   isOpen ? "bg-emerald-800/15 text-emerald-600 dark:bg-leaf/20" : "bg-slate-100 text-slate-500 dark:bg-white/5 dark:text-slate-400"
                  }`}>
                    {isOpen ? "Ativo" : "Encerrado"}
                  </span>
@@ -96,11 +96,11 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
                   onClick={() => onSelectProfile(auction.sellerSlug || auction.sellerId)}
                   className="group flex items-center gap-3 rounded-2xl border border-line bg-white dark:bg-zinc-900 p-2 pr-5 transition hover:border-brand dark:hover:border-brand shadow-sm hover:shadow-md dark:border-white/10"
                 >
-                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-ink text-white keep-white font-black text-sm dark:bg-white dark:text-ink group-hover:bg-brand group-hover:text-white dark:group-hover:bg-brand dark:group-hover:text-white transition-colors">
+                  <div className="grid h-10 w-10 place-items-center rounded-xl bg-slate-500 text-white keep-white font-black text-sm dark:bg-slate-500 dark:text-white group-hover:bg-brand group-hover:text-white dark:group-hover:bg-brand dark:group-hover:text-white transition-colors">
                     {auction.sellerName.charAt(0).toUpperCase()}
                   </div>
                   <div className="text-left">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-brand transition-colors">Vendedor</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-700 group-hover:text-brand transition-colors">Vendedor</p>
                     <p className="text-sm font-black text-ink dark:text-white">{auction.sellerName}</p>
                   </div>
                 </button>
@@ -143,7 +143,7 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
                 }`}>
                   <div className="flex items-center gap-4">
                     <div className={`grid h-10 w-10 place-items-center rounded-xl font-black text-sm ${
-                      index === 0 ? "bg-amber-400 text-white" : "bg-field text-slate-500 dark:bg-white/5 dark:text-slate-400"
+                      index === 0 ? "bg-emerald-600 dark:bg-emerald-400 text-white dark:text-white" : "bg-slate-200 dark:bg-slate-200 text-black/70 dark:text-black"
                     }`}>
                       {auction.bids.length - index}
                     </div>
@@ -180,16 +180,16 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
             </div>
 
             <div className="mb-8 p-6 rounded-[24px] bg-white/10 dark:bg-white/5 border border-white/10">
-               <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-slate-400 dark:text-white/40">
+               <p className="text-[10px] font-black uppercase tracking-[0.2em] mb-2 text-slate-600 dark:text-white/40">
                  {auction.currentBid ? "Lance Atual" : "Lance Inicial"}
                </p>
                <div className="flex items-baseline gap-2">
-                 <span className="text-4xl font-black text-amber-400">
+                 <span className="text-4xl font-black text-yellow-800 dark:text-emerald-500">
                     {formatBrl(auction.currentBid ?? auction.minBid)}
                  </span>
                </div>
                <p className="text-xs font-bold text-slate-300 dark:text-white/40 mt-3">
-                 Total de <span className="text-white dark:text-white/90 keep-white">{auction.bidCount}</span> lances
+                 Total de <span className="text-neutral-400 dark:text-white/90 dark:keep-white">{auction.bidCount}</span> lances
                </p>
             </div>
 
@@ -197,7 +197,7 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
               <div className="space-y-4">
                 {isOwner ? (
                   <div className="rounded-2xl bg-white/10 dark:bg-white/5 p-4 border border-white/10">
-                    <p className="text-xs font-bold text-slate-200 dark:text-white/70 text-center">
+                    <p className="text-xs font-bold text-slate-500 dark:text-white/70 text-center">
                       Você é o dono deste leilão.
                     </p>
                   </div>
@@ -206,9 +206,9 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
                     <div className="space-y-2">
                        <label className="text-[10px] font-black uppercase tracking-widest text-slate-300 dark:text-white/50 px-1">Seu Lance (Min {formatBrl(minNextBid)})</label>
                        <div className="relative">
-                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-white/40 text-lg">R$</span>
+                         <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-300 text-lg">R$</span>
                          <input 
-                           className="w-full h-14 rounded-2xl bg-white/10 dark:bg-white/5 border-white/20 dark:border-white/10 focus:border-amber-400 focus:ring-amber-400/20 text-white font-black text-xl pl-12 outline-none transition-all keep-white"
+                           className="w-full h-14 rounded-2xl bg-black/10 dark:bg-white/20 border-white/20 dark:border-white/10 focus:border-amber-400 focus:ring-amber-400/20 text-slate-300 font-black text-xl pl-12 outline-none transition-all dark:keep-white"
                            type="number"
                            step="0.01"
                            min={minNextBid}
@@ -221,7 +221,7 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
 
                     {message && (
                       <div className={`rounded-xl p-3 text-xs font-bold ${
-                        message.type === "success" ? "bg-leaf/20 text-leaf-light" : "bg-red-500/20 text-red-200"
+                        message.type === "success" ? "bg-leaf/20 text-emerald-900" : "bg-red-500/20 text-red-200"
                       }`}>
                         {message.text}
                       </div>
@@ -229,7 +229,7 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
 
                     <Button
                       variant="brand"
-                      className="w-full h-14 text-base shadow-glow shadow-amber-500/20 bg-amber-400 text-ink hover:bg-amber-300 border-none"
+                      className="w-full h-14 text-base shadow-glow shadow-amber-500/20 bg-amber-400 text-white hover:bg-amber-300 border-none"
                       disabled={submitting || !bidAmount || Number(bidAmount) < minNextBid}
                       onClick={handleBid}
                     >
