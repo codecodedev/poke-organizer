@@ -8,7 +8,6 @@ import {
   AddCollectionItemDto,
   ClearCollectionDto,
   CollectionFolderQueryDto,
-  CreateCollectionBidDto,
   CreateCollectionCartOfferDto,
   CreateCollectionFolderDto,
   DecideCollectionCartOfferDto,
@@ -59,11 +58,6 @@ export class CollectionController {
     return this.collection.listMyProposals(user.id);
   }
 
-  @Get("my-bids")
-  listMyBids(@CurrentUser() user: RequestUser) {
-    return this.collection.listMyBids(user.id);
-  }
-
   @Post("folders")
   createFolder(@CurrentUser() user: RequestUser, @Body() dto: CreateCollectionFolderDto) {
     return this.collection.createFolder(user.id, dto);
@@ -99,11 +93,6 @@ export class CollectionController {
     return this.collection.updateFolderItemSale(user.id, id, folderItemId, dto);
   }
 
-  @Post("folders/:id/items/:folderItemId/finish-auction")
-  finishAuction(@CurrentUser() user: RequestUser, @Param("id") id: string, @Param("folderItemId") folderItemId: string) {
-    return this.collection.finishAuction(user.id, id, folderItemId);
-  }
-
   @Post("folders/:id/items/:folderItemId/undo-sale")
   undoSale(
     @CurrentUser() user: RequestUser,
@@ -117,16 +106,6 @@ export class CollectionController {
   @Delete("folders/:id/items/:folderItemId")
   removeItem(@CurrentUser() user: RequestUser, @Param("id") id: string, @Param("folderItemId") folderItemId: string) {
     return this.collection.removeItemFromFolder(user.id, id, folderItemId);
-  }
-
-  @Delete("folders/:id/items/:folderItemId/bids/:bidId")
-  invalidateBid(
-    @CurrentUser() user: RequestUser,
-    @Param("id") id: string,
-    @Param("folderItemId") folderItemId: string,
-    @Param("bidId") bidId: string
-  ) {
-    return this.collection.invalidateBid(user.id, id, folderItemId, bidId);
   }
 
   @Get("folders/:id/offers")
@@ -205,17 +184,6 @@ export class PublicCollectionController {
       userId: user?.id,
       sid: query.sid,
     });
-  }
-
-  @Post(":shareToken/items/:folderItemId/bids")
-  @UseGuards(JwtAuthGuard)
-  createBid(
-    @CurrentUser() user: RequestUser,
-    @Param("shareToken") shareToken: string,
-    @Param("folderItemId") folderItemId: string,
-    @Body() dto: CreateCollectionBidDto
-  ) {
-    return this.collection.createBid(user.id, shareToken, folderItemId, dto);
   }
 
   @Post(":shareToken/offers")

@@ -104,16 +104,6 @@ export type CollectionItem = {
   updatedAt: string;
 };
 
-export type CollectionItemBid = {
-  id: string;
-  bidderId: string;
-  bidderName: string;
-  amount: number;
-  quantity: number;
-  folderId?: string;
-  createdAt: string;
-};
-
 export type CollectionItemStore = {
   manualPrice: number | null;
   effectivePrice: number | null;
@@ -122,8 +112,6 @@ export type CollectionItemStore = {
   soldQuantity: number;
   soldAt: string | null;
   soldByAuction?: boolean;
-  highestBid: CollectionItemBid | null;
-  bids: CollectionItemBid[];
 };
 
 export type CollectionAddAction = "created" | "incremented";
@@ -165,10 +153,53 @@ export type PublicCollectionDetail = CollectionFolderDetail & {
 };
 
 export type HomeSummary = {
-  hotAuctions: CollectionItem[];
-  recentBids: CollectionItemBid[];
   recentProposals: CollectionCartOffer[];
   ranking: CollectionFolderSummary[];
+};
+
+export type AuctionStatus = "open" | "closed" | "cancelled";
+
+export type AuctionSummary = {
+  id: string;
+  sellerId: string;
+  sellerName: string;
+  card: CardSummary;
+  collectionItem: CollectionItem;
+  title?: string | null;
+  description?: string | null;
+  minBid: number;
+  currentBid: number | null;
+  endsAt: string;
+  status: AuctionStatus;
+  shareToken: string;
+  bidCount: number;
+  createdAt: string;
+};
+
+export type AuctionBid = {
+  id: string;
+  auctionId: string;
+  bidderId: string;
+  bidderName: string;
+  amount: number;
+  createdAt: string;
+};
+
+export type AuctionDetail = AuctionSummary & {
+  bids: AuctionBid[];
+};
+
+export type UserPublicProfile = {
+  id: string;
+  name: string;
+  slug: string | null;
+  bio: string | null;
+  avatarUrl: string | null;
+  collections: {
+    viewing: CollectionFolderSummary[];
+    selling: CollectionFolderSummary[];
+  };
+  auctions: AuctionSummary[];
 };
 
 export type CollectionOfferStatus = "pending" | "accepted" | "rejected";
@@ -184,11 +215,13 @@ export type CollectionCartOfferItem = {
 export type CollectionCartOffer = {
   id: string;
   folderId: string;
+  folderName: string;
   buyerId: string;
   buyerName: string;
   status: CollectionOfferStatus;
   message?: string | null;
   totalOffer: number;
+  isGlobalOffer: boolean;
   decidedAt?: string | null;
   createdAt: string;
   updatedAt: string;

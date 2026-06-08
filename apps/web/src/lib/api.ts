@@ -9,7 +9,9 @@ import type {
   CollectionFolderSort,
   CollectionFolderSummary,
   CollectionItem,
-  CollectionItemBid,
+  AuctionSummary,
+  AuctionDetail,
+  UserPublicProfile,
   DeckArchetypeSummary,
   DeckAiAnalysis,
   DeckDetail,
@@ -25,10 +27,17 @@ import type {
 } from "@poke-organizer/shared";
 
 const API_URL =
-  import.meta.env.VITE_API_URL ?? "https://poke-organizer-api.onrender.com";
+  import.meta.env.VITE_API_URL ?? "http://localhost:3333";
 
 export type Session = {
-  user: { id: string; email: string; name?: string | null };
+  user: { 
+    id: string; 
+    email: string; 
+    name?: string | null;
+    profileSlug?: string | null;
+    profileBio?: string | null;
+    isPublicProfile?: boolean;
+  };
   accessToken: string;
   refreshToken: string;
 };
@@ -343,12 +352,6 @@ export const api = {
       },
     );
   },
-  finishCollectionItemAuction(token: string, folderId: string, folderItemId: string) {
-    return request<CollectionFolderDetail>(
-      `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/finish-auction`,
-      { method: "POST", token, body: JSON.stringify({}) },
-    );
-  },
   undoCollectionItemSale(token: string, folderId: string, folderItemId: string, quantity?: number) {
     return request<CollectionFolderDetail>(
       `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/undo-sale`,
@@ -365,18 +368,54 @@ export const api = {
       { method: "DELETE", token },
     );
   },
-  invalidateCollectionBid(token: string, folderId: string, folderItemId: string, bidId: string) {
-    return request<CollectionFolderDetail>(
-      `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/bids/${encodeURIComponent(bidId)}`,
-      { method: "DELETE", token },
-    );
-  },
   listCollectionOffers(token: string, folderId: string) {
     return request<CollectionCartOffer[]>(
       `/collection/folders/${encodeURIComponent(folderId)}/offers`,
       { token },
     );
   },
+// ... (User & Auction methods added here)
+  getUserProfile(slug: string) {
+    return request<UserPublicProfile>(`/users/profile/${encodeURIComponent(slug)}`);
+  },
+  checkProfileSlug(slug: string) {
+    return request<{ available: boolean }>(`/users/check-slug/${encodeURIComponent(slug)}`);
+  },
+  updateUserProfile(token: string, payload: { name?: string; profileSlug?: string; profileBio?: string; isPublicProfile?: boolean }) {
+    return request<any>("/users/profile", {
+      method: "PATCH",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  listActiveAuctions() {
+    return request<AuctionSummary[]>("/auctions");
+  },
+  getAuction(idOrToken: string, token?: string) {
+    return request<AuctionDetail>(`/auctions/${encodeURIComponent(idOrToken)}`, { token });
+  },
+  createAuction(token: string, payload: { collectionItemId: string; title?: string; description?: string; minBidBrl: number; endsAt: string }) {
+    return request<AuctionDetail>("/auctions", {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  placeAuctionBid(token: string, auctionId: string, amountBrl: number) {
+    return request<AuctionDetail>(`/auctions/${encodeURIComponent(auctionId)}/bids`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ amountBrl }),
+    });
+  },
+  closeAuction(token: string, auctionId: string) {
+    return request<AuctionDetail>(`/auctions/${encodeURIComponent(auctionId)}/close`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({}),
+    });
+  },
+// ... (rest of methods)
   getCollectionFolderPermissions(token: string, folderId: string) {
     return request<Array<{ id: string; user: { id: string; email: string; name: string | null } }>>(
       `/collection/folders/${encodeURIComponent(folderId)}/permissions`,
@@ -401,9 +440,6 @@ export const api = {
   },
   listMyProposals(token: string) {
     return request<CollectionCartOffer[]>("/collection/my-proposals", { token });
-  },
-  listMyBids(token: string) {
-    return request<CollectionItemBid[]>("/collection/my-bids", { token });
   },
   getHomeSummary(token: string) {
     return request<HomeSummary>("/collection/summary", { token });
@@ -463,27 +499,13 @@ export const api = {
       { token },
     );
   },
-  createPublicCollectionBid(
-    token: string,
-    shareToken: string,
-    folderItemId: string,
-    amount: number,
-    quantity?: number,
-  ) {
-    return request<PublicCollectionDetail>(
-      `/public/collections/${encodeURIComponent(shareToken)}/items/${encodeURIComponent(folderItemId)}/bids`,
-      {
-        method: "POST",
-        token,
-        body: JSON.stringify({ amount, quantity }),
-      },
-    );
-  },
   createPublicCollectionOffer(
     token: string,
     shareToken: string,
     payload: {
       message?: string;
+      totalOffer?: number;
+      isGlobalOffer?: boolean;
       items: Array<{ folderItemId: string; quantity?: number; amount: number }>;
     },
   ) {

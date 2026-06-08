@@ -4,6 +4,7 @@ import {
   CalendarDays,
   Circle,
   DollarSign,
+  Gavel,
   Hash,
   Pencil,
   Plus,
@@ -14,6 +15,7 @@ import {
   X,
   Zap,
 } from "lucide-react";
+// ... (rest of shared imports)
 import {
   CARD_CONDITIONS,
   CARD_LANGUAGES,
@@ -31,6 +33,7 @@ import {
 import { api } from "../lib/api";
 import { formatBrl } from "../lib/format";
 import { CardVariantImage } from "./collection/CardVariantImage";
+import { Button } from "./ui/Button";
 
 export type AddCardDetails = {
   cardId: string;
@@ -57,6 +60,7 @@ type Props = {
     itemId: string,
     details: UpdateCardDetails,
   ) => Promise<void> | void;
+  onStartAuction?: (item: CollectionItem) => void;
 };
 
 export function CardDetailModal({
@@ -67,7 +71,9 @@ export function CardDetailModal({
   collectionItem,
   collectionPrice,
   onUpdate,
+  onStartAuction,
 }: Props) {
+// ... (rest of state logic)
   const [quantity, setQuantity] = useState(1);
   const [condition, setCondition] = useState<CardCondition>("NM");
   const [variant, setVariant] = useState(DEFAULT_CARD_VARIANT);
@@ -78,8 +84,10 @@ export function CardDetailModal({
   const [price, setPrice] = useState<PriceEstimate | null>(null);
   const [priceLoading, setPriceLoading] = useState(false);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
+  const [showAuctionForm, setShowAuctionCreation] = useState(false);
 
   const variants = useMemo(() => {
+// ... (variants logic)
     const values = card?.variants?.length
       ? [...card.variants]
       : [DEFAULT_CARD_VARIANT];
@@ -99,6 +107,7 @@ export function CardDetailModal({
       : "view";
 
   useEffect(() => {
+// ... (useEffect logic)
     if (!card) return;
     setQuantity(collectionItem?.quantity ?? 1);
     setCondition(collectionItem?.condition ?? "NM");
@@ -125,6 +134,7 @@ export function CardDetailModal({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [card, collectionItem, initialVariant, onClose]);
 
+// ... (Price logic)
   useEffect(() => {
     if (!card) return;
 
@@ -225,6 +235,8 @@ export function CardDetailModal({
     }
   }
 
+  const showRightColumn = onAdd || (collectionItem && onUpdate) || (collectionItem && onStartAuction);
+
   return createPortal(
     <div
       className="fixed inset-0 z-50 grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm"
@@ -234,7 +246,7 @@ export function CardDetailModal({
       onMouseDown={onClose}
     >
       <div
-        className="card-detail-modal animate-soft-pop max-h-[80vh] w-full max-w-5xl overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        className={`card-detail-modal animate-soft-pop max-h-[90vh] w-full ${showRightColumn ? 'max-w-5xl' : 'max-w-3xl'} overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card`}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="holo-strip animate-shimmer h-2" />
@@ -255,21 +267,21 @@ export function CardDetailModal({
           </button>
         </div>
 
-        <div className="grid gap-6 p-5">
-          <div className="mx-auto w-full max-w-[390px]">
-            <CardVariantImage
-              src={card.imageLarge ?? card.imageSmall}
-              alt={card.name}
-              variant={variant}
-              effect="frame"
-              className=" rounded-[24px] border border-line/80 bg-gradient-to-br from-aqua/15 to-lilac/15 shadow-card"
-              imageClassName="rounded-[18px] object-contain"
-            />
-          </div>
-
+        <div className={`grid gap-8 p-5 ${showRightColumn ? 'lg:grid-cols-[1fr_400px]' : ''}`}>
           <div className="min-w-0">
+            <div className={`mx-auto w-full mb-8 ${showRightColumn ? 'max-w-[390px]' : 'max-w-[320px]'}`}>
+                <CardVariantImage
+                src={card.imageLarge ?? card.imageSmall}
+                alt={card.name}
+                variant={variant}
+                effect="frame"
+                className=" rounded-[24px] border border-line/80 bg-gradient-to-br from-aqua/15 to-lilac/15 shadow-card"
+                imageClassName="rounded-[18px] object-contain"
+                />
+            </div>
+
             <h3 className="mb-3 text-xl font-black text-ink">Atributos</h3>
-            <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <dl className={`grid gap-3 ${showRightColumn ? 'sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2'}`}>
               <Detail
                 icon={<Pencil size={18} />}
                 label="Ilustrador"
@@ -316,17 +328,19 @@ export function CardDetailModal({
             {price?.history?.length ? (
               <PriceHistoryChart price={price} />
             ) : null}
+          </div>
 
+          <div className="space-y-6">
             {(onAdd || (collectionItem && onUpdate)) && (
               <form
                 onSubmit={submit}
-                className="card-detail-form mt-5 rounded-[22px] border border-line/80 bg-gradient-to-br from-white to-field/80 p-4 shadow-sm"
+                className="card-detail-form rounded-[22px] border border-line/80 bg-gradient-to-br from-white to-field/80 p-5 shadow-sm"
               >
                 <h3 className="text-lg font-black text-ink">
                   {mode === "add" ? "Adicionar a colecao" : "Editar na colecao"}
                 </h3>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="mt-4 grid gap-4">
                   <label className="text-sm font-black text-slate-700">
                     Variante
                     <select
@@ -342,35 +356,37 @@ export function CardDetailModal({
                     </select>
                   </label>
 
-                  <label className="text-sm font-black text-slate-700">
-                    Quantidade
-                    <input
-                      className="premium-input mt-2 w-full"
-                      type="number"
-                      min={1}
-                      value={quantity}
-                      onChange={(event) =>
-                        setQuantity(Math.max(1, Number(event.target.value)))
-                      }
-                    />
-                  </label>
+                  <div className="grid grid-cols-2 gap-3">
+                      <label className="text-sm font-black text-slate-700">
+                        Quantidade
+                        <input
+                          className="premium-input mt-2 w-full"
+                          type="number"
+                          min={1}
+                          value={quantity}
+                          onChange={(event) =>
+                            setQuantity(Math.max(1, Number(event.target.value)))
+                          }
+                        />
+                      </label>
 
-                  <label className="text-sm font-black text-slate-700">
-                    Condicao
-                    <select
-                      className="premium-select mt-2 w-full"
-                      value={condition}
-                      onChange={(event) =>
-                        setCondition(event.target.value as CardCondition)
-                      }
-                    >
-                      {CARD_CONDITIONS.map((item) => (
-                        <option key={item} value={item}>
-                          {item}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                      <label className="text-sm font-black text-slate-700">
+                        Condicao
+                        <select
+                          className="premium-select mt-2 w-full"
+                          value={condition}
+                          onChange={(event) =>
+                            setCondition(event.target.value as CardCondition)
+                          }
+                        >
+                          {CARD_CONDITIONS.map((item) => (
+                            <option key={item} value={item}>
+                              {item}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                  </div>
 
                   <label className="text-sm font-black text-slate-700">
                     Idioma
@@ -398,7 +414,7 @@ export function CardDetailModal({
                     />
                   </label>
 
-                  <label className="text-sm font-black text-slate-700 sm:col-span-2">
+                  <label className="text-sm font-black text-slate-700">
                     Notas
                     <textarea
                       className="premium-input focus-ring mt-2 min-h-24 w-full rounded-2xl border border-line bg-white/90 px-4 py-3"
@@ -414,11 +430,6 @@ export function CardDetailModal({
                     Nenhum valor nacional encontrado para esta carta.
                   </p>
                 )}
-                {!priceLoading && hasBrazilianPrice && price?.label && (
-                  <p className="card-detail-note mt-3 rounded-2xl border border-line bg-white px-4 py-3 text-sm font-semibold text-slate-600">
-                    {price.label}
-                  </p>
-                )}
                 {submitMessage && (
                   <p className="success-note mt-3">{submitMessage}</p>
                 )}
@@ -427,7 +438,7 @@ export function CardDetailModal({
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="btn-primary mt-4 disabled:opacity-60"
+                  className="btn-primary mt-6 w-full shadow-lg disabled:opacity-60"
                 >
                   {mode === "add" ? <Plus size={18} /> : <Save size={18} />}
                   {submitting
@@ -437,6 +448,30 @@ export function CardDetailModal({
                       : "Salvar alteracoes"}
                 </button>
               </form>
+            )}
+
+            {collectionItem && onStartAuction && (
+                <div className="rounded-[22px] border border-amber-200 bg-amber-50 p-5 shadow-sm">
+                   <div className="flex items-center gap-3 mb-4">
+                     <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-400 text-white shadow-sm">
+                        <Gavel size={22} />
+                     </div>
+                     <div>
+                        <h4 className="font-black text-amber-900">Leilão Direto</h4>
+                        <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">Novo recurso</p>
+                     </div>
+                   </div>
+                   <p className="text-sm font-medium text-amber-800 leading-relaxed">
+                     Inicie um leilão separado para esta carta e compartilhe o link com quem quiser!
+                   </p>
+                   <Button
+                     variant="brand"
+                     className="mt-5 w-full bg-amber-400 text-amber-950 hover:bg-amber-300 border-amber-500/20"
+                     onClick={() => onStartAuction(collectionItem)}
+                   >
+                     Iniciar Leilão
+                   </Button>
+                </div>
             )}
           </div>
         </div>

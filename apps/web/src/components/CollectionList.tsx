@@ -20,6 +20,7 @@ import { api, type Session } from "../lib/api";
 import { withAuthRetry } from "../lib/authRetry";
 import { formatBrl } from "../lib/format";
 import { CardDetailModal, type UpdateCardDetails } from "./CardDetailModal";
+import { AuctionCreationModal } from "./AuctionCreationModal";
 import { Button } from "./ui/Button";
 import { Modal } from "./ui/Modal";
 import { Panel } from "./ui/Panel";
@@ -105,6 +106,7 @@ export function CollectionList({
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [auctionItem, setAuctionItem] = useState<CollectionItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const settingsRef = useRef<HTMLDivElement | null>(null);
 
@@ -588,7 +590,25 @@ export function CollectionList({
         collectionPrice={selectedItem?.price ?? null}
         onClose={closeItem}
         onUpdate={updateItemDetails}
+        onStartAuction={(item) => {
+          setAuctionItem(item);
+          closeItem();
+        }}
       />
+
+      {auctionItem && (
+        <AuctionCreationModal
+          item={auctionItem}
+          session={session}
+          onSession={onSession}
+          onUnauthorized={onUnauthorized}
+          onClose={() => setAuctionItem(null)}
+          onCreated={(shareToken) => {
+            setAuctionItem(null);
+            window.open(`/auctions/${shareToken}`, "_blank");
+          }}
+        />
+      )}
 
       {backupRows.length > 0 && (
         <Modal title="Restaurar backup de cartas" onClose={() => setBackupRows([])}>

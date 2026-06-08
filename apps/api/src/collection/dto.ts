@@ -173,19 +173,6 @@ export class UpdateFolderItemSaleDto {
   quantity?: number;
 }
 
-export class CreateCollectionBidDto {
-  @ApiProperty()
-  @Transform(({ value }) => Number(value))
-  @IsNumber()
-  amount!: number;
-
-  @ApiPropertyOptional({ default: 1 })
-  @IsOptional()
-  @IsInt()
-  @Min(1)
-  quantity?: number;
-}
-
 export class CreateCollectionCartOfferItemDto {
   @ApiProperty()
   @IsString()
@@ -214,6 +201,18 @@ export class CreateCollectionCartOfferDto {
   @IsOptional()
   @IsString()
   message?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsNumber()
+  totalOffer?: number;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  isGlobalOffer?: boolean;
 }
 
 export class DecideCollectionCartOfferDto {

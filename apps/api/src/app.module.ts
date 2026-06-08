@@ -9,6 +9,8 @@ import { PricingModule } from "./pricing/pricing.module";
 import { PrismaModule } from "./prisma/prisma.module";
 import { RecognitionModule } from "./recognition/recognition.module";
 import { NotificationModule } from "./notification/notification.module";
+import { AuctionModule } from "./auction/auction.module";
+import { UserModule } from "./user/user.module";
 
 @Module({
   imports: [
@@ -20,7 +22,9 @@ import { NotificationModule } from "./notification/notification.module";
     DecksModule,
     PricingModule,
     RecognitionModule,
-    NotificationModule
+    NotificationModule,
+    AuctionModule,
+    UserModule
   ],
   controllers: [HealthController]
 })

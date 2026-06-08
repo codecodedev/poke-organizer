@@ -51,12 +51,11 @@ body {
 }
 
 :root[data-theme="light"] .section-title,
-:root[data-theme="light"] .text-white,
 :root[data-theme="light"] h1,
 :root[data-theme="light"] h2,
 :root[data-theme="light"] h3,
 :root[data-theme="light"] .stat-card p,
-:root[data-theme="light"] .font-bold.text-white {
+:root[data-theme="light"] .font-bold.text-white:not(.keep-white) {
   color: #0f172a !important;
 }
 
@@ -65,7 +64,8 @@ body {
 :root[data-theme="light"] .btn-gradient *,
 :root[data-theme="light"] .btn-brand *,
 :root[data-theme="light"] .variant-badge,
-:root[data-theme="light"] .variant-badge * {
+:root[data-theme="light"] .variant-badge *,
+:root[data-theme="light"] .keep-white {
   color: #ffffff !important;
 }
 
@@ -115,14 +115,14 @@ body {
   color: #475569 !important;
 }
 
-:root[data-theme="light"] [class*="bg-white/5"],
-:root[data-theme="light"] [class*="bg-white/10"],
-:root[data-theme="light"] [class*="bg-white/20"] {
+:root[data-theme="light"] [class*="bg-white/5"]:not(.keep-white),
+:root[data-theme="light"] [class*="bg-white/10"]:not(.keep-white),
+:root[data-theme="light"] [class*="bg-white/20"]:not(.keep-white) {
   background-color: rgba(0, 0, 0, 0.04) !important;
 }
 
-:root[data-theme="light"] [class*="border-white/5"],
-:root[data-theme="light"] [class*="border-white/10"] {
+:root[data-theme="light"] [class*="border-white/5"]:not(.keep-white),
+:root[data-theme="light"] [class*="border-white/10"]:not(.keep-white) {
   border-color: rgba(0, 0, 0, 0.08) !important;
 }
 

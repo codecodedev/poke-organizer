@@ -11,12 +11,14 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ExternalLink,
+  User as UserIcon,
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { NotificationBell } from "../ui/NotificationBell";
 import type { Session } from "../../lib/api";
 
-type View = "home" | "cards" | "collections" | "decks" | "profile";
+type View = "home" | "cards" | "collections" | "decks" | "proposals" | "profile";
 
 type NavItem = {
   id: View;
@@ -29,7 +31,8 @@ const navItems: NavItem[] = [
   { id: "cards", label: "Cartas", icon: <LibraryBig size={20} /> },
   { id: "collections", label: "Coleções", icon: <FolderOpen size={20} /> },
   { id: "decks", label: "Decks", icon: <Swords size={20} /> },
-  { id: "profile", label: "Propostas", icon: <ShoppingBag size={20} /> },
+  { id: "proposals", label: "Propostas", icon: <ShoppingBag size={20} /> },
+  { id: "profile", label: "Perfil", icon: <UserIcon size={20} /> },
 ];
 
 type Props = {
@@ -94,8 +97,18 @@ export function Sidebar({
                 coleciona<span className="gradient-text">.cards</span>
               </h1>
               <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                {session?.user.email ?? "Visitante"}
+                {session?.user.name || session?.user.email || "Visitante"}
               </p>
+              {session?.user.profileSlug && isOpen && (
+                 <a 
+                   href={`/public/profile/${session.user.profileSlug}`}
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   className="mt-1 flex items-center gap-1 text-[9px] font-black text-brand uppercase hover:underline"
+                 >
+                   Ver Perfil Público <ExternalLink size={10} />
+                 </a>
+              )}
             </div>
           </div>
           
@@ -152,15 +165,15 @@ export function Sidebar({
           {session && (
             <div className={`flex items-center gap-3 ${!isOpen && 'md:justify-center'}`}>
                <NotificationBell
-                  session={session}
-                  onSession={onSession}
-                  onUnauthorized={onUnauthorized}
-                  onNavigate={(link) => {
-                    const url = new URL(link, window.location.origin);
-                    const tab = url.searchParams.get("tab");
-                    onNavigate("profile");
-                  }}
-                />
+                 session={session}
+                 onSession={onSession}
+                 onUnauthorized={onUnauthorized}
+                 onNavigate={(link) => {
+                   const url = new URL(link, window.location.origin);
+                   const tab = url.searchParams.get("tab");
+                   onNavigate("proposals");
+                 }}
+               />
                 {isOpen && <span className="text-sm font-bold text-slate-500">Notificações</span>}
             </div>
           )}

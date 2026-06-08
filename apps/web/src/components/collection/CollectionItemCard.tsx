@@ -41,19 +41,17 @@ export function CollectionItemCard({
   const soldPrice = item.store?.soldPrice ?? 0;
   const manualPrice = item.store?.manualPrice;
   const marketPrice = price?.amount ?? 0;
-  const highestBid = item.store?.highestBid?.amount;
 
   const displayPrice = isSold
     ? soldPrice
-    : highestBid ?? manualPrice ?? marketPrice;
+    : manualPrice ?? marketPrice;
 
   const kind = variantKind(item.variant);
   const latestChange = latestPriceChange(price);
-  const hasBids = Boolean(item.store?.highestBid);
 
   // So mostra variacao se for o preco de mercado puro
   const showPriceChange =
-    latestChange !== 0 && !isSold && manualPrice === null && !hasBids;
+    latestChange !== 0 && !isSold && manualPrice === null;
 
   return (
     <article
@@ -89,15 +87,6 @@ export function CollectionItemCard({
         >
           {selected ? <CheckSquare size={18} /> : <Square size={18} />}
         </button>
-      )}
-
-      {hasBids && !isSold && (
-        <span
-          className="absolute left-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-2xl border border-amber-500/20 bg-amber-500/10 text-amber-500 shadow-sm backdrop-blur"
-          title="Possui lances ativos"
-        >
-          <Gavel size={18} />
-        </span>
       )}
 
       {item.quantity > 1 && (
@@ -179,7 +168,7 @@ export function CollectionItemCard({
           </p>
           {isSold && (
             <span className="shrink-0 text-[10px] font-black uppercase text-slate-500">
-              {item.store?.soldByAuction ? "Leilão" : "Negociada"}
+              Negociada
             </span>
           )}
         </div>

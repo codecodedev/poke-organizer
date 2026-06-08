@@ -85,7 +85,15 @@ export class AuthService {
   async me(userId: string) {
     const user = await this.prisma.user.findUniqueOrThrow({
       where: { id: userId },
-      select: { id: true, email: true, name: true, createdAt: true }
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        profileSlug: true,
+        profileBio: true,
+        isPublicProfile: true,
+        createdAt: true
+      }
     });
     return user;
   }
@@ -96,7 +104,10 @@ export class AuthService {
       user: {
         id: user.id,
         email: user.email,
-        name: user.name
+        name: user.name,
+        profileSlug: user.profileSlug,
+        profileBio: user.profileBio,
+        isPublicProfile: user.isPublicProfile
       },
       ...tokens
     };

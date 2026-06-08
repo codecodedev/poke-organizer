@@ -21,7 +21,7 @@ export function ThemeToggle({
       title={dark ? "Modo claro" : "Modo escuro"}
     >
       {dark ? <Sun size={16} /> : <Moon size={16} />}
-      <span>{dark ? "Claro" : "Escuro"}</span>
+      <span className="hidden sm:inline">{dark ? "Claro" : "Escuro"}</span>
     </button>
   );
 }

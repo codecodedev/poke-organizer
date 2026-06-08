@@ -67,6 +67,14 @@ enum CollectionOfferStatus {
   @@schema("public")
 }
 
+enum AuctionStatus {
+  OPEN
+  CLOSED
+  CANCELLED
+
+  @@schema("public")
+}
+
 enum PriceProvider {
   LIGAPOKEMON
   MYPCARDS
@@ -79,12 +87,16 @@ model User {
   email        String           @unique
   name         String?
   passwordHash String
+  profileSlug  String?          @unique
+  profileBio   String?
+  isPublicProfile Boolean       @default(false)
   identities   UserIdentity[]
   refreshTokens RefreshToken[]
   collection   CollectionItem[]
   folders      CollectionFolder[]
   folderPermissions CollectionFolderPermission[]
-  collectionBids CollectionItemBid[]
+  auctions       Auction[]        @relation("UserAuctions")
+  auctionBids    AuctionBid[]
   collectionOffers CollectionCartOffer[]
   notifications    Notification[]
   decks        Deck[]
@@ -182,6 +194,7 @@ model CollectionItem {
   card           Card          @relation(fields: [cardId], references: [id], onDelete: Cascade)
   price          CardPrice?    @relation(fields: [cardPriceId], references: [id], onDelete: SetNull)
   folders        CollectionFolderItem[]
+  auctions       Auction[]
 
   @@index([userId])
   @@index([cardId])
@@ -253,7 +266,6 @@ model CollectionFolderItem {
   createdAt        DateTime         @default(now())
   folder           CollectionFolder @relation(fields: [folderId], references: [id], onDelete: Cascade)
   collectionItem   CollectionItem   @relation(fields: [collectionItemId], references: [id], onDelete: Cascade)
-  bids             CollectionItemBid[]
   cartOfferItems   CollectionCartOfferItem[]
 
   @@index([collectionItemId])
@@ -262,17 +274,40 @@ model CollectionFolderItem {
   @@schema("public")
 }
 
-model CollectionItemBid {
-  id           String               @id @default(cuid())
-  folderItemId String
-  bidderId     String
-  amountBrl    Decimal              @db.Decimal(10, 2)
-  quantity     Int                  @default(1)
-  createdAt    DateTime             @default(now())
-  folderItem   CollectionFolderItem @relation(fields: [folderItemId], references: [id], onDelete: Cascade)
-  bidder       User                 @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+model Auction {
+  id               String        @id @default(cuid())
+  sellerId         String
+  collectionItemId String
+  title            String?
+  description      String?
+  minBidBrl        Decimal       @db.Decimal(10, 2)
+  currentBidBrl    Decimal?      @db.Decimal(10, 2)
+  endsAt           DateTime
+  status           AuctionStatus @default(OPEN)
+  shareToken       String        @unique @default(cuid())
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  @@index([folderItemId, createdAt])
+  seller           User           @relation("UserAuctions", fields: [sellerId], references: [id], onDelete: Cascade)
+  collectionItem   CollectionItem @relation(fields: [collectionItemId], references: [id], onDelete: Cascade)
+  bids             AuctionBid[]
+
+  @@index([sellerId])
+  @@index([status])
+  @@schema("public")
+}
+
+model AuctionBid {
+  id        String   @id @default(cuid())
+  auctionId String
+  bidderId  String
+  amountBrl Decimal  @db.Decimal(10, 2)
+  createdAt DateTime @default(now())
+
+  auction Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  bidder  User    @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+
+  @@index([auctionId])
   @@index([bidderId])
   @@schema("public")
 }
@@ -284,6 +319,7 @@ model CollectionCartOffer {
   status      CollectionOfferStatus     @default(PENDING)
   message     String?
   totalOfferBrl Decimal                 @db.Decimal(10, 2)
+  isGlobalOffer Boolean                 @default(false)
   decidedAt   DateTime?
   createdAt   DateTime                  @default(now())
   updatedAt   DateTime                  @updatedAt

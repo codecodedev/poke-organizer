@@ -3,14 +3,20 @@ import {
   ArrowLeft, 
   ExternalLink, 
   Gavel, 
+  Globe, 
   ShoppingBag, 
+  User as UserIcon,
+  Check,
+  Copy,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
 import { api, type Session } from "../lib/api";
 import { withAuthRetry } from "../lib/authRetry";
 import { Button } from "./ui/Button";
 import { Panel } from "./ui/Panel";
 import { formatBrl } from "../lib/format";
-import type { CollectionCartOffer, CollectionItemBid } from "@poke-organizer/shared";
+import type { CollectionCartOffer } from "@poke-organizer/shared";
 
 type Props = {
   session: Session;
@@ -21,23 +27,59 @@ type Props = {
 };
 
 export function ProfilePage({ session, onSession, onUnauthorized, onBack, initialTab }: Props) {
-  const [tab, setTab] = useState<"proposals" | "bids">(initialTab === "bids" ? "bids" : "proposals");
+  const [tab, setTab] = useState<"proposals" | "settings">(initialTab === "settings" ? "settings" : "proposals");
+
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab === "settings" ? "settings" : "proposals");
+    }
+  }, [initialTab]);
+
   const [proposals, setProposals] = useState<CollectionCartOffer[]>([]);
-  const [bids, setBids] = useState<CollectionItemBid[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [name, setName] = useState(session.user.name || "");
+  const [profileSlug, setProfileSlug] = useState(session.user.profileSlug || "");
+  const [profileBio, setProfileBio] = useState(session.user.profileBio || "");
+  const [isPublicProfile, setIsPublicProfile] = useState(session.user.isPublicProfile || false);
+  const [updating, setUpdating] = useState(false);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!profileSlug || profileSlug === session.user.profileSlug) {
+      setSlugStatus("idle");
+      return;
+    }
+
+    if (profileSlug.length < 3) {
+      setSlugStatus("invalid");
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setSlugStatus("checking");
+      try {
+        const { available } = await api.checkProfileSlug(profileSlug);
+        setSlugStatus(available ? "available" : "taken");
+      } catch {
+        setSlugStatus("idle");
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [profileSlug, session.user.profileSlug]);
 
   useEffect(() => {
     async function load() {
       setLoading(true);
       try {
-        const [nextProposals, nextBids] = await withAuthRetry(session, onSession, onUnauthorized, async (token) => {
-          return Promise.all([
-            api.listMyProposals(token),
-            api.listMyBids(token),
-          ]);
+        const nextProposals = await withAuthRetry(session, onSession, onUnauthorized, async (token) => {
+          return api.listMyProposals(token);
         });
         setProposals(nextProposals);
-        setBids(nextBids);
       } catch (err) {
         console.error("Failed to load profile data", err);
       } finally {
@@ -47,49 +89,67 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
     void load();
   }, [session, onSession, onUnauthorized]);
 
+  async function handleUpdateProfile() {
+    setMessage(null);
+    setUpdating(true);
+    try {
+      const updatedUser = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.updateUserProfile(token, {
+          name,
+          profileSlug,
+          profileBio,
+          isPublicProfile
+        })
+      );
+      
+      // Update session with new user data
+      onSession({
+        ...session,
+        user: {
+          ...session.user,
+          ...updatedUser
+        }
+      });
+
+      setMessage({ type: "success", text: "Perfil atualizado com sucesso!" });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao atualizar perfil" });
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleCopyLink() {
+    const url = `${window.location.origin}/public/profile/${profileSlug}`;
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="grid h-12 w-12 place-items-center rounded-2xl border border-line bg-white text-slate-700 transition hover:bg-field shadow-sm"
+            className="grid h-12 w-12 place-items-center rounded-2xl border border-line bg-white text-slate-700 transition hover:bg-field shadow-sm dark:bg-black/20 dark:text-white dark:border-white/10"
           >
             <ArrowLeft size={22} />
           </button>
           <div>
-            <h1 className="text-3xl font-black text-ink">Minhas Propostas</h1>
-            <p className="text-sm font-semibold text-slate-500">Gerencie suas propostas enviadas e acompanhe seus lances ativos.</p>
+            <h1 className="text-3xl font-black text-ink dark:text-white">
+              {tab === "proposals" ? "Suas Propostas" : "Configurações de Perfil"}
+            </h1>
+            <p className="text-sm font-semibold text-slate-500">
+              {tab === "proposals" 
+                ? "Gerencie as propostas que você enviou para outros colecionadores." 
+                : "Gerencie suas informações e visibilidade do seu perfil público."}
+            </p>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
-        <button
-          onClick={() => setTab("proposals")}
-          className={`flex shrink-0 items-center gap-2 rounded-2xl border px-6 py-3 text-sm font-black transition ${
-            tab === "proposals"
-              ? "border-brand/40 bg-brand/10 text-brand shadow-soft"
-              : "border-line/80 bg-white/70 text-slate-500 hover:bg-white"
-          }`}
-        >
-          <ShoppingBag size={20} />
-          Propostas ({proposals.length})
-        </button>
-        <button
-          onClick={() => setTab("bids")}
-          className={`flex shrink-0 items-center gap-2 rounded-2xl border px-6 py-3 text-sm font-black transition ${
-            tab === "bids"
-              ? "border-amber-400/40 bg-amber-50 text-amber-700 shadow-soft"
-              : "border-line/80 bg-white/70 text-slate-500 hover:bg-white"
-          }`}
-        >
-          <Gavel size={20} />
-          Meus Lances ({bids.length})
-        </button>
-      </div>
-
-      <Panel className="p-0 overflow-hidden border-line/60">
+      <Panel className="p-0 overflow-hidden border-line/60 dark:bg-black/20 dark:border-white/5">
         {loading ? (
           <div className="py-24 text-center font-black text-slate-400 animate-pulse">Carregando dados...</div>
         ) : (
@@ -114,6 +174,11 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                             }`}>
                               {offer.status === "accepted" ? "Aceita" : offer.status === "rejected" ? "Recusada" : "Pendente"}
                             </span>
+                            {offer.isGlobalOffer && (
+                                <span className="rounded-lg bg-brand px-2 py-1 text-[10px] font-black text-white uppercase tracking-tighter">
+                                    Global
+                                </span>
+                            )}
                           </div>
                           <h3 className="mt-2 text-xl font-black text-ink">Valor sugerido: {formatBrl(offer.totalOffer)}</h3>
                           <p className="mt-1 text-sm font-semibold text-slate-500">Enviada em: {new Date(offer.createdAt).toLocaleDateString()}</p>
@@ -140,40 +205,109 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                 )}
               </>
             ) : (
-              <>
-                {bids.length === 0 ? (
-                  <div className="py-24 text-center">
-                    <p className="text-sm font-bold text-slate-400">Você ainda não deu lances em nenhuma carta.</p>
+              <div className="p-8 space-y-8">
+                <div className="grid gap-8 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">Nome de Exibição</label>
+                    <input
+                      className="premium-input w-full"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="Seu nome ou apelido"
+                    />
                   </div>
-                ) : (
-                  bids.map((bid) => (
-                    <div key={bid.id} className="p-6 transition hover:bg-field/30">
-                      <div className="flex flex-wrap items-center justify-between gap-6">
-                        <div className="flex items-center gap-5">
-                          <div className="grid h-14 w-14 place-items-center rounded-2xl bg-amber-50 text-amber-600 shadow-sm border border-amber-100">
-                            <Gavel size={28} />
-                          </div>
-                          <div>
-                            <p className="text-xs font-black uppercase tracking-widest text-slate-400 mb-1">Lance Atual</p>
-                            <h3 className="text-2xl font-black text-ink">{formatBrl(bid.amount)}</h3>
-                            <p className="text-sm font-semibold text-slate-500">
-                              Por {bid.quantity} unidade(s) • {new Date(bid.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                        </div>
-                        <Button
-                          variant="primary"
-                          className="h-11 px-6 gap-2 text-sm bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100 hover:border-amber-300"
-                          onClick={() => window.location.href = `/?publicCollection=${bid.folderId}`}
-                        >
-                          <ExternalLink size={16} />
-                          Acompanhar Leilão
-                        </Button>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">Link do Perfil (Slug)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">@</span>
+                      <input
+                        className={`premium-input w-full pl-10 pr-10 ${
+                          slugStatus === "available" ? "border-emerald-500/50 focus:border-emerald-500" :
+                          slugStatus === "taken" || slugStatus === "invalid" ? "border-rose-500/50 focus:border-rose-500" : ""
+                        }`}
+                        value={profileSlug}
+                        onChange={(e) => setProfileSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+                        placeholder="seu-apelido"
+                      />
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                        {slugStatus === "checking" && <Loader2 size={18} className="animate-spin text-slate-400" />}
+                        {slugStatus === "available" && <Check size={18} className="text-emerald-500" />}
+                        {(slugStatus === "taken" || slugStatus === "invalid") && <AlertCircle size={18} className="text-rose-500" />}
                       </div>
                     </div>
-                  ))
+                    <div className="flex items-center justify-between px-1">
+                      <p className={`text-[10px] font-bold ${
+                        slugStatus === "taken" ? "text-rose-500" :
+                        slugStatus === "available" ? "text-emerald-500" :
+                        slugStatus === "invalid" ? "text-rose-500" : "text-slate-400"
+                      }`}>
+                        {slugStatus === "taken" ? "Este link já está em uso" :
+                         slugStatus === "available" ? "Link disponível!" :
+                         slugStatus === "invalid" ? "Mínimo 3 caracteres" :
+                         "coleciona.cards/public/profile/" + (profileSlug || "seu-apelido")}
+                      </p>
+                      
+                      {profileSlug && !["taken", "invalid"].includes(slugStatus) && (
+                        <button 
+                          onClick={handleCopyLink}
+                          className="flex items-center gap-1 text-[10px] font-black text-brand uppercase hover:underline"
+                        >
+                          {copied ? <Check size={10} /> : <Copy size={10} />}
+                          {copied ? "Copiado!" : "Copiar Link"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-xs font-black uppercase tracking-widest text-slate-500">Biografia</label>
+                  <textarea
+                    className="premium-input w-full min-h-[120px] py-4"
+                    value={profileBio}
+                    onChange={(e) => setProfileBio(e.target.value)}
+                    placeholder="Conte um pouco sobre você e sua coleção..."
+                  />
+                </div>
+
+                <div className="flex items-center justify-between rounded-[24px] border border-line bg-field/30 p-6 dark:bg-white/5 dark:border-white/5">
+                  <div className="flex items-center gap-4">
+                    <div className={`grid h-12 w-12 place-items-center rounded-2xl ${isPublicProfile ? "bg-leaf text-white" : "bg-slate-100 text-slate-400 dark:bg-white/5"}`}>
+                      <Globe size={24} />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-ink dark:text-white">Perfil Público</h4>
+                      <p className="text-xs font-semibold text-slate-500">Permitir que qualquer pessoa veja seu perfil e coleções públicas.</p>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={isPublicProfile}
+                    onChange={(e) => setIsPublicProfile(e.target.checked)}
+                    className="h-7 w-7 rounded-lg border-line text-brand focus:ring-brand/30 dark:bg-black/20"
+                  />
+                </div>
+
+                {message && (
+                  <div className={`rounded-2xl p-4 text-sm font-bold animate-in fade-in slide-in-from-top-2 ${
+                    message.type === "success" ? "bg-leaf/10 text-leaf dark:bg-leaf/20" : "bg-red-50 text-red-600 dark:bg-red-500/20 dark:text-red-400"
+                  }`}>
+                    {message.text}
+                  </div>
                 )}
-              </>
+
+                <div className="flex justify-end border-t border-line/40 dark:border-white/5 pt-8">
+                  <Button
+                    variant="brand"
+                    className="h-12 px-10 shadow-glow"
+                    disabled={updating || slugStatus === "taken" || slugStatus === "checking" || slugStatus === "invalid"}
+                    onClick={handleUpdateProfile}
+                  >
+                    {updating ? "Salvando..." : "Salvar Alterações"}
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         )}

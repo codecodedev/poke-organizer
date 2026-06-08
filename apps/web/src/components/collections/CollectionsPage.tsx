@@ -359,33 +359,6 @@ export function CollectionsPage({
     setMessage("Dados de venda atualizados.");
   }
 
-  async function finishAuction(folderItemId: string) {
-    if (!activeFolder) return;
-    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-      api.finishCollectionItemAuction(token, activeFolder.id, folderItemId),
-    );
-    setActiveFolder(detail);
-    setActiveName(detail.name);
-    setMessage("Leilao finalizado.");
-  }
-
-  async function invalidateBid(folderItemId: string, bidId: string) {
-    if (!activeFolder) return;
-    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-      api.invalidateCollectionBid(token, activeFolder.id, folderItemId, bidId),
-    );
-    setActiveFolder(detail);
-    setActiveName(detail.name);
-    
-    // Atualiza o item selecionado para refletir a remocao do lance no modal aberto
-    const updatedItem = detail.items.find(i => i.folderItemId === folderItemId);
-    if (updatedItem) {
-      setSelectedAuctionItem(updatedItem);
-    }
-    
-    setMessage("Lance invalidado.");
-  }
-
   async function refreshOffers(folderId = activeFolder?.id) {
     if (!folderId) return;
     const nextOffers = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
@@ -812,7 +785,6 @@ export function CollectionsPage({
           onToggleSharing={(isPublic) => void updateFolderSharing(isPublic)}
           onToggleStore={(isStore) => void updateFolderStore(isStore)}
           onUpdateSale={(folderItemId, payload) => void updateFolderItemSale(folderItemId, payload)}
-          onFinishAuction={(folderItemId) => void finishAuction(folderItemId)}
           onUndoSale={setUndoingItem}
           onCopyShareLink={() => void copyShareLink()}
           onTypeFilter={setTypeFilter}
@@ -834,7 +806,6 @@ export function CollectionsPage({
           onOpenCard={setSelectedItem}
           showPickerModal={showPickerModal}
           onTogglePickerModal={setShowPickerModal}
-          setSelectedAuctionItem={setSelectedAuctionItem}
           setSellingItem={setSellingItem}
           onManagePermissions={() => setShowPermissionsModal(true)}
         />
@@ -888,19 +859,6 @@ export function CollectionsPage({
           onClose={() => setShowOffersModal(false)}
           onDecide={decideOffer}
           onRefresh={refreshOffers}
-        />
-      )}
-
-      {selectedAuctionItem && activeFolder && (
-        <BidsModal
-          item={selectedAuctionItem}
-          onClose={() => setSelectedAuctionItem(null)}
-          onAcceptBid={async (bidAmount) => {
-            await finishAuction(selectedAuctionItem.folderItemId!);
-            setSelectedAuctionItem(null);
-          }}
-          onInvalidateBid={(bidId) => invalidateBid(selectedAuctionItem.folderItemId!, bidId)}
-          isOwner={true}
         />
       )}
 
@@ -1213,162 +1171,6 @@ function SellModal({
   );
 }
 
-function BidsModal({
-  item,
-  onClose,
-  onBid,
-  onAcceptBid,
-  onInvalidateBid,
-  isOwner,
-}: {
-  item: CollectionItem;
-  onClose: () => void;
-  onBid?: (amount: number, quantity: number) => Promise<void>;
-  onAcceptBid?: (amount: number) => Promise<void>;
-  onInvalidateBid?: (bidId: string) => Promise<void>;
-  isOwner?: boolean;
-}) {
-  const [amount, setAmount] = useState("");
-  const [quantity, setQuantity] = useState(1);
-  const [submitting, setSubmitting] = useState(false);
-
-  const bids = useMemo(() => {
-    return item.store?.highestBid ? [item.store.highestBid] : [];
-  }, [item.store?.highestBid]);
-
-  async function submit() {
-    if (!onBid || !amount) return;
-    setSubmitting(true);
-    try {
-      await onBid(Number(amount), quantity);
-      setAmount("");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
-      <div
-        className="animate-soft-pop w-full max-w-md overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
-          <div>
-            <h2 className="text-xl font-black text-ink">Lances: {item.card.name}</h2>
-            <p className="text-sm font-semibold text-slate-500">Acompanhe e participe do leilão.</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-5">
-          <div className="grid gap-4">
-            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
-              <p className="text-xs font-black uppercase tracking-widest text-amber-600">Lance Atual</p>
-              <div className="mt-1 flex items-baseline justify-between">
-                <p className="text-2xl font-black text-amber-900">
-                  {item.store?.highestBid ? formatBrl(item.store.highestBid.amount) : "Nenhum lance"}
-                </p>
-                {item.store?.highestBid && (
-                  <p className="text-xs font-bold text-amber-700">por {item.store.highestBid.quantity} carta(s)</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-black text-ink">Histórico de Lances</h3>
-              {bids.length === 0 ? (
-                <p className="py-4 text-center text-xs font-bold text-slate-400">Aguardando primeiro lance...</p>
-              ) : (
-                <div className="grid gap-2">
-                  {bids.map((bid, index) => (
-                    <div key={index} className="flex items-center justify-between rounded-xl bg-field p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="grid h-8 w-8 place-items-center rounded-lg bg-white font-black text-ink shadow-sm text-xs">
-                          {index + 1}
-                        </div>
-                        <span className="text-xs font-bold text-ink">Lance por {bid.quantity} carta(s)</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm font-black text-ink">{formatBrl(bid.amount)}</span>
-                        {isOwner && (
-                          <div className="flex gap-2">
-                            {onInvalidateBid && (
-                              <button
-                                onClick={() => onInvalidateBid(bid.id)}
-                                className="grid h-8 w-8 place-items-center rounded-lg border border-red-100 bg-white text-red-500 hover:bg-red-50 transition"
-                                title="Invalidar lance"
-                              >
-                                <Trash2 size={14} />
-                              </button>
-                            )}
-                            {onAcceptBid && (
-                              <button
-                                onClick={() => onAcceptBid(bid.amount)}
-                                className="rounded-lg bg-aqua px-3 py-1.5 text-[10px] font-black text-white hover:bg-cyan-600 transition"
-                              >
-                                Aceitar
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {!isOwner && onBid && (
-              <div className="mt-2 grid gap-4 border-t border-line/50 pt-5">
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="grid gap-2">
-                    <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Valor Unitário</span>
-                    <input
-                      className="premium-input"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="Em R$"
-                    />
-                  </label>
-                  <label className="grid gap-2">
-                    <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Quantidade</span>
-                    <input
-                      className="premium-input"
-                      type="number"
-                      min={1}
-                      max={item.quantity}
-                      value={quantity}
-                      onChange={(e) => setQuantity(Math.min(item.quantity, Math.max(1, Number(e.target.value))))}
-                    />
-                  </label>
-                </div>
-                <Button
-                  type="button"
-                  variant="primary"
-                  className="w-full"
-                  disabled={submitting || !amount}
-                  onClick={submit}
-                >
-                  Enviar Lance
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function OffersModal({
   offers,
   onClose,
@@ -1434,9 +1236,16 @@ function OffersModal({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="font-black text-ink">{offer.buyerName}</p>
-                    <p className="text-xs font-semibold text-slate-500">
-                      {offer.items.length} carta(s) • {formatBrl(offer.totalOffer)} • {formatOfferStatus(offer.status)}
-                    </p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-xs font-semibold text-slate-500">
+                        {offer.items.length} carta(s) • {formatBrl(offer.totalOffer)} • {formatOfferStatus(offer.status)}
+                      </p>
+                      {offer.isGlobalOffer && (
+                        <span className="rounded-lg bg-brand px-1.5 py-0.5 text-[9px] font-black text-white uppercase tracking-tighter shadow-sm">
+                          Global
+                        </span>
+                      )}
+                    </div>
                     {offer.message && (
                       <p className="mt-2 rounded-xl bg-white/60 p-3 text-sm italic text-slate-600 border border-line/40">
                         "{offer.message}"
@@ -1869,7 +1678,6 @@ function CollectionDetailScreen({
   onToggleSharing,
   onToggleStore,
   onUpdateSale,
-  onFinishAuction,
   onCopyShareLink,
   onTypeFilter,
   onRarityFilter,
@@ -1887,7 +1695,6 @@ function CollectionDetailScreen({
   onOpenCard,
   showPickerModal,
   onTogglePickerModal,
-  setSelectedAuctionItem,
   setSellingItem,
   onUndoSale,
   onManagePermissions,
@@ -1931,7 +1738,6 @@ function CollectionDetailScreen({
   onToggleSharing: (isPublic: boolean) => void;
   onToggleStore: (isStore: boolean) => void;
   onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null }) => void;
-  onFinishAuction: (folderItemId: string) => void;
   onCopyShareLink: () => void;
   onUndoSale: (item: CollectionItem) => void;
   onTypeFilter: (value: string) => void;
@@ -1950,7 +1756,6 @@ function CollectionDetailScreen({
   onOpenCard: (item: CollectionItem) => void;
   showPickerModal: boolean;
   onTogglePickerModal: (open: boolean) => void;
-  setSelectedAuctionItem: (item: CollectionItem | null) => void;
   setSellingItem: (item: CollectionItem | null) => void;
   onManagePermissions: () => void;
 }) {
@@ -2093,9 +1898,9 @@ function CollectionDetailScreen({
             {isStore && (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-aqua/20 bg-aqua/5 p-4">
                 <div>
-                  <h4 className="font-black text-ink">Propostas e Lances</h4>
+                  <h4 className="font-black text-ink">Propostas e Negociações</h4>
                   <p className="text-sm font-semibold text-slate-500">
-                    Gerencie as ofertas recebidas e acompanhe os leilões ativos.
+                    Gerencie as ofertas e negociações desta coleção.
                   </p>
                 </div>
                 <Button
@@ -2247,7 +2052,7 @@ function CollectionDetailScreen({
                   >
                     {isStore && item.folderItemId && (
                       <div className="grid gap-2 p-1">
-                        {!item.store?.isSold && !item.store?.highestBid && (
+                        {!item.store?.isSold && (
                           <Button
                             type="button"
                             variant="primary"
@@ -2265,15 +2070,6 @@ function CollectionDetailScreen({
                             onClick={() => onUndoSale(item)}
                           >
                             Desfazer venda
-                          </Button>
-                        )}
-                        {item.store?.highestBid && !item.store?.isSold && (
-                          <Button
-                            type="button"
-                            className="h-8 w-full text-[10px]"
-                            onClick={() => setSelectedAuctionItem(item)}
-                          >
-                            Ver lances
                           </Button>
                         )}
                       </div>

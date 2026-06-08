@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { FolderOpen, Gavel, Lock, Plus, Search, ShoppingBag, X } from "lucide-react";
+import { FolderOpen, Gavel, Lock, Plus, Search, ShoppingBag, X, CheckSquare, SlidersHorizontal } from "lucide-react";
+import { ProposalCart } from "../ProposalCart";
 import type {
   CollectionFolderSort,
   CollectionItem,
@@ -44,10 +45,22 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-  const [selectedAuctionItem, setSelectedAuctionItem] = useState<CollectionItem | null>(null);
-  const [showProposalModal, setShowProposalModal] = useState(false);
+  const [cart, setCart] = useState<Record<string, { item: CollectionItem; amount: string; quantity: number }>>(() => {
+    try {
+      const saved = localStorage.getItem(`cart_${shareToken}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showMyProposalsModal, setShowMyProposalsModal] = useState(false);
+  const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [myProposals, setMyProposals] = useState<CollectionCartOffer[]>([]);
+
+  useEffect(() => {
+    localStorage.setItem(`cart_${shareToken}`, JSON.stringify(cart));
+  }, [cart, shareToken]);
 
   useEffect(() => {
     localStorage.setItem("pc_typeFilter", typeFilter);
@@ -169,63 +182,81 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
     setCollection(detail);
   }
 
-  async function submitBid(amount: number) {
-    if (!selectedAuctionItem?.folderItemId) return;
-    if (!session) {
-      setMessage("Faca login no site para dar lances nesta colecao.");
-      return;
-    }
-    const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-      api.createPublicCollectionBid(token, shareToken, selectedAuctionItem.folderItemId!, amount),
-    );
-    setCollection(detail);
-    
-    const updatedItem = detail.items.find(i => i.id === selectedAuctionItem.id);
-    if (updatedItem) {
-      setSelectedAuctionItem(updatedItem);
-    }
-    
-    setMessage("Lance enviado.");
-  }
-
-  async function submitProposal(proposalItems: { folderItemId: string; amount: number; quantity: number }[], proposalMessage: string) {
+  async function submitProposal(proposalItems: { folderItemId: string; amount: number; quantity: number }[], proposalMessage: string, totalOffer?: number, isGlobalOffer?: boolean) {
     if (!session) {
       setMessage("Faca login no site para enviar uma proposta.");
       return;
     }
-    await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-      api.createPublicCollectionOffer(token, shareToken, { items: proposalItems, message: proposalMessage || undefined }),
-    );
-    setMessage("Proposta enviada para o dono da colecao.");
-    await reloadCollection();
+    setIsSubmitting(true);
+    try {
+      await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.createPublicCollectionOffer(token, shareToken, { 
+          items: proposalItems, 
+          message: proposalMessage || undefined,
+          totalOffer,
+          isGlobalOffer
+        }),
+      );
+      setMessage("Proposta enviada para o dono da colecao.");
+      await reloadCollection();
+      
+      // Clear saved cart
+      localStorage.removeItem(`cart_${shareToken}`);
+      setCart({});
+      
+      // Refresh user proposals
+      const allMyProposals = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.listMyProposals(token),
+      );
+      setMyProposals(allMyProposals.filter((p) => p.folderId === collection?.id));
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  function addToCart(item: CollectionItem) {
+    setCart(prev => ({
+      ...prev,
+      [item.id]: {
+        item,
+        amount: String(item.store?.effectivePrice ?? item.price?.amount ?? 0),
+        quantity: 1
+      }
+    }));
   }
 
   return (
     <main className={hideHeader ? "" : "app-shell"}>
       {!hideHeader && (
         <header className="sticky top-0 z-30 border-b border-white/70 bg-white/75 backdrop-blur-xl">
-          <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-5 py-4">
-            <div className="flex min-w-0 items-center gap-3">
-              <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white shadow-glow">
+          <div className="mx-auto flex h-20 max-w-7xl items-center px-5 py-4">
+            {/* Left: Spacer (to center logo) */}
+            <div className="hidden sm:flex w-1/4" />
+            
+            {/* Center: Logo */}
+            <div className="flex flex-1 items-center justify-center gap-3">
+              <div className="grid h-10 w-10 sm:h-12 sm:w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white shadow-glow">
                 CC
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-xl font-black text-ink">
+                <h1 className="truncate text-lg sm:text-xl font-black text-ink">
                   Coleciona cards
                 </h1>
-                <p className="truncate text-sm font-medium text-slate-600">
-                  Colecao compartilhada
+                <p className="truncate text-[10px] sm:text-sm font-medium text-slate-600">
+                  Coleção compartilhada
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-3">
+            {/* Right: Actions */}
+            <div className="flex w-1/4 items-center justify-end gap-2 sm:gap-3">
               {theme && onToggleTheme && (
                 <ThemeToggle theme={theme} onToggle={onToggleTheme} />
               )}
               {!session && (
                 <Button
                   variant="brand"
+                  className="hidden sm:flex"
                   onClick={() => window.location.href = "/"}
                 >
                   Entrar
@@ -295,15 +326,6 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                       Minhas propostas
                     </Button>
                   )}
-                  {collection.isStore && (
-                    <Button
-                      variant="primary"
-                      icon={<ShoppingBag size={18} />}
-                      onClick={() => setShowProposalModal(true)}
-                    >
-                      Fazer uma proposta
-                    </Button>
-                  )}
                   <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
                     collection.isPublic 
                       ? "border-leaf/25 bg-leaf/10 text-emerald-800" 
@@ -318,24 +340,139 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
             </Panel>
 
             <Panel>
-              <FilterContainer>
-                <label className="grid gap-2 sm:col-span-2 lg:col-span-1 xl:col-span-1">
-                  <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                    Busca
-                  </span>
-                  <div className="relative">
-                    <Search
-                      className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
-                      size={18}
-                    />
-                    <input
-                      className="premium-input w-full pl-11"
-                      value={query}
-                      onChange={(event) => setQuery(event.target.value)}
-                      placeholder="Nome, número, coleção..."
-                    />
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="relative flex-1">
+                  <Search
+                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                    size={18}
+                  />
+                  <input
+                    className="premium-input w-full pl-11"
+                    value={query}
+                    onChange={(event) => setQuery(event.target.value)}
+                    placeholder="Nome, número, coleção..."
+                  />
+                </div>
+                <Button
+                  variant="primary"
+                  className="gap-2 sm:px-6"
+                  icon={<SlidersHorizontal size={18} />}
+                  onClick={() => setShowFiltersModal(true)}
+                >
+                  Filtros e Ordenação
+                </Button>
+              </div>
+
+              <div className="mt-6 rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
+                {visibleItems.length} de {items.length} cartas visíveis
+              </div>
+
+              {visibleItems.length ? (
+                <>
+                  <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+                    {paginatedItems.map((item) => (
+                      <CollectionItemCard
+                        key={item.id}
+                        item={item}
+                        price={item.price ?? undefined}
+                        onOpen={setSelectedItem}
+                      >
+                        {collection.isStore && !item.store?.isSold && (
+                          <Button
+                            variant="primary"
+                            className={`w-full h-10 gap-2 text-xs font-black uppercase transition-all ${
+                                cart[item.id] 
+                                    ? "bg-emerald-500 text-white border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]" 
+                                    : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-brand hover:bg-brand/10 dark:bg-white/5 dark:text-slate-400"
+                            }`}
+                            icon={cart[item.id] ? <CheckSquare size={16} /> : <Plus size={16} />}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                if (cart[item.id]) {
+                                    setCart(prev => {
+                                        const next = { ...prev };
+                                        delete next[item.id];
+                                        return next;
+                                    });
+                                } else {
+                                    addToCart(item);
+                                }
+                            }}
+                          >
+                            {cart[item.id] ? "No carrinho" : "Adicionar"}
+                          </Button>
+                        )}
+                      </CollectionItemCard>
+                    ))}
                   </div>
-                </label>
+                  <PaginationControls
+                    page={page}
+                    pageSize={PUBLIC_COLLECTION_PAGE_SIZE}
+                    totalItems={visibleItems.length}
+                    onPageChange={setPage}
+                    itemLabel="cartas"
+                  />
+                </>
+              ) : (
+                <div className="mt-5 rounded-[24px] border border-line/80 bg-white/70 p-5 text-sm font-bold text-slate-500 shadow-sm">
+                  Nenhuma carta aparece com os filtros atuais.
+                </div>
+              )}
+            </Panel>
+          </>
+        )}
+      </div>
+
+      <CardDetailModal
+        card={selectedItem?.card ?? null}
+        collectionItem={selectedItem}
+        collectionPrice={selectedItem?.price ?? null}
+        onClose={() => setSelectedItem(null)}
+      />
+
+      {collection?.isStore && (
+        <ProposalCart
+          cart={cart}
+          setCart={setCart}
+          onSubmit={submitProposal}
+          isSubmitting={isSubmitting}
+          folderName={collection.name}
+          session={session}
+          theme={theme}
+        />
+      )}
+
+      {showMyProposalsModal && (
+        <MyProposalsModal
+          proposals={myProposals}
+          onClose={() => setShowMyProposalsModal(false)}
+        />
+      )}
+
+      {showFiltersModal && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-night/55 backdrop-blur-sm sm:items-center p-0 sm:p-4"
+          onMouseDown={() => setShowFiltersModal(false)}
+        >
+          <div 
+            className="animate-in slide-in-from-bottom-full sm:animate-soft-pop flex w-full max-w-lg flex-col overflow-hidden rounded-t-[32px] sm:rounded-[32px] border border-white/10 bg-white dark:bg-zinc-900 shadow-2xl h-[80vh] sm:h-auto"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-line/70 dark:border-white/5 px-6 py-5 shrink-0">
+              <div>
+                <h2 className="text-xl font-black text-ink dark:text-white">Filtros e Ordenação</h2>
+                <p className="text-sm font-semibold text-slate-500">Refine os resultados da coleção.</p>
+              </div>
+              <button
+                onClick={() => setShowFiltersModal(false)}
+                className="grid h-10 w-10 place-items-center rounded-xl border border-line dark:border-white/10 bg-white dark:bg-zinc-800 text-slate-700 dark:text-white transition hover:bg-field"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid gap-6">
                 <FilterSelect
                   label="Tipo"
                   value={typeFilter}
@@ -376,102 +513,38 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                     <option value="price-change-asc">Maior queda</option>
                   </select>
                 </label>
-                {collection.isStore && (
-                  <label className="grid gap-2">
-                    <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500 text-center text-nowrap">
-                      Ver vendidas
-                    </span>
-                    <div className="flex h-[46px] items-center justify-center">
-                      <input
-                        type="checkbox"
-                        checked={showSold}
-                        onChange={(e) => setShowSold(e.target.checked)}
-                        className="h-6 w-6 rounded-lg border-line text-brand focus:ring-brand/30"
-                      />
+                {collection?.isStore && (
+                  <label className="flex items-center justify-between gap-4 rounded-2xl border border-line/50 p-4">
+                    <div>
+                      <span className="block text-sm font-black text-ink dark:text-white">
+                        Ver vendidas
+                      </span>
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                        Exibir itens já negociados
+                      </span>
                     </div>
+                    <input
+                      type="checkbox"
+                      checked={showSold}
+                      onChange={(e) => setShowSold(e.target.checked)}
+                      className="h-6 w-6 rounded-lg border-line text-brand focus:ring-brand/30"
+                    />
                   </label>
                 )}
-              </FilterContainer>
-
-              <div className="mt-6 rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
-                {visibleItems.length} de {items.length} cartas visíveis
               </div>
+            </div>
 
-              {visibleItems.length ? (
-                <>
-                  <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                    {paginatedItems.map((item) => (
-                      <CollectionItemCard
-                        key={item.id}
-                        item={item}
-                        price={item.price ?? undefined}
-                        onOpen={setSelectedItem}
-                      >
-                        {collection.isStore && item.folderItemId && !item.store?.isSold && (
-                          <div className="mt-1 space-y-2">
-                            <Button
-                              type="button"
-                              variant="primary"
-                              className="h-9 w-full text-xs"
-                              icon={<Gavel size={14} />}
-                              onClick={() => setSelectedAuctionItem(item)}
-                            >
-                              {item.store?.highestBid ? "Ver lances" : "Dar lance"}
-                            </Button>
-                          </div>
-                        )}
-                      </CollectionItemCard>
-                    ))}
-                  </div>
-                  <PaginationControls
-                    page={page}
-                    pageSize={PUBLIC_COLLECTION_PAGE_SIZE}
-                    totalItems={visibleItems.length}
-                    onPageChange={setPage}
-                    itemLabel="cartas"
-                  />
-                </>
-              ) : (
-                <div className="mt-5 rounded-[24px] border border-line/80 bg-white/70 p-5 text-sm font-bold text-slate-500 shadow-sm">
-                  Nenhuma carta aparece com los filtros atuais.
-                </div>
-              )}
-            </Panel>
-          </>
-        )}
-      </div>
-
-      <CardDetailModal
-        card={selectedItem?.card ?? null}
-        collectionItem={selectedItem}
-        collectionPrice={selectedItem?.price ?? null}
-        onClose={() => setSelectedItem(null)}
-      />
-
-      {selectedAuctionItem && (
-        <BidsModal
-          item={selectedAuctionItem}
-          onClose={() => setSelectedAuctionItem(null)}
-          onBid={submitBid}
-          isOwner={false}
-          session={session}
-        />
-      )}
-
-      {showProposalModal && collection && (
-        <ProposalModal
-          items={unsoldItems}
-          onClose={() => setShowProposalModal(false)}
-          onSubmit={submitProposal}
-          session={session}
-        />
-      )}
-
-      {showMyProposalsModal && (
-        <MyProposalsModal
-          proposals={myProposals}
-          onClose={() => setShowMyProposalsModal(false)}
-        />
+            <div className="border-t border-line/70 dark:border-white/5 p-6 shrink-0">
+              <Button 
+                variant="brand" 
+                className="w-full h-12"
+                onClick={() => setShowFiltersModal(false)}
+              >
+                Ver {visibleItems.length} resultados
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );
@@ -515,11 +588,18 @@ function MyProposalsModal({
                     <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">
                       Enviada em {new Date(offer.createdAt).toLocaleDateString()}
                     </p>
-                    <p className="font-black text-ink">Total: {formatBrl(offer.totalOffer)}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="font-black text-ink">Total: {formatBrl(offer.totalOffer)}</p>
+                      {offer.isGlobalOffer && (
+                        <span className="rounded-lg bg-brand px-2 py-0.5 text-[10px] font-black text-white uppercase tracking-tighter">
+                          Proposta Global
+                        </span>
+                      )}
+                    </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {offer.items.map((item) => (
                         <span key={item.id} className="rounded-lg bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600 border border-line/50">
-                          {item.quantity}x {item.item.card.name}
+                          {item.quantity}x {item.item.card.name} {offer.isGlobalOffer ? "" : `(${formatBrl(item.amount)})`}
                         </span>
                       ))}
                     </div>
@@ -543,385 +623,6 @@ function MyProposalsModal({
               </div>
             ))}
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function LoginWarning({ message }: { message: string }) {
-  const currentUrl = encodeURIComponent(window.location.href);
-  return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-bold text-amber-800">{message}</p>
-        <Button
-          type="button"
-          variant="brand"
-          className="h-9 text-xs"
-          onClick={() => (window.location.href = `/?redirect=${currentUrl}`)}
-        >
-          Fazer Login
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function BidsModal({
-  item,
-  onClose,
-  onBid,
-  isOwner,
-  session,
-}: {
-  item: CollectionItem;
-  onClose: () => void;
-  onBid?: (amount: number, quantity: number) => Promise<void>;
-  isOwner?: boolean;
-  session?: Session | null;
-}) {
-  const [amount, setAmount] = useState("");
-  const [quantity, setQuantity] = useState(1);
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
-  const bids = useMemo(() => {
-    return item.store?.highestBid ? [item.store.highestBid] : [];
-  }, [item.store?.highestBid]);
-
-  async function submit() {
-    if (!onBid || !amount) return;
-    setError(null);
-    setSuccess(null);
-    setSubmitting(true);
-    try {
-      await onBid(Number(amount), quantity);
-      setAmount("");
-      setSuccess("Lance enviado com sucesso!");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar lance");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
-      <div
-        className="animate-soft-pop w-full max-w-md overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
-          <div>
-            <h2 className="text-xl font-black text-ink">Lances: {item.card.name}</h2>
-            <p className="text-sm font-semibold text-slate-500">Acompanhe e participe do leilão.</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="p-5">
-          <div className="grid gap-4">
-            {!session && !isOwner && (
-              <LoginWarning message="Você precisa estar logado para dar um lance." />
-            )}
-
-            <div className="rounded-2xl border border-amber-100 bg-amber-50 p-4">
-              <p className="text-xs font-black uppercase tracking-widest text-amber-600">Lance Atual</p>
-              <div className="mt-1 flex items-baseline justify-between">
-                <p className="text-2xl font-black text-amber-900">
-                  {item.store?.highestBid ? formatBrl(item.store.highestBid.amount) : "Nenhum lance"}
-                </p>
-                {item.store?.highestBid && (
-                  <p className="text-xs font-bold text-amber-700">por {item.store.highestBid.quantity} carta(s)</p>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-sm font-black text-ink">Histórico de Lances</h3>
-              {bids.length === 0 ? (
-                <p className="py-4 text-center text-xs font-bold text-slate-400">Aguardando primeiro lance...</p>
-              ) : (
-                <div className="grid gap-2">
-                  {bids.map((bid, index) => (
-                    <div key={index} className="flex items-center justify-between rounded-xl bg-field p-3">
-                      <div className="flex items-center gap-3">
-                        <div className="grid h-8 w-8 place-items-center rounded-lg bg-white font-black text-ink shadow-sm text-xs">
-                          {index + 1}
-                        </div>
-                        <span className="text-xs font-bold text-ink">Lance por {bid.quantity} carta(s)</span>
-                      </div>
-                      <span className="text-sm font-black text-ink">{formatBrl(bid.amount)}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {error && <p className="danger-note text-xs">{error}</p>}
-            {success && <p className="success-note text-xs">{success}</p>}
-
-            {!isOwner && onBid && session && (
-              <div className="mt-2 grid gap-4 border-t border-line/50 pt-5">
-                <div className="grid grid-cols-2 gap-3">
-                  <label className="grid gap-2">
-                    <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Valor Unitário</span>
-                    <input
-                      className="premium-input"
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="Em R$"
-                    />
-                  </label>
-                  <label className="grid gap-2">
-                    <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Quantidade</span>
-                    <input
-                      className="premium-input"
-                      type="number"
-                      min={1}
-                      max={item.quantity}
-                      value={quantity}
-                      onChange={(e) => setQuantity(Math.min(item.quantity, Math.max(1, Number(e.target.value))))}
-                    />
-                  </label>
-                </div>
-                <Button
-                  type="button"
-                  variant="primary"
-                  className="w-full"
-                  disabled={submitting || !amount}
-                  onClick={submit}
-                >
-                  Enviar Lance
-                </Button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ProposalModal({
-  items,
-  onClose,
-  onSubmit,
-  session,
-}: {
-  items: CollectionItem[];
-  onClose: () => void;
-  onSubmit: (proposalItems: { folderItemId: string; amount: number; quantity: number }[], message: string) => Promise<void>;
-  session?: Session | null;
-}) {
-  const [query, setQuery] = useState("");
-  const [cart, setCart] = useState<Record<string, { item: CollectionItem; amount: string; quantity: number }>>({});
-  const [message, setMessage] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const searchResults = useMemo(() => {
-    if (!query.trim()) return [];
-    const normalized = normalizeText(query);
-    return items.filter((item) => {
-      const searchable = normalizeText(item.card.name);
-      return searchable.includes(normalized);
-    }).slice(0, 5);
-  }, [items, query]);
-
-  const cartList = Object.values(cart);
-  const totalValue = cartList.reduce((sum, entry) => sum + (Number(entry.amount) || 0) * entry.quantity, 0);
-
-  async function submit() {
-    const proposalItems = cartList.map((entry) => ({
-      folderItemId: entry.item.folderItemId!,
-      amount: Number(entry.amount),
-      quantity: entry.quantity,
-    })).filter(i => i.amount > 0);
-
-    if (proposalItems.length === 0) return;
-
-    setError(null);
-    setSubmitting(true);
-    try {
-      await onSubmit(proposalItems, message);
-      onClose();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao enviar proposta");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
-      <div
-        className="animate-soft-pop flex h-full max-h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-card"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-line/70 px-6 py-5">
-          <div>
-            <h2 className="text-xl font-black text-ink">Fazer uma proposta</h2>
-            <p className="text-sm font-semibold text-slate-500">Selecione as cartas e sugira um valor total.</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-auto p-6">
-          <div className="grid gap-6">
-            {!session && (
-              <LoginWarning message="Você precisa estar logado para enviar uma proposta." />
-            )}
-
-            <div className="relative">
-              <label className="grid gap-2">
-                <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Adicionar carta</span>
-                <div className="relative">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                  <input
-                    className="premium-input w-full pl-11"
-                    value={query}
-                    onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Pesquise cartas nesta coleção..."
-                  />
-                </div>
-              </label>
-
-              {searchResults.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-20 mt-2 overflow-hidden rounded-2xl border border-line bg-white shadow-soft">
-                  {searchResults.map((item) => (
-                    <button
-                      key={item.id}
-                      className="flex w-full items-center gap-3 p-3 text-left transition hover:bg-field"
-                      onClick={() => {
-                        setCart(prev => ({
-                          ...prev,
-                          [item.id]: {
-                            item,
-                            amount: String(item.store?.effectivePrice ?? item.price?.amount ?? 0),
-                            quantity: 1
-                          }
-                        }));
-                        setQuery("");
-                      }}
-                    >
-                      <img src={item.card.imageSmall ?? undefined} className="h-10 w-7 rounded object-cover" alt="" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-ink">{item.card.name}</p>
-                        <p className="text-[10px] font-bold text-slate-500">{item.card.rarity} • {item.card.setName}</p>
-                      </div>
-                      <Plus size={16} className="text-aqua" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div>
-              <h3 className="text-sm font-black text-ink">Cartas selecionadas ({cartList.length})</h3>
-              <div className="mt-3 space-y-3">
-                {cartList.length === 0 && (
-                  <p className="py-8 text-center text-xs font-bold text-slate-400">Nenhuma carta selecionada ainda.</p>
-                )}
-                {cartList.map((entry) => (
-                  <div key={entry.item.id} className="grid gap-3 rounded-2xl border border-line/60 bg-field/30 p-3">
-                    <div className="flex items-center gap-4">
-                      <img src={entry.item.card.imageSmall ?? undefined} className="h-12 w-8 rounded object-cover shadow-sm" alt="" />
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-black text-ink">{entry.item.card.name}</p>
-                        <p className="text-[10px] font-bold text-slate-500">Ref: {formatBrl(entry.item.store?.effectivePrice ?? entry.item.price?.amount ?? 0)}</p>
-                      </div>
-                      <button
-                        onClick={() => setCart(prev => {
-                          const next = { ...prev };
-                          delete next[entry.item.id];
-                          return next;
-                        })}
-                        className="text-slate-400 hover:text-red-500"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-[1fr_120px] gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase text-slate-400">Unitário</span>
-                        <div className="relative flex-1">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">R$</span>
-                          <input
-                            className="premium-input h-9 w-full pl-8 text-sm"
-                            type="number"
-                            value={entry.amount}
-                            onChange={(e) => setCart(prev => ({
-                              ...prev,
-                              [entry.item.id]: { ...prev[entry.item.id], amount: e.target.value }
-                            }))}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-black uppercase text-slate-400">Qtd</span>
-                        <input
-                          className="premium-input h-9 w-full text-center text-sm"
-                          type="number"
-                          min={1}
-                          max={entry.item.quantity}
-                          value={entry.quantity}
-                          onChange={(e) => setCart(prev => ({
-                            ...prev,
-                            [entry.item.id]: { ...prev[entry.item.id], quantity: Math.min(entry.item.quantity, Math.max(1, Number(e.target.value))) }
-                          }))}
-                        />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {error && <p className="danger-note text-xs">{error}</p>}
-
-            <label className="grid gap-2">
-              <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Sua mensagem</span>
-              <textarea
-                className="premium-input min-h-[100px] py-3"
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="Explique sua proposta ou adicione detalhes para o vendedor..."
-              />
-            </label>
-          </div>
-        </div>
-
-        <div className="border-t border-line/70 bg-field/30 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <span className="text-sm font-black text-slate-500 uppercase tracking-widest">Valor Total</span>
-            <span className="text-2xl font-black text-ink">{formatBrl(totalValue)}</span>
-          </div>
-          <Button
-            type="button"
-            variant="primary"
-            className="w-full h-12 text-base"
-            disabled={submitting || cartList.length === 0 || !session}
-            onClick={submit}
-          >
-            {session ? "Enviar Proposta" : "Login necessário"}
-          </Button>
         </div>
       </div>
     </div>

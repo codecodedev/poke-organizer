@@ -25,6 +25,8 @@ import { CollectionList } from "../components/CollectionList";
 import { CollectionsPage } from "../components/collections/CollectionsPage";
 import { DecksPage } from "../components/decks/DecksPage";
 import { PublicCollectionPage } from "../components/collections/PublicCollectionPage";
+import { PublicProfilePage } from "../components/PublicProfilePage";
+import { AuctionPage } from "../components/AuctionPage";
 import { api, HttpError, type Session } from "../lib/api";
 import { clearSession, loadSession, saveSession } from "../lib/session";
 import { AuthPanel } from "../components/AuthPanel";
@@ -39,11 +41,13 @@ import { ProfilePage } from "../components/ProfilePage";
 import { Sidebar } from "../components/layout/Sidebar";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 
-type View = "home" | "cards" | "collections" | "decks" | "profile";
+type View = "home" | "cards" | "collections" | "decks" | "proposals" | "profile";
 type ThemeMode = "light" | "dark";
 type AppRoute = {
   view: View;
   publicCollection?: string | null;
+  publicProfile?: string | null;
+  auction?: string | null;
   collection?: string | null;
   card?: string | null;
 };
@@ -91,11 +95,10 @@ export function App() {
         const newUrl = `${window.location.pathname}${newSearch ? `?${newSearch}` : ""}`;
         window.history.replaceState(null, "", newUrl);
         
-        // Handle external-like redirect (to public collection paths) or internal views
-        if (redirect.includes("/public/collections/")) {
+        // Handle external-like redirect
+        if (redirect.includes("/public/") || redirect.includes("/auctions/")) {
           window.location.href = redirect;
         } else {
-          // Attempt to parse internal redirect if possible, otherwise just stay at home
           setRoute(parseRoute());
         }
       }
@@ -110,27 +113,16 @@ export function App() {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    if (theme === "dark") {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
     window.localStorage.setItem("poke-organizer-theme", theme);
   }, [theme]);
 
   function toggleTheme() {
     setTheme((current) => (current === "dark" ? "light" : "dark"));
-  }
-
-  if (route.publicCollection && !session) {
-    return (
-      <>
-        <RequestFeedback />
-        <PublicCollectionPage
-          shareToken={route.publicCollection}
-          session={session}
-          onSession={handleSession}
-          onUnauthorized={handleUnauthorized}
-          theme={theme}
-          onToggleTheme={toggleTheme}
-        />
-      </>
-    );
   }
 
   function navigate(nextRoute: AppRoute) {
@@ -148,6 +140,8 @@ export function App() {
   function refreshCollection() {
     setRefreshKey((value) => value + 1);
   }
+
+  const isPublicView = route.publicCollection || route.publicProfile || route.auction;
 
   return (
     <>
@@ -169,49 +163,84 @@ export function App() {
         )}
 
         <div className={`flex flex-1 flex-col transition-all duration-300 ${session ? (sidebarOpen ? "md:ml-[280px]" : "md:ml-20") : ""}`}>
-          {(session || !route.publicCollection) && (
-            <header className={`sticky top-0 z-30 flex h-20 items-center border-b border-white/5 bg-white/5 px-5 backdrop-blur-xl dark:bg-black/20 ${session ? 'md:hidden' : 'justify-between'}`}>
-              <div className="flex items-center gap-3">
+          {(session || isPublicView) && (
+            <header className={`sticky top-0 z-30 flex h-20 items-center border-b border-white/5 bg-white/5 px-5 backdrop-blur-xl dark:bg-black/20 ${session ? 'md:hidden' : ''}`}>
+              {/* Left: Sidebar Toggle (Mobile only) */}
+              <div className="flex w-1/4 items-center justify-start md:hidden">
+                {session && (
+                  <button
+                    type="button"
+                    onClick={() => setSidebarOpen(true)}
+                    className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 text-night shadow-sm"
+                  >
+                    <Menu size={22} />
+                  </button>
+                )}
+              </div>
+
+              {/* Center: Logo */}
+              <div className="flex flex-1 items-center justify-center gap-2 sm:gap-3">
                 <img 
                   src={theme === "dark" ? "/images/logo-dark-bg.png" : "/images/logo-light-bg.png"} 
                   alt="Logo" 
-                  className="h-10 w-10 object-contain scale-[2.5]"
+                  className="h-8 w-8 sm:h-10 sm:w-10 object-contain scale-[2.5]"
                 />
-                <span className="text-xl font-black text-ink dark:text-white">coleciona<span className="gradient-text">.cards</span></span>
+                <span className="text-lg sm:text-xl font-black text-ink dark:text-white">coleciona<span className="gradient-text">.cards</span></span>
               </div>
 
-              {session ? (
-                <button
-                  type="button"
-                  onClick={() => setSidebarOpen(true)}
-                  className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 text-night shadow-sm"
-                >
-                  <Menu size={22} />
-                </button>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <ThemeToggle theme={theme} onToggle={toggleTheme} />
-                </div>
-              )}
+              {/* Right: Actions */}
+              <div className="flex w-1/4 items-center justify-end gap-2 sm:gap-3">
+                <ThemeToggle theme={theme} onToggle={toggleTheme} />
+                {!session && (
+                  <Button
+                    variant="brand"
+                    className="hidden sm:flex"
+                    onClick={() => navigate({ view: "home" })}
+                  >
+                    Entrar
+                  </Button>
+                )}
+              </div>
             </header>
           )}
 
-          <main className={`mx-auto w-full max-w-7xl gap-5 px-5 py-6 ${!session && !route.publicCollection ? 'flex flex-1 flex-col items-center justify-center' : ''}`}>
+          <main className={`mx-auto w-full max-w-7xl gap-5 px-5 py-6 ${!session && !isPublicView ? 'flex flex-1 flex-col items-center justify-center' : ''}`}>
+            {!session && !isPublicView && (
+              <AuthPanel onSession={handleSession} theme={theme} />
+            )}
+
             {route.publicCollection && (
               <PublicCollectionPage
                 shareToken={route.publicCollection}
                 session={session}
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
+                theme={theme}
+                onToggleTheme={toggleTheme}
                 hideHeader
               />
             )}
 
-            {!session && !route.publicCollection && (
-              <AuthPanel onSession={handleSession} theme={theme} />
+            {route.publicProfile && (
+              <PublicProfilePage
+                slug={route.publicProfile}
+                session={session}
+                onSelectCollection={(shareToken) => navigate({ view: "home", publicCollection: shareToken })}
+                onSelectAuction={(id) => navigate({ view: "home", auction: id })}
+              />
             )}
 
-            {!route.publicCollection && view === "home" && session && (
+            {route.auction && (
+              <AuctionPage
+                idOrToken={route.auction}
+                session={session}
+                onSession={handleSession}
+                onUnauthorized={handleUnauthorized}
+                onSelectProfile={(slug) => navigate({ view: "home", publicProfile: slug })}
+              />
+            )}
+
+            {!isPublicView && view === "home" && session && (
               <HomeView
                 session={session}
                 onSession={handleSession}
@@ -223,7 +252,7 @@ export function App() {
               />
             )}
 
-            {!route.publicCollection && view === "cards" && session && (
+            {!isPublicView && view === "cards" && session && (
               <div className="flex flex-col gap-4">
                 <HeroPanel
                   session={session}
@@ -254,7 +283,7 @@ export function App() {
               </div>
             )}
 
-            {!route.publicCollection && view === "collections" && session && (
+            {!isPublicView && view === "collections" && session && (
               <CollectionsPage
                 session={session}
                 onSession={handleSession}
@@ -266,7 +295,7 @@ export function App() {
               />
             )}
 
-            {view === "decks" && session && (
+            {!isPublicView && view === "decks" && session && (
               <DecksPage
                 session={session}
                 onSession={handleSession}
@@ -274,13 +303,23 @@ export function App() {
               />
             )}
 
-            {view === "profile" && session && (
+            {!isPublicView && view === "proposals" && session && (
               <ProfilePage
                 session={session}
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
                 onBack={() => navigate({ view: "home" })}
-                initialTab={route.collection}
+                initialTab="proposals"
+              />
+            )}
+
+            {!isPublicView && view === "profile" && session && (
+              <ProfilePage
+                session={session}
+                onSession={handleSession}
+                onUnauthorized={handleUnauthorized}
+                onBack={() => navigate({ view: "home" })}
+                initialTab="settings"
               />
             )}
           </main>
@@ -335,29 +374,36 @@ function HeroPanel({
 }
 
 function parseRoute(): AppRoute {
-  const publicCollectionMatch = window.location.pathname.match(
-    /^\/public\/collections\/([^/]+)\/?$/,
-  );
+  const path = window.location.pathname;
+  
+  const publicCollectionMatch = path.match(/^\/public\/collections\/([^/]+)\/?$/);
   if (publicCollectionMatch) {
-    return {
-      view: "home",
-      publicCollection: decodeURIComponent(publicCollectionMatch[1]),
-      collection: null,
-      card: null,
-    };
+    return { view: "home", publicCollection: decodeURIComponent(publicCollectionMatch[1]) };
+  }
+
+  const publicProfileMatch = path.match(/^\/public\/profile\/([^/]+)\/?$/);
+  if (publicProfileMatch) {
+    return { view: "home", publicProfile: decodeURIComponent(publicProfileMatch[1]) };
+  }
+
+  const auctionMatch = path.match(/^\/auctions\/([^/]+)\/?$/);
+  if (auctionMatch) {
+    return { view: "home", auction: decodeURIComponent(auctionMatch[1]) };
   }
 
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
   const view: View =
-    page === "cards" || page === "collections" || page === "decks" || page === "profile"
+    page === "cards" || page === "collections" || page === "decks" || page === "proposals" || page === "profile"
       ? page
       : "home";
 
   return {
     view,
     publicCollection: null,
-    collection: (view === "collections" || view === "profile") ? params.get("collection") : null,
+    publicProfile: null,
+    auction: null,
+    collection: (view === "collections" || view === "profile" || view === "proposals") ? params.get("collection") : null,
     card: params.get("card"),
   };
 }
@@ -366,6 +412,12 @@ function routeToUrl(route: AppRoute): string {
   if (route.publicCollection) {
     return `/public/collections/${encodeURIComponent(route.publicCollection)}`;
   }
+  if (route.publicProfile) {
+    return `/public/profile/${encodeURIComponent(route.publicProfile)}`;
+  }
+  if (route.auction) {
+    return `/auctions/${encodeURIComponent(route.auction)}`;
+  }
 
   const params = new URLSearchParams();
 
@@ -373,7 +425,7 @@ function routeToUrl(route: AppRoute): string {
     params.set("page", route.view);
   }
 
-  if ((route.view === "collections" || route.view === "profile") && route.collection) {
+  if ((route.view === "collections" || route.view === "profile" || route.view === "proposals") && route.collection) {
     params.set("collection", route.collection);
   }
 
@@ -410,19 +462,28 @@ function HomeView({
   cardRoute: string | null;
 }) {
   const [summary, setSummary] = useState<HomeSummary | null>(null);
+  const [auctions, setAuctions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const data = await api.getHomeSummary(session.accessToken);
-        setSummary(data);
+        const [summaryData, auctionsData] = await Promise.all([
+          api.getHomeSummary(session.accessToken),
+          api.listActiveAuctions()
+        ]);
+        setSummary(summaryData);
+        setAuctions(auctionsData);
       } catch (err) {
         if (err instanceof HttpError && err.status === 401) {
           const next = await onUnauthorized();
           if (next) {
-            const data = await api.getHomeSummary(next.accessToken);
-            setSummary(data);
+            const [summaryData, auctionsData] = await Promise.all([
+              api.getHomeSummary(next.accessToken),
+              api.listActiveAuctions()
+            ]);
+            setSummary(summaryData);
+            setAuctions(auctionsData);
           }
         }
       } finally {
@@ -451,17 +512,10 @@ function HomeView({
                   <Flame size={18} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-lg">Leilões mais movimentados</h3>
-                  <p className="text-xs text-slate-400">As cartas que estão recebendo mais lances no momento.</p>
+                  <h3 className="font-bold text-white text-lg">Leilões em destaque</h3>
+                  <p className="text-xs text-slate-400">Participe dos leilões ativos da comunidade.</p>
                 </div>
               </div>
-              <Button
-                variant="ghost"
-                className="text-xs h-8 px-3"
-                onClick={() => navigate({ view: "collections" })}
-              >
-                Ver tudo
-              </Button>
             </div>
 
             {loading ? (
@@ -470,40 +524,36 @@ function HomeView({
                   <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-slate-100" />
                 ))}
               </div>
-            ) : !summary?.hotAuctions?.length ? (
-              <p className="py-8 text-center text-slate-400 text-sm italic">Nenhum leilão ativo no momento.</p>
+            ) : !auctions?.length ? (
+              <div className="py-12 text-center rounded-2xl border border-dashed border-white/10 bg-white/5">
+                <Gavel size={32} className="mx-auto text-slate-600 mb-3" />
+                <p className="text-slate-400 text-sm font-medium italic">Nenhum leilão ativo no momento.</p>
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                {summary?.hotAuctions?.map((item) => (
+                {auctions.map((auction) => (
                   <div
-                    key={item.id}
-                    className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-white/5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-cyan/5"
-                    onClick={() => {
-                      if (item.store?.highestBid?.folderId) {
-                        navigate({ view: "home", publicCollection: item.store.highestBid.folderId });
-                      }
-                    }}
+                    key={auction.id}
+                    className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-white/5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-amber-500/10 hover:border-amber-500/30"
+                    onClick={() => navigate({ view: "home", auction: auction.shareToken })}
                   >
                     <div className="aspect-[3/4] overflow-hidden bg-white/5">
                       <img
-                        src={item.card.imageSmall || ""}
-                        alt={item.card.name}
+                        src={auction.card.imageSmall || ""}
+                        alt={auction.card.name}
                         className="h-full w-full object-cover transition-transform group-hover:scale-110"
                       />
                     </div>
                     <div className="p-3">
-                      <p className="truncate text-xs font-bold text-white">{item.card.name}</p>
+                      <p className="truncate text-xs font-bold text-white">{auction.card.name}</p>
                       <div className="mt-2 flex items-center justify-between">
-                        <span className="text-[10px] font-black text-cyan">
-                          {formatBrl(item.store?.highestBid?.amount || item.store?.effectivePrice || 0)}
+                        <span className="text-[10px] font-black text-amber-400">
+                          {formatBrl(auction.currentBid || auction.minBid)}
                         </span>
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-orange-400">
-                          <Gavel size={10} /> {item.store?.bids.length || 0}
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                          <Gavel size={10} /> {auction.bidCount}
                         </span>
                       </div>
-                    </div>
-                    <div className="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-0.5 text-[8px] font-black text-white shadow-glow">
-                      HOT
                     </div>
                   </div>
                 ))}
@@ -512,30 +562,6 @@ function HomeView({
           </div>
 
           <div className="grid gap-6 md:grid-cols-2">
-            <div className="glass-panel p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-cyan/10 text-cyan">
-                  <Gavel size={18} />
-                </div>
-                <h3 className="font-bold text-white">Seus lances recentes</h3>
-              </div>
-              {!summary?.recentBids?.length && !loading ? (
-                <p className="py-4 text-center text-slate-400 text-sm italic">Nenhum lance realizado ainda.</p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {summary?.recentBids?.map((bid) => (
-                    <div key={bid.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Lance em {bid.folderId}</p>
-                        <p className="font-bold text-white">{formatBrl(bid.amount)}</p>
-                      </div>
-                      <span className="text-[10px] text-slate-500">{new Date(bid.createdAt).toLocaleDateString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
             <div className="glass-panel p-5">
               <div className="mb-4 flex items-center gap-2">
                 <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
@@ -550,7 +576,7 @@ function HomeView({
                   {summary?.recentProposals?.map((offer) => (
                     <div key={offer.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3">
                       <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Proposta para {offer.buyerName}</p>
+                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Proposta em {offer.folderName || 'Loja'}</p>
                         <p className="font-bold text-white">{formatBrl(offer.totalOffer)}</p>
                       </div>
                       <div className="text-right">
