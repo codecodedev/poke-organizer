@@ -275,8 +275,8 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
             <Panel>
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-                    Visualizacao compartilhada
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                    {collection.isStore ? "Pasta para vender" : "Pasta para visualizar"}
                   </p>
                   <h2 className="section-title truncate">{collection.name}</h2>
                   <p className="section-copy mt-1">

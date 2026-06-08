@@ -259,11 +259,11 @@ export const api = {
   listCollectionFolders(token: string) {
     return request<CollectionFolderSummary[]>("/collection/folders", { token });
   },
-  createCollectionFolder(token: string, name: string) {
+  createCollectionFolder(token: string, name: string, isStore = false) {
     return request<CollectionFolderDetail>("/collection/folders", {
       method: "POST",
       token,
-      body: JSON.stringify({ name }),
+      body: JSON.stringify({ name, isStore }),
     });
   },
   getCollectionFolder(

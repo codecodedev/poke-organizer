@@ -105,6 +105,11 @@ export class CreateCollectionFolderDto {
   @ApiProperty()
   @IsString()
   name!: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isStore?: boolean;
 }
 
 export class UpdateCollectionFolderDto {

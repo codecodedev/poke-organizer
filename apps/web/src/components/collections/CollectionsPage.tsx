@@ -12,6 +12,7 @@ import {
   Save,
   Search,
   Share2,
+  ShoppingBag,
   Trash2,
   X,
 } from "lucide-react";
@@ -64,6 +65,7 @@ export function CollectionsPage({
   );
   const [selectedItem, setSelectedItem] = useState<CollectionItem | null>(null);
   const [newName, setNewName] = useState("");
+  const [newIsStore, setNewIsStore] = useState(false);
   const [activeName, setActiveName] = useState("");
   const [typeFilter, setTypeFilter] = useState(() => localStorage.getItem("cp_typeFilter") ?? "");
   const [rarityFilter, setRarityFilter] = useState(() => localStorage.getItem("cp_rarityFilter") ?? "");
@@ -165,6 +167,7 @@ export function CollectionsPage({
 
   function showCreate() {
     setNewName("");
+    setNewIsStore(false);
     setActiveFolder(null);
     setSelectedItemIds(new Set());
     resetPicker();
@@ -225,7 +228,7 @@ export function CollectionsPage({
         onSession,
         onUnauthorized,
         async (token) => {
-          const created = await api.createCollectionFolder(token, name);
+          const created = await api.createCollectionFolder(token, name, newIsStore);
           if (selectedItemIds.size === 0) return created;
           return api.updateCollectionFolder(token, created.id, {
             name,
@@ -332,9 +335,9 @@ export function CollectionsPage({
       setActiveName(detail.name);
       await refreshFolders();
       if (detail.isStore) await refreshOffers(detail.id);
-      setMessage(isStore ? "Modo loja ativado." : "Modo loja desativado.");
+      setMessage(isStore ? "Objetivo alterado para vender." : "Objetivo alterado para visualizar.");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao atualizar modo loja");
+      setError(err instanceof Error ? err.message : "Falha ao atualizar objetivo");
     }
   }
 
@@ -744,8 +747,11 @@ export function CollectionsPage({
           pickerItems={pickerItems}
           pickerPage={pickerPage}
           selectedItemIds={selectedItemIds}
+          selectedItems={selectedItems}
+          isStore={newIsStore}
           onBack={backToList}
           onNameChange={setNewName}
+          onIsStoreChange={setNewIsStore}
           onQueryChange={setPickerQuery}
           onPickerTypeFilter={setPickerTypeFilter}
           onPickerRarityFilter={setPickerRarityFilter}
@@ -1535,8 +1541,12 @@ function CollectionsListScreen({
                   onClick={() => onOpen(folder.id)}
                   className="group rounded-[26px] border border-line/80 bg-white/76 p-5 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/40 hover:shadow-soft"
                 >
-                  <span className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-lilac/20 to-aqua/20 text-violet-800">
-                    <Layers3 size={20} />
+                  <span className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br transition ${
+                    folder.isStore 
+                      ? "from-aqua/20 to-cyan/10 text-cyan-800" 
+                      : "from-lilac/20 to-aqua/20 text-violet-800"
+                  }`}>
+                    {folder.isStore ? <ShoppingBag size={20} /> : <Layers3 size={20} />}
                   </span>
                   <span className="mt-5 block truncate text-xl font-black text-ink">
                     {folder.name}
@@ -1544,16 +1554,28 @@ function CollectionsListScreen({
                   <span className="mt-1 block text-sm font-semibold text-slate-500">
                     {folder.itemCount} cartas - {formatBrl(folder.totalValue)}
                   </span>
-                  <span
-                    className={`mt-4 inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
-                      folder.isPublic
-                        ? "border-leaf/25 bg-leaf/10 text-emerald-800"
-                        : "border-line/70 bg-white/70 text-slate-500"
-                    }`}
-                  >
-                    {folder.isPublic ? <Eye size={14} /> : <Lock size={14} />}
-                    {folder.isPublic ? "Publica" : "Privada"}
-                  </span>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
+                        folder.isStore
+                          ? "border-aqua/25 bg-aqua/10 text-cyan-800"
+                          : "border-brand/25 bg-brand/10 text-violet-800"
+                      }`}
+                    >
+                      {folder.isStore ? <ShoppingBag size={14} /> : <Layers3 size={14} />}
+                      {folder.isStore ? "Vender" : "Visualizar"}
+                    </span>
+                    <span
+                      className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
+                        folder.isPublic
+                          ? "border-leaf/25 bg-leaf/10 text-emerald-800"
+                          : "border-line/70 bg-white/70 text-slate-500"
+                      }`}
+                    >
+                      {folder.isPublic ? <Eye size={14} /> : <Lock size={14} />}
+                      {folder.isPublic ? "Publica" : "Privada"}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
@@ -1594,8 +1616,11 @@ function CollectionCreateScreen({
   pickerItems,
   pickerPage,
   selectedItemIds,
+  selectedItems,
+  isStore,
   onBack,
   onNameChange,
+  onIsStoreChange,
   onQueryChange,
   onPickerTypeFilter,
   onPickerRarityFilter,
@@ -1624,8 +1649,11 @@ function CollectionCreateScreen({
   pickerItems: CollectionItem[];
   pickerPage: number;
   selectedItemIds: Set<string>;
+  selectedItems: CollectionItem[];
+  isStore: boolean;
   onBack: () => void;
   onNameChange: (value: string) => void;
+  onIsStoreChange: (value: boolean) => void;
   onQueryChange: (value: string) => void;
   onPickerTypeFilter: (value: string) => void;
   onPickerRarityFilter: (value: string) => void;
@@ -1644,9 +1672,12 @@ function CollectionCreateScreen({
       <Panel>
         <form onSubmit={onSubmit} className="grid gap-5">
           <ScreenHeader
-            eyebrow="Nova colecao"
-            title="Criar colecao"
-            description="Defina um nome, busque cartas do inventario e salve a nova pasta."
+            eyebrow={isStore ? "Nova Venda" : "Nova Pasta"}
+            title={isStore ? "Criar para vender" : "Criar para visualizar"}
+            description={isStore 
+              ? "Defina um nome, escolha as cartas que deseja vender e comece a receber propostas."
+              : "Defina um nome, organize suas cartas e compartilhe sua coleção."
+            }
             onBack={onBack}
             action={
               <Button
@@ -1660,10 +1691,10 @@ function CollectionCreateScreen({
             }
           />
 
-          <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_260px] lg:items-end">
+          <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm lg:grid-cols-[1fr_auto_260px] lg:items-end">
             <label className="grid gap-2">
               <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                Nome da colecao
+                Nome da pasta
               </span>
               <input
                 className="premium-input"
@@ -1672,12 +1703,43 @@ function CollectionCreateScreen({
                 placeholder="Ex: Binder principal"
               />
             </label>
-            <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
+            <div className="grid gap-2">
+              <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                Objetivo
+              </span>
+              <div className="flex h-[46px] items-center gap-2 rounded-2xl border border-line bg-white px-2">
+                <button
+                  type="button"
+                  onClick={() => onIsStoreChange(false)}
+                  className={`flex h-8 items-center gap-2 rounded-xl px-3 text-xs font-black transition ${
+                    !isStore
+                      ? "bg-brand text-white shadow-sm"
+                      : "text-slate-500 hover:bg-field"
+                  }`}
+                >
+                  <Eye size={14} />
+                  Visualizar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onIsStoreChange(true)}
+                  className={`flex h-8 items-center gap-2 rounded-xl px-3 text-xs font-black transition ${
+                    isStore
+                      ? "bg-aqua text-white shadow-sm"
+                      : "text-slate-500 hover:bg-field"
+                  }`}
+                >
+                  <ShoppingBag size={14} />
+                  Vender
+                </button>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900 text-center">
               {selectedCount} cartas - {formatBrl(selectedTotalValue)}
             </div>
             </div>
 
-            <div className="mt-4 flex justify-center">
+            <div className="mt-4 flex flex-col items-center gap-8">
               <Button
                 type="button"
                 variant="primary"
@@ -1687,6 +1749,39 @@ function CollectionCreateScreen({
               >
                 Selecionar cartas
               </Button>
+
+              <div className="w-full">
+                <div className="mb-4 flex items-center justify-between border-b border-line/50 pb-2">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
+                    Preview da seleção
+                  </h3>
+                  <span className="text-[10px] font-bold text-slate-400">
+                    {selectedItems.length} selecionadas
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
+                  {selectedItems.length > 0 ? (
+                    selectedItems.map((item) => (
+                      <CollectionItemCard
+                        key={item.id}
+                        item={item}
+                        price={item.price ?? undefined}
+                        onOpen={onOpenCard}
+                        onRemove={(it) => onToggleItem(it.id)}
+                        removeLabel="Desmarcar"
+                      />
+                    ))
+                  ) : (
+                    Array.from({ length: 7 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="aspect-[5/7] animate-pulse rounded-[24px] border border-dashed border-line/60 bg-white/20"
+                      />
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
             </form>
             </Panel>
@@ -1977,13 +2072,13 @@ function CollectionDetailScreen({
           <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 className="font-black text-ink">Modo loja</h3>
+                <h3 className="font-black text-ink">Objetivo da pasta</h3>
                 <p className="section-copy mt-1">
-                  Ative para permitir precos manuais, lances e propostas de carrinho nesta colecao.
+                  Mude para permitir preços manuais, lances e propostas se desejar vender as cartas.
                 </p>
               </div>
               <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700">
-                <span>Vitrine</span>
+                <span>Visualizar</span>
                 <input
                   type="checkbox"
                   className="peer sr-only"
@@ -1991,7 +2086,7 @@ function CollectionDetailScreen({
                   onChange={(event) => onToggleStore(event.target.checked)}
                 />
                 <span className="relative h-7 w-12 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition peer-checked:bg-aqua peer-checked:after:translate-x-5" />
-                <span>Loja</span>
+                <span>Vender</span>
               </label>
             </div>
 

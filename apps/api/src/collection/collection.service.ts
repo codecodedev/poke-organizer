@@ -161,7 +161,7 @@ export class CollectionService {
     }
 
     const folder = await this.prisma.collectionFolder.create({
-      data: { userId, name },
+      data: { userId, name, isStore: dto.isStore ?? false },
       include: {
         items: { include: folderItemInclude },
       },
