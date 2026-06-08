@@ -76,7 +76,7 @@ export function Sidebar({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-full flex-col border-r border-white/5 bg-white/5 backdrop-blur-2xl transition-all duration-300 ease-in-out dark:border-white/5 dark:bg-black/20 ${
+        className={`fixed left-0 top-0 z-50 flex h-full flex-col border-r border-white/5 bg-white/70 backdrop-blur-2xl transition-all duration-300 ease-in-out dark:border-white/5 dark:bg-black/20 ${
           isOpen 
             ? "w-[280px] translate-x-0" 
             : "w-[280px] -translate-x-full md:w-20 md:translate-x-0"
@@ -136,12 +136,12 @@ export function Sidebar({
                 onClick={() => onNavigate(item.id)}
                 className={`group flex w-full items-center gap-3 rounded-2xl px-3 py-3 font-bold transition-all duration-200 ${
                   activeView === item.id
-                    ? "bg-gradient-to-r from-cyan/20 to-magenta/20 text-white shadow-[0_0_20px_rgba(0,242,255,0.15)] border border-cyan/30 sidebar-active-item"
-                    : "text-slate-400 hover:bg-white/5 hover:text-white"
+                    ? "bg-gradient-to-r from-cyan/90 to-magenta/90 text-white shadow-[0_0_20px_rgba(0,242,255,0.15)] sidebar-active-item"
+                    : "text-slate-400 hover:bg-white/10 hover:text-white"
                 }`}
                 title={!isOpen ? item.label : undefined}
               >
-                <span className={`shrink-0 ${activeView === item.id ? 'text-cyan' : ''}`}>{item.icon}</span>
+                <span className={`shrink-0 ${activeView === item.id ? 'text-black dark:text-white' : ''}`}>{item.icon}</span>
                 <span
                   className={`truncate transition-opacity duration-200 ${
                     isOpen ? "opacity-100" : "opacity-0 md:hidden"
@@ -163,9 +163,9 @@ export function Sidebar({
         </nav>
 
         {/* Footer Actions */}
-        <div className="space-y-4 p-4">
+        <div className="space-y-4 p-4 ">
           {session && (
-            <div className={`flex items-center gap-3 ${!isOpen && 'md:justify-center'}`}>
+            <div className={`flex items-center gap-3 ${!isOpen && 'md:justify-center'} `}>
                <NotificationBell
                  session={session}
                  onSession={onSession}

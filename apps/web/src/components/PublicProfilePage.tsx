@@ -143,13 +143,13 @@ function TabButton({ active, onClick, label, count, icon }: { active: boolean, o
       onClick={onClick}
       className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition-all whitespace-nowrap ${
         active 
-          ? "bg-ink text-white shadow-lg dark:bg-white dark:text-ink" 
+          ? "bg-ink dark:bg-slate-300 text-white dark:text-ink shadow-lg" 
           : "bg-white text-slate-500 hover:bg-field border border-line dark:bg-black/20 dark:text-slate-400 dark:border-white/10"
       }`}
     >
       {icon}
       {label}
-      <span className={`ml-1 rounded-lg px-1.5 py-0.5 text-[10px] ${active ? "bg-white/20 dark:bg-black/20" : "bg-slate-100 dark:bg-white/10"}`}>
+      <span className={`ml-1 rounded-lg px-1.5 py-0.5 text-[10px] ${active ? "bg-white/90 dark:bg-black/20 text-black dark:text-white " : "bg-slate-400 dark:bg-white/10"}`}>
         {count}
       </span>
     </button>

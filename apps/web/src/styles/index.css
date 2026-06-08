@@ -128,8 +128,9 @@ body {
 
 :root[data-theme="light"] .sidebar-active-item,
 :root[data-theme="light"] [class*="from-cyan/20"] {
-  background: linear-gradient(90deg, rgba(0, 242, 255, 0.1), rgba(255, 87, 144, 0.1)) !important;
+  background: linear-gradient(90deg, rgba(0, 242, 255, 0.336), rgba(255, 87, 143, 0.336)) !important;
   color: #ef5d75 !important;
+  
 }
 
 :root[data-theme="light"] .text-cyan {
