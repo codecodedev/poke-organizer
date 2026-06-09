@@ -1466,7 +1466,7 @@ export class CollectionService {
       }),
     );
 
-    const validImages = images.filter((img): img is Buffer => img !== null);
+    const validImages = images.filter((img) => img !== null) as Buffer[];
     if (validImages.length === 0) return fallbackLogo();
 
     const composites: sharp.OverlayOptions[] = [];
@@ -1478,7 +1478,7 @@ export class CollectionService {
     const startY = (height - cardHeight) / 2;
 
     for (let i = 0; i < validImages.length; i++) {
-      const cardBuffer = await sharp(validImages[i])
+      const cardBuffer = await sharp(validImages[i] as Buffer)
         .rotate()
         .resize(cardWidth, cardHeight, { fit: "cover", position: "center" })
         .jpeg({ quality: 90 })
@@ -1530,46 +1530,46 @@ export class CollectionService {
       "Confira minha coleção de cartas Pokémon no Coleciona Card!",
     );
 
-    return \`
+    return `
   <!DOCTYPE html>
   <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <title>\${title}</title>
+    <title>${title}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="\${redirectUrl}" />
+    <meta property="og:url" content="${redirectUrl}" />
     <meta property="og:site_name" content="Coleciona Card" />
-    <meta property="og:title" content="\${title}" />
-    <meta property="og:description" content="\${description}" />
-    <meta property="og:image" content="\${imageUrl}" />
-    <meta property="og:image:secure_url" content="\${imageUrl}" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:image" content="${imageUrl}" />
+    <meta property="og:image:secure_url" content="${imageUrl}" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="\${redirectUrl}" />
-    <meta name="twitter:title" content="\${title}" />
-    <meta name="twitter:description" content="\${description}" />
-    <meta name="twitter:image" content="\${imageUrl}" />
+    <meta name="twitter:url" content="${redirectUrl}" />
+    <meta name="twitter:title" content="${title}" />
+    <meta name="twitter:description" content="${description}" />
+    <meta name="twitter:image" content="${imageUrl}" />
 
-    <meta http-equiv="refresh" content="1;url=\${redirectUrl}" />
+    <meta http-equiv="refresh" content="1;url=${redirectUrl}" />
   </head>
   <body style="background:#111827;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
     <div style="text-align:center;">
       <p>Redirecionando para a coleção...</p>
-      <a href="\${redirectUrl}" style="color:#3b82f6;">Abrir coleção</a>
+      <a href="${redirectUrl}" style="color:#3b82f6;">Abrir coleção</a>
     </div>
 
     <script>
       setTimeout(function () {
-        window.location.href = "\${redirectUrl}";
+        window.location.href = "${redirectUrl}";
       }, 800);
     </script>
   </body>
-  </html>\`;
+  </html>`;
   }
 
   private escapeHtml(value: string): string {
