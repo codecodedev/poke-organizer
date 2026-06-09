@@ -979,6 +979,7 @@ export class CollectionService {
     if (!folder) {
       throw new NotFoundException("Collection not found");
     }
+    return folder;
   }
 
   private async assertFolderItem(folderId: string, folderItemId: string) {

@@ -50,7 +50,7 @@ export class LocalStorageService implements StorageService {
 
       const filePath = join(process.cwd(), 'public', 'banners', filename);
       await fs.unlink(filePath);
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Falha ao excluir arquivo local: ${error.message}`);
     }
   }
@@ -114,7 +114,7 @@ export class SupabaseStorageService implements StorageService {
       if (error) {
         this.logger.error(`Falha ao excluir arquivo do Supabase: ${error.message}`);
       }
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Erro ao processar exclusão no Supabase: ${error.message}`);
     }
   }
