@@ -156,7 +156,7 @@ export function App() {
 
   return (
     <>
-      {/* <RequestFeedback /> */}
+      <RequestFeedback />
       <div className="flex min-h-screen transition-all duration-300">
         {session && (
           <Sidebar

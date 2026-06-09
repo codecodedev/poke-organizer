@@ -138,6 +138,7 @@ export type CollectionFolderSummary = {
   isPublic: boolean;
   isStore: boolean;
   shareToken?: string | null;
+  bannerUrl?: string | null;
   viewCount: number;
   itemCount: number;
   totalValue: number;

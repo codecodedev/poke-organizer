@@ -60,7 +60,8 @@ export class HttpError extends Error {
 type ApiFeedbackListener = (event: ApiFeedbackEvent) => void;
 type ApiFeedbackEvent =
   | { type: "pending"; pending: number }
-  | { type: "error"; id: number; message: string };
+  | { type: "error"; id: number; message: string }
+  | { type: "success"; id: number; message: string };
 
 let pendingRequests = 0;
 let feedbackEventId = 0;
@@ -77,6 +78,10 @@ export const apiFeedback = {
   getPendingCount() {
     return pendingRequests;
   },
+  success(message: string) {
+    const id = ++feedbackEventId;
+    feedbackListeners.forEach((listener) => listener({ type: "success", id, message }));
+  },
 };
 
 type RequestOptions = RequestInit & {
@@ -92,13 +97,24 @@ async function request<T>(
   startRequest();
 
   try {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    };
+
+    if (options.headers) {
+      Object.entries(options.headers).forEach(([key, value]) => {
+        if (value === undefined) {
+          delete headers[key];
+        } else {
+          headers[key] = value as string;
+        }
+      });
+    }
+
     const response = await fetch(`${API_URL}${path}`, {
       ...fetchOptions,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...fetchOptions.headers,
-      },
+      headers,
     });
 
     if (!response.ok) {
@@ -332,7 +348,7 @@ export const api = {
   updateCollectionFolderSharing(
     token: string,
     id: string,
-    payload: { isPublic?: boolean; ensureToken?: boolean },
+    payload: { isPublic?: boolean; ensureToken?: boolean; bannerUrl?: string },
   ) {
     return request<CollectionFolderDetail>(
       `/collection/folders/${encodeURIComponent(id)}/sharing`,
@@ -340,6 +356,23 @@ export const api = {
         method: "PATCH",
         token,
         body: JSON.stringify(payload),
+      },
+    );
+  },
+  uploadCollectionBanner(token: string, id: string, file: File) {
+    const formData = new FormData();
+    formData.append("file", file);
+
+    return request<CollectionFolderDetail>(
+      `/collection/folders/${encodeURIComponent(id)}/banner`,
+      {
+        method: "POST",
+        token,
+        headers: {
+          // Fastify-multipart handles boundary automatically if we don't set Content-Type manually
+          "Content-Type": undefined as any,
+        },
+        body: formData as any,
       },
     );
   },

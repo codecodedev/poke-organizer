@@ -63,7 +63,20 @@ export class EmailService {
   }
 
   private getBaseUrl() {
-    return this.config.get("FRONT_URL") || "http://localhost:5173";
+    const frontUrl = this.config.get<string>("FRONT_URL");
+    const webOrigin = this.config.get<string>("WEB_ORIGIN");
+    
+    const rawUrl = frontUrl || webOrigin || "http://localhost:5173";
+    
+    // Se for uma lista (comum em WEB_ORIGIN para CORS), pega o primeiro
+    const firstUrl = rawUrl.split(",")[0].trim();
+    
+    // Proteção contra a string literal "undefined" que pode vir de envs mal configurados
+    if (firstUrl === "undefined" || !firstUrl) {
+      return "http://localhost:5173";
+    }
+    
+    return firstUrl;
   }
 
   async sendWelcomeEmail(email: string, name: string, token: string) {

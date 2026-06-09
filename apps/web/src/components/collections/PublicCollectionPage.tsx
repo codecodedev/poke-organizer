@@ -329,17 +329,40 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
 
         {!loading && collection && (
           <>
+            {collection.bannerUrl && (
+              <div className="overflow-hidden rounded-[32px] border border-line/80 bg-white/70 shadow-sm">
+                <div className="relative aspect-[21/9] w-full overflow-hidden bg-slate-900 sm:aspect-[4/1]">
+                  <img 
+                    src={collection.bannerUrl} 
+                    alt="Banner da Coleção" 
+                    className="h-full w-full object-cover opacity-90 transition-opacity hover:opacity-100" 
+                    onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
+                  <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between gap-4">
+                     <div>
+                       <h1 className="text-2xl font-black text-white drop-shadow-md sm:text-4xl">{collection.name}</h1>
+                       <p className="mt-1 text-sm font-bold text-slate-200 drop-shadow-sm">Por {collection.ownerName} - {unsoldItems.length} cartas - {formatBrl(totalValue)}</p>
+                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <Panel>
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
                     {collection.isStore ? "Pasta para vender" : "Pasta para visualizar"}
                   </p>
-                  <h2 className="section-title truncate">{collection.name}</h2>
-                  <p className="section-copy mt-1">
-                    Por {collection.ownerName} - {unsoldItems.length} cartas -{" "}
-                    {formatBrl(totalValue)}
-                  </p>
+                  {!collection.bannerUrl && <h2 className="section-title truncate">{collection.name}</h2>}
+                  {!collection.bannerUrl && (
+                    <p className="section-copy mt-1">
+                      Por {collection.ownerName} - {unsoldItems.length} cartas -{" "}
+                      {formatBrl(totalValue)}
+                    </p>
+                  )}
+                  {collection.bannerUrl && <h2 className="section-title truncate">Informações</h2>}
                 </div>
                 <div className="flex flex-wrap items-center gap-3">
                   {myProposals.length > 0 && (

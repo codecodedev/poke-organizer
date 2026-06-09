@@ -1,9 +1,12 @@
 import "reflect-metadata";
+import { join } from "node:path";
 import { ValidationPipe } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { NestFactory } from "@nestjs/core";
 import { FastifyAdapter, NestFastifyApplication } from "@nestjs/platform-fastify";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
+import multipart from "@fastify/multipart";
+import fastifyStatic from "@fastify/static";
 import { AppModule } from "./app.module";
 
 async function bootstrap() {
@@ -11,6 +14,18 @@ async function bootstrap() {
     AppModule,
     new FastifyAdapter({ trustProxy: true }),
   );
+
+  await app.register(multipart as any, {
+    limits: {
+      fileSize: 5 * 1024 * 1024 // 5MB
+    }
+  });
+
+  await app.register(fastifyStatic as any, {
+    root: join(__dirname, "..", "public"),
+    prefix: "/public/",
+  });
+
   const config = app.get(ConfigService);
   const webOrigins = (config.get<string>("WEB_ORIGIN") ?? "http://localhost:5173")
     .split(",")

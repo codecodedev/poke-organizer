@@ -4,7 +4,12 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { randomBytes } from "node:crypto";
+import { createWriteStream } from "node:fs";
+import { join } from "node:path";
+import { pipeline } from "node:stream/promises";
+import sharp from "sharp";
 import {
   CollectionAddResult,
   CollectionCartOffer,
@@ -91,6 +96,7 @@ export class CollectionService {
     private readonly catalog: CatalogService,
     private readonly auth: AuthService,
     private readonly emailService: EmailService,
+    private readonly config: ConfigService,
   ) {}
 
   async clearCollection(userId: string, dto: ClearCollectionDto) {
@@ -279,6 +285,7 @@ export class CollectionService {
       where: { id },
       data: {
         isPublic: dto.isPublic,
+        bannerUrl: dto.bannerUrl === undefined ? undefined : dto.bannerUrl,
         shareToken:
           shouldEnsureToken && !folder.shareToken
             ? await this.createShareToken()
@@ -299,10 +306,35 @@ export class CollectionService {
       where: { id },
       data: { isStore: dto.isStore },
     });
+
     return this.getFolder(userId, id);
   }
 
-  async updateFolderItemSale(
+  async uploadBanner(
+    userId: string,
+    id: string,
+    file: any, // MultipartFile
+  ): Promise<CollectionFolderDetail> {
+    await this.assertOwnsFolder(userId, id);
+
+    const ext = file.filename.split(".").pop();
+    const fileName = `${id}_${randomBytes(4).toString("hex")}.${ext}`;
+    const filePath = join(process.cwd(), "public", "banners", fileName);
+
+    await pipeline(file.file, createWriteStream(filePath));
+
+    const baseUrl = this.config.get<string>("API_BASE_URL") ?? "http://localhost:3333";
+    const bannerUrl = `${baseUrl}/public/banners/${fileName}`;
+
+    await this.prisma.collectionFolder.update({
+      where: { id },
+      data: { bannerUrl },
+    });
+
+    return this.getFolder(userId, id);
+  }
+
+    async updateFolderItemSale(
     userId: string,
     folderId: string,
     folderItemId: string,
@@ -1138,6 +1170,7 @@ export class CollectionService {
       isPublic: folder.isPublic,
       isStore: folder.isStore,
       shareToken: folder.shareToken,
+      bannerUrl: folder.bannerUrl,
       viewCount: folder.viewCount,
       itemCount: folder.items.length,
       totalValue,
@@ -1163,6 +1196,7 @@ export class CollectionService {
       isPublic: folder.isPublic,
       isStore: folder.isStore,
       shareToken: folder.shareToken,
+      bannerUrl: folder.bannerUrl,
       viewCount: folder.viewCount,
       itemCount: folder.items.length,
       totalValue,
@@ -1280,6 +1314,153 @@ export class CollectionService {
     }
 
     throw new BadRequestException("Unable to create share link");
+  }
+
+  async getPreviewImage(shareToken: string): Promise<Buffer> {
+    const folder = await this.prisma.collectionFolder.findUnique({
+      where: { shareToken },
+      include: {
+        items: {
+          take: 4,
+          include: { collectionItem: { include: { card: true } } },
+        },
+      },
+    });
+
+    if (!folder) throw new NotFoundException("Coleção não encontrada");
+
+    // Default image size for OG: 1200x630
+    const width = 1200;
+    const height = 630;
+
+    if (folder.bannerUrl && !folder.bannerUrl.includes("preview-image")) {
+      try {
+        const response = await fetch(folder.bannerUrl);
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          // Resize/Format if needed to ensure OG compatibility
+          return sharp(Buffer.from(arrayBuffer)).resize(width, height, { fit: "cover" }).png().toBuffer();
+        }
+      } catch (e) {
+        console.error("Failed to fetch banner", e);
+      }
+    }
+
+    const cardImages = folder.items
+      .map((item) => item.collectionItem.card.imageSmall)
+      .filter(Boolean) as string[];
+
+    if (cardImages.length === 0) {
+      return sharp({
+        create: {
+          width,
+          height,
+          channels: 4,
+          background: { r: 31, g: 41, b: 55, alpha: 1 }, // slate-800
+        },
+      })
+        .png()
+        .toBuffer();
+    }
+
+    const images = await Promise.all(
+      cardImages.map(async (url) => {
+        try {
+          const res = await fetch(url);
+          if (!res.ok) return null;
+          return Buffer.from(await res.arrayBuffer());
+        } catch {
+          return null;
+        }
+      }),
+    );
+
+    const validImages = images.filter((img): img is NonNullable<typeof img> => img !== null);
+
+    const canvas = sharp({
+      create: {
+        width,
+        height,
+        channels: 4,
+        background: { r: 17, g: 24, b: 39, alpha: 1 }, // slate-900
+      },
+    });
+
+    const composites: sharp.OverlayOptions[] = [];
+
+    // Simple grid logic
+    const cardWidth = 240;
+    const cardHeight = 335;
+    const gap = 40;
+    const totalWidth = validImages.length * cardWidth + (validImages.length - 1) * gap;
+    const startX = Math.max(gap, (width - totalWidth) / 2);
+    const startY = (height - cardHeight) / 2;
+
+    for (let i = 0; i < validImages.length; i++) {
+      composites.push({
+        input: await sharp(validImages[i]).resize(cardWidth, cardHeight).toBuffer(),
+        top: Math.round(startY),
+        left: Math.round(startX + i * (cardWidth + gap)),
+      });
+    }
+
+    return canvas.composite(composites).png().toBuffer();
+  }
+
+  async getShareHtml(shareToken: string): Promise<string> {
+    const folder = await this.prisma.collectionFolder.findUnique({
+      where: { shareToken },
+      include: { user: true },
+    });
+
+    if (!folder) throw new NotFoundException();
+
+    const baseUrl = this.config.get<string>("API_BASE_URL");
+    const frontUrl = this.config.get<string>("FRONT_URL");
+
+    const imageUrl =
+      folder.bannerUrl && !folder.bannerUrl.includes("preview-image")
+        ? folder.bannerUrl
+        : `${baseUrl}/public/collections/${shareToken}/preview-image`;
+    const redirectUrl = `${frontUrl}/public/collections/${shareToken}`;
+    const title = `${folder.name} - Coleção de ${folder.user.name?.trim() || "um colecionador"}`;
+    const description = `Confira minha coleção de cartas Pokémon no Coleciona Card!`;
+
+    return `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>${title}</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="${redirectUrl}">
+    <meta property="og:title" content="${title}">
+    <meta property="og:description" content="${description}">
+    <meta property="og:image" content="${imageUrl}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="${redirectUrl}">
+    <meta property="twitter:title" content="${title}">
+    <meta property="twitter:description" content="${description}">
+    <meta property="twitter:image" content="${imageUrl}">
+
+    <meta http-equiv="refresh" content="0;url=${redirectUrl}">
+    <script>window.location.href = "${redirectUrl}";</script>
+</head>
+<body style="background: #111827; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+    <div style="text-align: center;">
+        <p>Redirecionando para a coleção...</p>
+        <p style="font-size: 0.8rem; color: #9ca3af;">Se não for redirecionado, <a href="${redirectUrl}" style="color: #3b82f6;">clique aqui</a>.</p>
+    </div>
+</body>
+</html>
+    `;
   }
 }
 

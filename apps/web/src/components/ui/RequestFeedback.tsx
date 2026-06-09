@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
-import { AlertCircle, LoaderCircle, X } from "lucide-react";
+import { AlertCircle, CheckCircle, LoaderCircle, X } from "lucide-react";
 import { apiFeedback } from "../../lib/api";
 
 type Toast = {
   id: number;
+  type: "error" | "success";
   message: string;
 };
 
@@ -24,7 +25,7 @@ export function RequestFeedback() {
 
       setToasts((current) => [
         ...current.filter((toast) => toast.message !== event.message).slice(-2),
-        { id: event.id, message: event.message },
+        { id: event.id, type: event.type, message: event.message },
       ]);
     });
   }, []);
@@ -73,21 +74,26 @@ export function RequestFeedback() {
       )}
 
       <div className="fixed right-4 top-4 z-[90] grid w-[min(420px,calc(100vw-32px))] gap-3">
-
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className="flex items-start gap-3 rounded-2xl border border-red-200 bg-white/95 p-4 text-sm font-semibold text-slate-700 shadow-card backdrop-blur"
+            className={`flex items-start gap-3 rounded-2xl border bg-white/95 p-4 text-sm font-semibold shadow-card backdrop-blur ${
+              toast.type === "error" ? "border-red-200 text-slate-700" : "border-emerald-200 text-emerald-900"
+            }`}
             role="status"
           >
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-red-50 text-red-600">
-              <AlertCircle size={18} />
+            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
+              toast.type === "error" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
+            }`}>
+              {toast.type === "error" ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
             </span>
-            <p className="min-w-0 flex-1 leading-6">{toast.message}</p>
+            <p className="min-w-0 flex-1 leading-6 pt-1.5">{toast.message}</p>
             <button
               type="button"
               onClick={() => closeToast(toast.id)}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-line bg-white text-slate-500 transition hover:border-red-200 hover:text-red-600"
+              className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border bg-white transition ${
+                toast.type === "error" ? "border-line text-slate-500 hover:border-red-200 hover:text-red-600" : "border-emerald-100 text-emerald-600 hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50"
+              }`}
               aria-label="Fechar aviso"
             >
               <X size={16} />

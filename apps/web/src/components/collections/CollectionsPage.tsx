@@ -1,6 +1,7 @@
 import { FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
+  Check,
   Copy,
   Eye,
   Filter,
@@ -8,12 +9,14 @@ import {
   Gavel,
   Layers3,
   Lock,
+  Pencil,
   Plus,
   Save,
   Search,
   Share2,
   ShoppingBag,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import type {
@@ -24,7 +27,7 @@ import type {
   CollectionItem,
 } from "@poke-organizer/shared";
 import { formatCardVariant } from "@poke-organizer/shared";
-import { api, type Session } from "../../lib/api";
+import { api, apiFeedback, type Session } from "../../lib/api";
 import { withAuthRetry } from "../../lib/authRetry";
 import { formatBrl } from "../../lib/format";
 import { Button } from "../ui/Button";
@@ -34,6 +37,7 @@ import { CardDetailModal, type UpdateCardDetails } from "../CardDetailModal";
 import { PaginationControls } from "../ui/PaginationControls";
 import { Modal } from "../ui/Modal";
 import { ConfirmationModal } from "../ui/ConfirmationModal";
+import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { FilterField, FilterGroup } from "../ui/Filters";
 
 type Props = {
@@ -96,6 +100,9 @@ export function CollectionsPage({
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [undoingItem, setUndoingItem] = useState<CollectionItem | null>(null);
   const [permissions, setPermissions] = useState<Array<{ id: string; user: { email: string; name: string | null } }>>([]);
+  const [bannerUploading, setBannerUploading] = useState(false);
+  const [pendingBannerFile, setPendingBannerFile] = useState<File | null>(null);
+  const [pendingBannerRemoval, setPendingBannerRemoval] = useState(false);
 
   useEffect(() => {
     localStorage.setItem("cp_typeFilter", typeFilter);
@@ -142,6 +149,8 @@ export function CollectionsPage({
       );
       setActiveFolder(detail);
       setActiveName(detail.name);
+      setPendingBannerFile(null);
+      setPendingBannerRemoval(false);
       setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
       if (detail.isStore) {
         await refreshOffers(detail.id);
@@ -285,8 +294,11 @@ export function CollectionsPage({
     if (!activeFolder) return;
     setError(null);
     setMessage(null);
+    setBannerUploading(true);
     try {
-      const detail = await withAuthRetry(
+      let detail = activeFolder;
+      
+      detail = await withAuthRetry(
         session,
         onSession,
         onUnauthorized,
@@ -296,13 +308,28 @@ export function CollectionsPage({
             itemIds: Array.from(selectedItemIds),
           }),
       );
+
+      if (pendingBannerRemoval) {
+        detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+          api.updateCollectionFolderSharing(token, activeFolder.id, { bannerUrl: null })
+        );
+      } else if (pendingBannerFile) {
+        detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+          api.uploadCollectionBanner(token, activeFolder.id, pendingBannerFile)
+        );
+      }
+
       setActiveFolder(detail);
       setActiveName(detail.name);
       setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
+      setPendingBannerFile(null);
+      setPendingBannerRemoval(false);
       await refreshFolders();
-      setMessage("Colecao salva.");
+      apiFeedback.success("Coleção salva com sucesso.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao salvar colecao");
+    } finally {
+      setBannerUploading(false);
     }
   }
 
@@ -323,7 +350,7 @@ export function CollectionsPage({
     }
   }
 
-  async function updateFolderSharing(isPublic: boolean) {
+  async function updateFolderSharing(payload: { isPublic?: boolean; bannerUrl?: string }) {
     if (!activeFolder) return;
     setError(null);
     setMessage(null);
@@ -334,15 +361,15 @@ export function CollectionsPage({
         onUnauthorized,
         (token) =>
           api.updateCollectionFolderSharing(token, activeFolder.id, {
-            isPublic,
-            ensureToken: isPublic,
+            ...payload,
+            ensureToken: payload.isPublic ?? activeFolder.isPublic,
           }),
       );
       setActiveFolder(detail);
       setActiveName(detail.name);
       setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
       await refreshFolders();
-      setMessage(isPublic ? "Colecao publica." : "Colecao privada.");
+      setMessage("Compartilhamento atualizado.");
     } catch (err) {
       setError(
         err instanceof Error
@@ -777,6 +804,11 @@ export function CollectionsPage({
       {screen === "detail" && activeFolder && (
         <CollectionDetailScreen
           activeName={activeName}
+          hasChanges={
+            activeName !== activeFolder.name ||
+            pendingBannerFile !== null ||
+            (pendingBannerRemoval && activeFolder.bannerUrl !== null)
+          }
           selectedItems={selectedItems}
           unsoldCount={unsoldCount}
           visibleItems={visibleItems}
@@ -812,11 +844,15 @@ export function CollectionsPage({
               ? publicCollectionUrl(activeFolder.shareToken)
               : null
           }
+          bannerUrl={pendingBannerRemoval ? null : (pendingBannerFile ? URL.createObjectURL(pendingBannerFile) : activeFolder.bannerUrl ?? null)}
           onBack={backToList}
           onNameChange={setActiveName}
           onSave={() => void saveFolder()}
           onRemoveFolder={() => setShowFolderRemoveConfirm(true)}
-          onToggleSharing={(isPublic) => void updateFolderSharing(isPublic)}
+          onToggleSharing={(payload) => void updateFolderSharing(payload)}
+          onRemoveBanner={() => { setPendingBannerRemoval(true); setPendingBannerFile(null); }}
+          onUploadBanner={(file) => { setPendingBannerFile(file); setPendingBannerRemoval(false); }}
+          bannerUploading={bannerUploading}
           onToggleStore={(isStore) => void updateFolderStore(isStore)}
           onUpdateSale={(folderItemId, payload) => void updateFolderItemSale(folderItemId, payload)}
           onUndoSale={setUndoingItem}
@@ -1583,22 +1619,22 @@ function CollectionCreateScreen({
                 </button>
               </div>
             </div>
-            <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900 text-center">
-              {selectedCount} cartas - {formatBrl(selectedTotalValue)}
-            </div>
+            <Button
+              type="button"
+              variant="primary"
+              className="px-8 w-full"
+              icon={<Plus size={20} />}
+              onClick={() => onTogglePickerModal(true)}
+            >
+              Selecionar cartas
+            </Button>
             </div>
 
             <div className="mt-4 flex flex-col items-center gap-8">
-              <Button
-                type="button"
-                variant="primary"
-                className="px-8 shadow-glow"
-                icon={<Plus size={20} />}
-                onClick={() => onTogglePickerModal(true)}
-              >
-                Selecionar cartas
-              </Button>
 
+            <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900 text-center">
+              {selectedCount} cartas - {formatBrl(selectedTotalValue)}
+            </div>
               <div className="w-full">
                 <div className="mb-4 flex items-center justify-between border-b border-line/50 pb-2">
                   <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
@@ -1661,6 +1697,7 @@ function CollectionCreateScreen({
             onPickerPageChange={onPickerPageChange}
             onToggleItem={onToggleItem}
             onOpenCard={onOpenCard}
+            onTogglePickerModal={onTogglePickerModal}
             />
             </Modal>
             )}
@@ -1670,6 +1707,7 @@ function CollectionCreateScreen({
 
 function CollectionDetailScreen({
   activeName,
+  hasChanges,
   selectedItems,
   unsoldCount,
   visibleItems,
@@ -1701,11 +1739,15 @@ function CollectionDetailScreen({
   isPublic,
   isStore,
   shareUrl,
+  bannerUrl,
   onBack,
   onNameChange,
   onSave,
   onRemoveFolder,
   onToggleSharing,
+  onRemoveBanner,
+  onUploadBanner,
+  bannerUploading,
   onToggleStore,
   onUpdateSale,
   onCopyShareLink,
@@ -1762,11 +1804,15 @@ function CollectionDetailScreen({
   isPublic: boolean;
   isStore: boolean;
   shareUrl: string | null;
+  bannerUrl: string | null;
   onBack: () => void;
   onNameChange: (value: string) => void;
   onSave: () => void;
   onRemoveFolder: () => void;
-  onToggleSharing: (isPublic: boolean) => void;
+  onToggleSharing: (payload: { isPublic?: boolean; bannerUrl?: string | null }) => void;
+  onRemoveBanner: () => void;
+  onUploadBanner: (file: File) => void;
+  bannerUploading: boolean;
   onToggleStore: (isStore: boolean) => void;
   onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null }) => void;
   onCopyShareLink: () => void;
@@ -1792,6 +1838,15 @@ function CollectionDetailScreen({
   onManagePermissions: () => void;
 }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    if (!shareUrl) return;
+    onCopyShareLink();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   const paginatedVisibleItems = useMemo(
     () =>
       visibleItems.slice(
@@ -1814,12 +1869,60 @@ function CollectionDetailScreen({
 
   return (
     <>
+        <div className="mb-6 overflow-hidden rounded-[32px] border border-line/80 bg-white/70 shadow-sm w-full">
+          <div className={`relative w-full overflow-hidden bg-slate-900 ${bannerUrl ? "aspect-[21/9] sm:aspect-[4/1]": "min-h-28"}`}>
+            {bannerUrl && (
+               <img 
+                src={bannerUrl} 
+                alt="Banner da Coleção" 
+                className="h-full w-full object-cover opacity-80 transition-opacity hover:opacity-100" 
+                onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')}
+              /> 
+            )}
+
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
+
+            <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between gap-4">
+               <div>
+                 <h1 className="text-2xl font-black text-white drop-shadow-md sm:text-4xl">{activeName}</h1>
+                 <p className="mt-1 text-sm font-bold text-slate-200 drop-shadow-sm">{unsoldCount} cartas - {formatBrl(selectedTotalValue)}</p>
+               </div>
+            </div>
+            
+            <label className="absolute flex flex-row items-center gap-1 right-8 bottom-6 cursor-pointer text-[10px] font-black text-white hover:text-brand-light hover:underline uppercase tracking-wider">
+              {bannerUploading ? "Enviando..." : (bannerUrl ? <>Alterar Banner<Pencil size={12} /></> : <>Adicionar Banner<Plus className="text-brand" size={16} /></>)} 
+              <input
+                type="file"
+                className="hidden"
+                accept="image/*"
+                disabled={bannerUploading}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (file) onUploadBanner(file);
+                  e.target.value = "";
+                }}
+              />
+            </label>
+            <div className="flex absolute right-6 top-6 items-center gap-3">
+              {bannerUrl && (
+                <button
+                  type="button"
+                  className="text-[10px] font-black text-red-500 hover:text-red-700 hover:underline uppercase tracking-wider"
+                  onClick={() => onRemoveBanner()}
+                >
+                  <Trash2 size={20} />
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
       <Panel>
         <div className="grid gap-5">
           <ScreenHeader
             eyebrow="Detalhes"
-            title={activeName || "Colecao"}
-            description={`${unsoldCount} cartas - ${formatBrl(selectedTotalValue)}`}
+            title={bannerUrl ? "Configurações" : (activeName || "Colecao")}
+            description={bannerUrl ? "Gerencie sua coleção e links" : `${unsoldCount} cartas - ${formatBrl(selectedTotalValue)}`}
             onBack={onBack}
             notification={pendingOffersCount > 0}
             action={
@@ -1827,8 +1930,10 @@ function CollectionDetailScreen({
                 <Button
                   type="button"
                   variant="primary"
+                  className={hasChanges ? "bg-brand text-white border-brand shadow-[0_0_15px_rgba(var(--brand-rgb),0.5)]" : "opacity-50 pointer-events-none"}
                   icon={<Save size={16} />}
                   onClick={onSave}
+                  disabled={!hasChanges}
                 >
                   Salvar alteracoes
                 </Button>
@@ -1843,10 +1948,12 @@ function CollectionDetailScreen({
             }
           />
 
-          <label className="grid gap-2 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm">
-            <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-              Nome da colecao
-            </span>
+          <label className="grid gap-2 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm relative">
+            <div className="flex items-center justify-between gap-4">
+              <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                Nome da colecao
+              </span>
+            </div>
             <input
               className="w-full rounded-none border-0 bg-transparent p-0 text-3xl font-black text-ink outline-none placeholder:text-slate-300"
               value={activeName}
@@ -1855,82 +1962,123 @@ function CollectionDetailScreen({
             />
           </label>
 
-          <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-3">
-                <span
-                  className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
-                    isPublic
-                      ? "border-leaf/25 bg-leaf/10 text-emerald-800"
-                      : "border-line/70 bg-white/70 text-slate-500"
-                  }`}
-                >
-                  {isPublic ? <Eye size={14} /> : <Lock size={14} />}
-                  {isPublic ? "Publica" : "Privada"}
-                </span>
-                <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700">
-                  <span>Privada</span>
-                  <input
-                    type="checkbox"
-                    className="peer sr-only"
-                    checked={isPublic}
-                    onChange={(event) => onToggleSharing(event.target.checked)}
-                  />
-                  <span className="relative h-7 w-12 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition peer-checked:bg-leaf peer-checked:after:translate-x-5" />
-                  <span>Publica</span>
-                </label>
-              </div>
-              <p className="mt-3 truncate text-sm font-semibold text-slate-500">
-                {shareUrl ?? "Nenhum link gerado"}
-              </p>
-            </div>
+          <CollapsibleSection 
+            title="Compartilhamento" 
+            defaultExpanded={false}
+            action={
+              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700" onClick={(e) => e.stopPropagation()}>
+                <span className="hidden sm:inline">Privada</span>
+                <input
+                  type="checkbox"
+                  className="peer sr-only"
+                  checked={isPublic}
+                  onChange={(event) => onToggleSharing({ isPublic: event.target.checked })}
+                />
+                <span className="relative h-7 w-12 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition peer-checked:bg-leaf peer-checked:after:translate-x-5" />
+                <span className="hidden sm:inline">Publica</span>
+              </label>
+            }
+          >
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span
+                    className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
+                      isPublic
+                        ? "border-leaf/25 bg-leaf/10 text-emerald-800"
+                        : "border-line/70 bg-white/70 text-slate-500"
+                    }`}
+                  >
+                    {isPublic ? <Eye size={14} /> : <Lock size={14} />}
+                    {isPublic ? "Publica" : "Privada"}
+                  </span>
+                </div>
 
-            <div className="flex gap-2">
-              {!isPublic && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  icon={<Plus size={16} />}
-                  onClick={onManagePermissions}
-                >
-                  Autorizar usuários
-                </Button>
-              )}
-              <Button
-                type="button"
-                icon={shareUrl ? <Copy size={16} /> : <Share2 size={16} />}
-                onClick={onCopyShareLink}
-              >
-                {shareUrl ? "Copiar link" : "Gerar link"}
-              </Button>
-            </div>
-          </div>
-
-          <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="font-black text-ink">Objetivo da pasta</h3>
-                <p className="section-copy mt-1">
-                  Mude para permitir preços manuais, lances e propostas se desejar vender as cartas.
-                </p>
+                {isPublic && (
+                  <div className="mt-4 grid gap-5 border-t border-line/40 pt-4">
+                    <div className="grid gap-1.5 min-w-0">
+                      <span className="px-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                        Link de compartilhamento (WhatsApp)
+                      </span>
+                      <div className="relative flex items-center min-w-0 w-full">
+                        <p className="flex-1 truncate rounded-xl bg-slate-50 dark:bg-slate-800 py-3 pl-3 pr-10 text-sm font-semibold text-slate-400 border border-line/40">
+                          {shareUrl ?? "Nenhum link gerado"}
+                        </p>
+                        <button
+                          type="button"
+                          onClick={handleCopy}
+                          className={`absolute right-2 p-2 rounded-lg transition-colors ${
+                            copied ? "text-emerald-600 bg-emerald-50" : "text-slate-400 hover:text-ink hover:bg-slate-100"
+                          }`}
+                          title="Copiar link"
+                        >
+                          {copied ? <Check size={18} /> : <Copy size={18} />}
+                        </button>
+                        {copied && (
+                          <span className="absolute -top-6 right-0 text-[10px] font-bold text-emerald-600 animate-fade-up">
+                            Copiado!
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
-              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700">
-                <span>Visualizar</span>
+
+              <div className="flex gap-2 self-start lg:mt-1">
+                {!isPublic && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    icon={<Plus size={16} />}
+                    onClick={onManagePermissions}
+                  >
+                    Autorizar usuários
+                  </Button>
+                )}
+                {isPublic && !shareUrl && (
+                  <Button
+                    type="button"
+                    icon={<Share2 size={16} />}
+                    onClick={onCopyShareLink}
+                  >
+                    Gerar link
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CollapsibleSection>
+
+          <CollapsibleSection 
+            title="Objetivo da pasta" 
+            defaultExpanded={false}
+            action={
+              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700" onClick={(e) => e.stopPropagation()}>
+                <span className="hidden sm:inline">Visualizar</span>
                 <input
                   type="checkbox"
                   className="peer sr-only"
                   checked={isStore}
                   onChange={(event) => onToggleStore(event.target.checked)}
                 />
-                <span className="relative h-7 w-12 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition peer-checked:bg-aqua peer-checked:after:translate-x-5" />
-                <span>Vender</span>
+                <span className="relative h-7 w-12 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition peer-checked:bg-leaf peer-checked:after:translate-x-5" />
+                <span className="hidden sm:inline">Vender</span>
               </label>
-            </div>
-
-            {isStore && (
-              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-aqua/20 bg-aqua/5 p-4">
+            }
+          >
+            <div className="grid gap-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h4 className="font-black text-ink">Propostas e Negociações</h4>
+                  <p className="section-copy mt-1">
+                    Mude para permitir preços manuais, lances e propostas se desejar vender as cartas.
+                  </p>
+                </div>
+              </div>
+
+              {isStore && (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-aqua/20 bg-aqua/5 p-4">
+                  <div>
+                    <h4 className="font-black text-ink">Propostas e Negociações</h4>
                   <p className="text-sm font-semibold text-slate-500">
                     Gerencie as ofertas e negociações desta coleção.
                   </p>
@@ -1950,7 +2098,8 @@ function CollectionDetailScreen({
                 </Button>
               </div>
             )}
-          </div>
+            </div>
+          </CollapsibleSection>
 
           <div className="flex flex-wrap items-center gap-3">
             <Button
@@ -2123,7 +2272,7 @@ function CollectionDetailScreen({
             </EmptyState>
           )}
 
-          <div className="mt-8 flex justify-center">
+          {/* <div className="mt-8 flex justify-center">
             <Button
               type="button"
               variant="primary"
@@ -2133,7 +2282,7 @@ function CollectionDetailScreen({
             >
               Adicionar carta
             </Button>
-          </div>
+          </div> */}
         </div>
       </Panel>
 
@@ -2163,6 +2312,7 @@ function CollectionDetailScreen({
             onPickerPageChange={onPickerPageChange}
             onToggleItem={onToggleItem}
             onOpenCard={onOpenCard}
+            onTogglePickerModal={onTogglePickerModal}
           />
         </Modal>
       )}
@@ -2195,6 +2345,7 @@ function CardPickerPanel({
   onPickerRarityFilter,
   onPickerVariantFilter,
   onPickerSort,
+  onTogglePickerModal,
 }: {
   title: string;
   description: string;
@@ -2220,6 +2371,7 @@ function CardPickerPanel({
   onToggleItem: (itemId: string) => void;
   onOpenCard: (item: CollectionItem) => void;
   action?: ReactNode;
+  onTogglePickerModal: (open: boolean) => void;
 }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const paginatedPickerItems = useMemo(
@@ -2262,6 +2414,15 @@ function CardPickerPanel({
           className={(pickerTypeFilter || pickerRarityFilter || pickerVariantFilter) ? "border-brand/40 bg-brand/5 text-brand" : ""}
         >
           Filtros e Ordenação
+        </Button>
+        <Button
+          type="button"
+          variant="primary"
+          className="px-8 shadow-glow"
+          icon={<Plus size={20} />}
+          onClick={() => onTogglePickerModal(true)}
+        >
+          Adicionar carta
         </Button>
         <Button
           type="button"
@@ -2511,7 +2672,9 @@ function getLanguageFlag(language: string): string {
 }
 
 function publicCollectionUrl(shareToken: string): string {
-  return `${window.location.origin}/public/collections/${encodeURIComponent(shareToken)}`;
+  // Use o link de compartilhamento da API para obter o preview do Open Graph no WhatsApp
+  const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
+  return `${baseUrl}/public/collections/${encodeURIComponent(shareToken)}/share`;
 }
 
 function InfoPill({ label, value }: { label: string; value: string }) {

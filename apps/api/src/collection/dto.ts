@@ -150,6 +150,12 @@ export class UpdateCollectionSharingDto {
   @Transform(({ value }) => value === true || value === "true")
   @IsBoolean()
   ensureToken?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @Transform(({ value }) => (value === "" ? null : value))
+  bannerUrl?: string | null;
 }
 
 export class UpdateCollectionStoreDto {

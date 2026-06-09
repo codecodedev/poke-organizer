@@ -1,5 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, UseGuards } from "@nestjs/common";
-import { FastifyRequest } from "fastify";
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
+import { FastifyReply, FastifyRequest } from "fastify";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequestUser } from "../common/current-user.decorator";
 import { JwtAuthGuard, OptionalJwtAuthGuard } from "../common/jwt-auth.guard";
@@ -81,6 +81,17 @@ export class CollectionController {
   @Patch("folders/:id/store")
   updateFolderStore(@CurrentUser() user: RequestUser, @Param("id") id: string, @Body() dto: UpdateCollectionStoreDto) {
     return this.collection.updateFolderStore(user.id, id, dto);
+  }
+
+  @Post("folders/:id/banner")
+  async uploadBanner(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Req() req: FastifyRequest
+  ) {
+    const data = await req.file();
+    if (!data) throw new BadRequestException("No file uploaded");
+    return this.collection.uploadBanner(user.id, id, data);
   }
 
   @Patch("folders/:id/items/:folderItemId/sale")
@@ -190,6 +201,18 @@ export class PublicCollectionController {
       userId: user?.id,
       sid: query.sid,
     });
+  }
+
+  @Get(":shareToken/share")
+  async getShareHtml(@Param("shareToken") shareToken: string, @Res() res: FastifyReply) {
+    const html = await this.collection.getShareHtml(shareToken);
+    res.type("text/html").send(html);
+  }
+
+  @Get(":shareToken/preview-image")
+  async getPreviewImage(@Param("shareToken") shareToken: string, @Res() res: FastifyReply) {
+    const buffer = await this.collection.getPreviewImage(shareToken);
+    res.type("image/png").send(buffer);
   }
 
   @Post(":shareToken/offers")
