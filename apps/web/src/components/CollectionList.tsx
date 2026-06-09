@@ -16,7 +16,7 @@ import {
   type CollectionItem,
   type CollectionFolderSort,
 } from "@poke-organizer/shared";
-import { api, type Session } from "../lib/api";
+import { api, type Session, type AppRoute } from "../lib/api";
 import { withAuthRetry } from "../lib/authRetry";
 import { formatBrl } from "../lib/format";
 import { CardDetailModal, type UpdateCardDetails } from "./CardDetailModal";
@@ -35,6 +35,7 @@ type Props = {
   session: Session;
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
+  onNavigate: (route: AppRoute) => void;
   refreshKey: number;
   limit?: number;
   title?: string;
@@ -595,7 +596,6 @@ export function CollectionList({
         onUpdate={updateItemDetails}
         onStartAuction={(item) => {
           setAuctionItem(item);
-          closeItem();
         }}
       />
 
@@ -610,6 +610,7 @@ export function CollectionList({
             setAuctionItem(null);
             window.open(`/auctions/${shareToken}`, "_blank");
           }}
+          onNavigate={onNavigate}
         />
       )}
 

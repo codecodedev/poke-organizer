@@ -1,10 +1,12 @@
-import { ConflictException, Injectable, UnauthorizedException } from "@nestjs/common";
+import { ConflictException, Injectable, UnauthorizedException, BadRequestException, NotFoundException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { User } from "@prisma/client";
 import * as argon2 from "argon2";
+import * as randomstring from "randomstring";
 import { PrismaService } from "../prisma/prisma.service";
-import { LoginDto, RegisterDto } from "./dto";
+import { EmailService } from "../email/email.service";
+import { LoginDto, RegisterDto, RequestPasswordResetDto, ResetPasswordDto, ConfirmEmailDto } from "./dto";
 
 type TokenPair = {
   accessToken: string;
@@ -16,7 +18,8 @@ export class AuthService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
-    private readonly config: ConfigService
+    private readonly config: ConfigService,
+    private readonly emailService: EmailService
   ) {}
 
   async register(dto: RegisterDto) {
@@ -26,11 +29,14 @@ export class AuthService {
       throw new ConflictException("Email already registered");
     }
 
+    const emailConfirmationToken = randomstring.generate(32);
+
     const user = await this.prisma.user.create({
       data: {
         email,
         name: dto.name?.trim() || null,
         passwordHash: await argon2.hash(dto.password),
+        emailConfirmationToken,
         identities: {
           create: {
             provider: "password",
@@ -40,13 +46,91 @@ export class AuthService {
       }
     });
 
-    return this.buildAuthResponse(user);
+    // Send welcome email asynchronously
+    void this.emailService.sendWelcomeEmail(user.email, user.name || "Treinador", emailConfirmationToken)
+      .catch(err => console.error("Failed to send welcome email", err));
+
+    return { 
+      message: "Registration successful. Please check your email to confirm your account." 
+    };
+  }
+
+  async confirmEmail(dto: ConfirmEmailDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { emailConfirmationToken: dto.token }
+    });
+
+    if (!user) {
+      throw new BadRequestException("Invalid or expired confirmation token");
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailConfirmedAt: new Date(),
+        emailConfirmationToken: null
+      }
+    });
+
+    return { ok: true };
+  }
+
+  async requestPasswordReset(dto: RequestPasswordResetDto) {
+    const email = dto.email.toLowerCase().trim();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    // We don't want to leak if the email exists or not
+    if (!user) {
+      return { ok: true };
+    }
+
+    const passwordResetToken = randomstring.generate(32);
+    const passwordResetExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordResetToken,
+        passwordResetExpiresAt
+      }
+    });
+
+    // Send email asynchronously
+    void this.emailService.sendPasswordResetEmail(user.email, passwordResetToken)
+      .catch(err => console.error("Failed to send password reset email", err));
+
+    return { ok: true };
+  }
+
+  async resetPassword(dto: ResetPasswordDto) {
+    const user = await this.prisma.user.findUnique({
+      where: { passwordResetToken: dto.token }
+    });
+
+    if (!user || !user.passwordResetExpiresAt || user.passwordResetExpiresAt < new Date()) {
+      throw new BadRequestException("Invalid or expired reset token");
+    }
+
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        passwordHash: await argon2.hash(dto.password),
+        passwordResetToken: null,
+        passwordResetExpiresAt: null
+      }
+    });
+
+    return { ok: true };
   }
 
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email.toLowerCase().trim() } });
     if (!user || !(await argon2.verify(user.passwordHash, dto.password))) {
       throw new UnauthorizedException("Invalid credentials");
+    }
+
+    if (!user.emailConfirmedAt) {
+      throw new UnauthorizedException("Please confirm your email before logging in");
     }
 
     return this.buildAuthResponse(user);

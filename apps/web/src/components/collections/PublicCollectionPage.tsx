@@ -7,7 +7,7 @@ import type {
   PublicCollectionDetail,
   CollectionCartOffer,
 } from "@poke-organizer/shared";
-import { api, type Session } from "../../lib/api";
+import { api, type Session, type AppRoute } from "../../lib/api";
 import { withAuthRetry } from "../../lib/authRetry";
 import { formatBrl } from "../../lib/format";
 import { CollectionItemCard } from "../collection/CollectionItemCard";
@@ -25,12 +25,13 @@ type Props = {
   session: Session | null;
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
+  onNavigate: (route: AppRoute) => void;
   hideHeader?: boolean;
   theme?: "light" | "dark";
   onToggleTheme?: () => void;
 };
 
-export function PublicCollectionPage({ shareToken, session, onSession, onUnauthorized, hideHeader, theme, onToggleTheme }: Props) {
+export function PublicCollectionPage({ shareToken, session, onSession, onUnauthorized, onNavigate, hideHeader, theme, onToggleTheme }: Props) {
   const [collection, setCollection] = useState<PublicCollectionDetail | null>(
     null,
   );
@@ -201,6 +202,12 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
       setMessage("Faca login no site para enviar uma proposta.");
       return;
     }
+
+    if (!session.user.whatsapp) {
+      setMessage("Você precisa cadastrar seu WhatsApp no seu perfil para enviar propostas.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await withAuthRetry(session, onSession, onUnauthorized, (token) =>
@@ -354,7 +361,22 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                   </span>
                 </div>
               </div>
-              {message && <p className="success-note mt-4">{message}</p>}
+              {message && (
+                <div className={`mt-4 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
+                  message.includes("enviada") ? "bg-leaf/10 text-leaf" : "bg-red-50 text-red-600"
+                }`}>
+                  <p className="text-sm font-bold">{message}</p>
+                  {message.includes("WhatsApp") && (
+                    <Button
+                      variant="outline"
+                      className="h-10 px-6 border-red-200 text-red-600 hover:bg-red-50"
+                      onClick={() => onNavigate({ view: "profile" })}
+                    >
+                      Ir para o Perfil
+                    </Button>
+                  )}
+                </div>
+              )}
             </Panel>
 
             <Panel>

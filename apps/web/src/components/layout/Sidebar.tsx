@@ -14,12 +14,14 @@ import {
   ChevronRight,
   ExternalLink,
   User as UserIcon,
+  Gavel,
+  Package,
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { NotificationBell } from "../ui/NotificationBell";
 import type { Session } from "../../lib/api";
 
-type View = "home" | "cards" | "collections" | "decks" | "buy" | "proposals" | "profile";
+type View = "home" | "cards" | "collections" | "decks" | "buy" | "proposals" | "profile" | "my-auctions" | "orders";
 
 type NavItem = {
   id: View;
@@ -30,6 +32,8 @@ type NavItem = {
 const navItems: NavItem[] = [
   { id: "home", label: "Início", icon: <Home size={20} /> },
   { id: "buy", label: "Comprar", icon: <ShoppingBag size={20} /> },
+  { id: "my-auctions", label: "Meus Leilões", icon: <Gavel size={20} /> },
+  { id: "orders", label: "Pedidos", icon: <Package size={20} /> },
   { id: "cards", label: "Minhas Cartas", icon: <LibraryBig size={20} /> },
   { id: "collections", label: "Coleções", icon: <FolderOpen size={20} /> },
   { id: "decks", label: "Decks", icon: <Swords size={20} /> },

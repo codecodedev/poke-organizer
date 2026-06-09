@@ -5,7 +5,8 @@ export type RequestUser = {
   email: string;
 };
 
-export const CurrentUser = createParamDecorator((_data: unknown, context: ExecutionContext): RequestUser => {
+export const CurrentUser = createParamDecorator((data: string | undefined, context: ExecutionContext) => {
   const request = context.switchToHttp().getRequest<{ user: RequestUser }>();
-  return request.user;
+  const user = request.user;
+  return data ? user?.[data as keyof RequestUser] : user;
 });

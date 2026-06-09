@@ -15,6 +15,13 @@ export class AuctionController {
     return this.auction.listActive();
   }
 
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Get("me")
+  listByUser(@CurrentUser() user: RequestUser) {
+    return this.auction.listByUser(user.id);
+  }
+
   @Get(":idOrToken")
   @UseGuards(OptionalJwtAuthGuard)
   getById(@Param("idOrToken") idOrToken: string) {
@@ -44,5 +51,27 @@ export class AuctionController {
   @Post(":id/close")
   close(@CurrentUser() user: RequestUser, @Param("id") id: string) {
     return this.auction.close(user.id, id);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post(":id/select-winner/:bidId")
+  selectWinner(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Param("bidId") bidId: string
+  ) {
+    return this.auction.selectWinner(user.id, id, bidId);
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post(":id/bids/:bidId/delete")
+  deleteBid(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Param("bidId") bidId: string
+  ) {
+    return this.auction.deleteBid(user.id, id, bidId);
   }
 }

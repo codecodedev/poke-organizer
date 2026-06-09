@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { createPortal } from "react-dom";
 import { Gavel, X } from "lucide-react";
 import type { CollectionItem } from "@poke-organizer/shared";
-import { api, type Session } from "../lib/api";
+import { api, type Session, type AppRoute } from "../lib/api";
 import { withAuthRetry } from "../lib/authRetry";
 import { Button } from "./ui/Button";
 
@@ -12,9 +13,10 @@ type Props = {
   onUnauthorized: () => Promise<Session | null>;
   onClose: () => void;
   onCreated: (shareToken: string) => void;
+  onNavigate: (route: AppRoute) => void;
 };
 
-export function AuctionCreationModal({ item, session, onSession, onUnauthorized, onClose, onCreated }: Props) {
+export function AuctionCreationModal({ item, session, onSession, onUnauthorized, onClose, onCreated, onNavigate }: Props) {
   const [minBid, setMinBid] = useState(String(item.store?.effectivePrice ?? item.price?.amount ?? 0));
   const [durationDays, setDurationDays] = useState("7");
   const [title, setTitle] = useState("");
@@ -24,6 +26,12 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+
+    if (!session.user.whatsapp) {
+      setError("Você precisa cadastrar seu WhatsApp no seu perfil para iniciar leilões.");
+      return;
+    }
+
     setError(null);
     setSubmitting(true);
 
@@ -48,8 +56,8 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
     }
   }
 
-  return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-night/60 px-4 py-6 backdrop-blur-md" onMouseDown={onClose}>
+  return createPortal(
+    <div className="fixed inset-0 z-[100] grid place-items-center bg-night/60 px-4 py-6 backdrop-blur-md" onMouseDown={onClose}>
       <div
         className="animate-soft-pop w-full max-w-lg overflow-hidden rounded-[32px] border border-white/20 bg-white shadow-card"
         onMouseDown={(e) => e.stopPropagation()}
@@ -125,7 +133,23 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
              />
           </label>
 
-          {error && <p className="danger-note">{error}</p>}
+          {error && (
+            <div className="danger-note p-4 flex flex-col gap-3">
+              <p>{error}</p>
+              {error.includes("WhatsApp") && (
+                <Button
+                  variant="outline"
+                  className="h-10 border-red-200 text-red-600 hover:bg-red-50"
+                  onClick={() => {
+                    onClose();
+                    onNavigate({ view: "profile" });
+                  }}
+                >
+                  Ir para o Perfil
+                </Button>
+              )}
+            </div>
+          )}
 
           <div className="pt-2">
             <Button
@@ -142,6 +166,7 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
           </div>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

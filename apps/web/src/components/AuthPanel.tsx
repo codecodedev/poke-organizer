@@ -6,10 +6,11 @@ import { Button } from "./ui/Button";
 
 type Props = {
   onSession: (session: Session) => void;
+  onRequestPasswordReset?: () => void;
   theme?: "light" | "dark";
 };
 
-export function AuthPanel({ onSession, theme = "dark" }: Props) {
+export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }: Props) {
   const dark = theme === "dark";
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
@@ -17,17 +18,24 @@ export function AuthPanel({ onSession, theme = "dark" }: Props) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
     setError(null);
+    setSuccessMessage(null);
     setLoading(true);
 
     try {
-      const session =
-        mode === "login" ? await api.login(email, password) : await api.register(email, password, name || undefined);
-      saveSession(session);
-      onSession(session);
+      if (mode === "login") {
+        const session = await api.login(email, password);
+        saveSession(session);
+        onSession(session);
+      } else {
+        await api.register(email, password, name || undefined);
+        setSuccessMessage("Conta criada! Verifique seu e-mail para confirmar seu cadastro antes de entrar.");
+        setMode("login");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao autenticar");
     } finally {
@@ -36,7 +44,7 @@ export function AuthPanel({ onSession, theme = "dark" }: Props) {
   }
 
   return (
-    <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center gap-12 px-5 py-12">
+    <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col lg:flex-row items-center justify-center gap-12 px-5 py-12">
       <div className="flex flex-col items-center text-center">
         <img 
           src={dark ? "/images/logo-light-bg.png" : "/images/logo-dark-bg.png"} 
@@ -97,7 +105,18 @@ export function AuthPanel({ onSession, theme = "dark" }: Props) {
         </div>
 
         <div className="mb-6">
-          <label className="mb-2 block text-sm font-bold text-slate-300">Senha</label>
+          <div className="mb-2 flex items-center justify-between">
+            <label className="text-sm font-bold text-slate-300">Senha</label>
+            {mode === "login" && onRequestPasswordReset && (
+              <button
+                type="button"
+                onClick={onRequestPasswordReset}
+                className="text-xs font-semibold text-brand hover:underline"
+              >
+                Esqueceu a senha?
+              </button>
+            )}
+          </div>
           <input
             className="input-dark w-full"
             value={password}
@@ -110,6 +129,7 @@ export function AuthPanel({ onSession, theme = "dark" }: Props) {
         </div>
 
         {error && <p className="mb-6 rounded-xl border border-magenta/20 bg-magenta/10 px-4 py-3 text-sm font-semibold text-magenta">{error}</p>}
+        {successMessage && <p className="mb-6 rounded-xl border border-leaf/20 bg-leaf/10 px-4 py-3 text-sm font-semibold text-leaf">{successMessage}</p>}
 
         <button
           type="submit"

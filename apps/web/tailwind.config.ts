@@ -11,7 +11,7 @@ export default {
         cyan: "#00f2ff",
         magenta: "#FF5790",
         teal: "#053b50",
-        gray: {
+        customGray: {
           light: "#a62830", // Keeping hex as requested even if name is odd
           medium: "#838987",
         },

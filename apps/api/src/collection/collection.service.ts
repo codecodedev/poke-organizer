@@ -18,6 +18,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { CatalogService } from "../cards/catalog.service";
 import { AuthService } from "../auth/auth.service";
+import { EmailService } from "../email/email.service";
 import {
   fromPrismaLanguage,
   toCardSummary,
@@ -78,7 +79,7 @@ type FolderItemWithStore = Prisma.CollectionFolderItemGetPayload<{
 type CartOfferWithItems = Prisma.CollectionCartOfferGetPayload<{
   include: {
     buyer: true;
-    folder: true;
+    folder: { include: { user: true } };
     items: { include: { folderItem: { include: typeof folderItemInclude } } };
   };
 }>;
@@ -89,6 +90,7 @@ export class CollectionService {
     private readonly prisma: PrismaService,
     private readonly catalog: CatalogService,
     private readonly auth: AuthService,
+    private readonly emailService: EmailService,
   ) {}
 
   async clearCollection(userId: string, dto: ClearCollectionDto) {
@@ -132,7 +134,7 @@ export class CollectionService {
       where: { buyerId: userId },
       include: {
         buyer: true,
-        folder: true,
+        folder: { include: { user: true } },
         items: { include: { folderItem: { include: folderItemInclude } } },
       },
       orderBy: { createdAt: "desc" },
@@ -370,6 +372,11 @@ export class CollectionService {
     shareToken: string,
     dto: CreateCollectionCartOfferDto,
   ): Promise<CollectionCartOffer> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.whatsapp) {
+      throw new BadRequestException("Você precisa cadastrar um número de WhatsApp no seu perfil para enviar propostas.");
+    }
+
     const folder = await this.findPublicStoreFolder(shareToken);
     if (folder.userId === userId) {
       throw new BadRequestException("O dono da colecao nao pode enviar proposta para a propria loja");
@@ -425,7 +432,7 @@ export class CollectionService {
       },
       include: {
         buyer: true,
-        folder: true,
+        folder: { include: { user: true } },
         items: { include: { folderItem: { include: folderItemInclude } } },
       },
     });
@@ -435,9 +442,16 @@ export class CollectionService {
         userId: folder.userId,
         title: "Nova Proposta Recebida!",
         message: `${offer.buyer.name || offer.buyer.email} enviou uma proposta na coleção "${folder.name}".`,
-        link: `/collections/${folder.id}`,
+        link: `/collections/${folder.id}?openProposals=true`,
       },
     });
+
+    // Send email notification
+    const seller = await this.prisma.user.findUnique({ where: { id: folder.userId } });
+    if (seller) {
+      void this.emailService.sendNewProposalEmail(seller.email, offer.buyer.name || offer.buyer.email, folder.name, totalOfferBrl, folder.id)
+        .catch(err => console.error("Failed to send proposal email", err));
+    }
 
     return this.mapCartOffer(offer);
   }
@@ -448,7 +462,7 @@ export class CollectionService {
       where: { folderId },
       include: {
         buyer: true,
-        folder: true,
+        folder: { include: { user: true } },
         items: { include: { folderItem: { include: folderItemInclude } } },
       },
       orderBy: { createdAt: "desc" },
@@ -467,7 +481,7 @@ export class CollectionService {
       where: { id: offerId, folderId },
       include: {
         buyer: true,
-        folder: true,
+        folder: { include: { user: true } },
         items: { include: { folderItem: { include: folderItemInclude } } },
       },
     });
@@ -485,11 +499,32 @@ export class CollectionService {
         data: { status, decidedAt: new Date() },
         include: {
           buyer: true,
-          folder: true,
+          folder: { include: { user: true } },
           items: { include: { folderItem: { include: folderItemInclude } } },
         },
       });
       if (status === "ACCEPTED") {
+        // Create Order
+        await tx.order.create({
+          data: {
+            sellerId: offer.folder.userId,
+            buyerId: offer.buyerId,
+            status: "PENDING",
+            totalAmountBrl: offer.totalOfferBrl,
+            proposalId: offerId,
+            items: {
+              create: offer.items.map(item => ({
+                name: item.folderItem.collectionItem.card.name,
+                quantity: item.quantity,
+                priceBrl: item.amountBrl,
+                imageSmall: item.folderItem.collectionItem.card.imageSmall,
+                condition: item.folderItem.collectionItem.condition,
+                variant: item.folderItem.collectionItem.variant,
+              }))
+            }
+          }
+        });
+
         for (const offerItem of offer.items) {
           const folderItem = offerItem.folderItem;
           const soldQuantity = offerItem.quantity;
@@ -522,6 +557,11 @@ export class CollectionService {
             link: `/profile?tab=proposals`,
           },
         });
+
+        // Send decision email (Accepted)
+        void this.emailService.sendProposalDecisionEmail(offer.buyer.email, offer.folder.user.name || offer.folder.user.email, offer.folder.name, "accepted")
+          .catch(err => console.error("Failed to send accept email", err));
+
       } else if (status === "REJECTED") {
         await tx.notification.create({
           data: {
@@ -531,6 +571,10 @@ export class CollectionService {
             link: `/profile?tab=proposals`,
           },
         });
+
+        // Send decision email (Rejected)
+        void this.emailService.sendProposalDecisionEmail(offer.buyer.email, offer.folder.user.name || offer.folder.user.email, offer.folder.name, "rejected")
+          .catch(err => console.error("Failed to send reject email", err));
       }
       return decided;
     });

@@ -24,6 +24,7 @@ import type {
   PriceEstimate,
   PublicCollectionDetail,
   RecognitionCandidate,
+  OrderSummary,
 } from "@poke-organizer/shared";
 
 const API_URL =
@@ -34,6 +35,7 @@ export type Session = {
     id: string; 
     email: string; 
     name?: string | null;
+    whatsapp?: string | null;
     profileSlug?: string | null;
     profileBio?: string | null;
     isPublicProfile?: boolean;
@@ -193,6 +195,24 @@ export const api = {
       method: "POST",
       silentError: true,
       body: JSON.stringify({ refreshToken }),
+    });
+  },
+  confirmEmail(token: string) {
+    return request<{ ok: true }>("/auth/confirm-email", {
+      method: "POST",
+      body: JSON.stringify({ token }),
+    });
+  },
+  requestPasswordReset(email: string) {
+    return request<{ ok: true }>("/auth/request-password-reset", {
+      method: "POST",
+      body: JSON.stringify({ email }),
+    });
+  },
+  resetPassword(token: string, password: string) {
+    return request<{ ok: true }>("/auth/reset-password", {
+      method: "POST",
+      body: JSON.stringify({ token, password }),
     });
   },
   searchCards(params: {
@@ -381,7 +401,7 @@ export const api = {
   checkProfileSlug(slug: string) {
     return request<{ available: boolean }>(`/users/check-slug/${encodeURIComponent(slug)}`);
   },
-  updateUserProfile(token: string, payload: { name?: string; profileSlug?: string; profileBio?: string; isPublicProfile?: boolean }) {
+  updateUserProfile(token: string, payload: { name?: string; whatsapp?: string; profileSlug?: string; profileBio?: string; isPublicProfile?: boolean }) {
     return request<any>("/users/profile", {
       method: "PATCH",
       token,
@@ -390,6 +410,9 @@ export const api = {
   },
   listActiveAuctions() {
     return request<AuctionSummary[]>("/auctions");
+  },
+  listMyAuctions(token: string) {
+    return request<AuctionSummary[]>("/auctions/me", { token });
   },
   getAuction(idOrToken: string, token?: string) {
     return request<AuctionDetail>(`/auctions/${encodeURIComponent(idOrToken)}`, { token });
@@ -410,6 +433,20 @@ export const api = {
   },
   closeAuction(token: string, auctionId: string) {
     return request<AuctionDetail>(`/auctions/${encodeURIComponent(auctionId)}/close`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({}),
+    });
+  },
+  selectAuctionWinner(token: string, auctionId: string, bidId: string) {
+    return request<AuctionDetail>(`/auctions/${encodeURIComponent(auctionId)}/select-winner/${encodeURIComponent(bidId)}`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({}),
+    });
+  },
+  deleteAuctionBid(token: string, auctionId: string, bidId: string) {
+    return request<AuctionDetail>(`/auctions/${encodeURIComponent(auctionId)}/bids/${encodeURIComponent(bidId)}/delete`, {
       method: "POST",
       token,
       body: JSON.stringify({}),
@@ -613,6 +650,19 @@ export const api = {
   },
   listDeckArchetypes(token: string) {
     return request<DeckArchetypeSummary[]>("/deck-archetypes", { token });
+  },
+  listMySales(token: string) {
+    return request<OrderSummary[]>("/orders/sales", { token });
+  },
+  listMyPurchases(token: string) {
+    return request<OrderSummary[]>("/orders/purchases", { token });
+  },
+  updateOrderStatus(token: string, orderId: string, status: "delivered" | "cancelled") {
+    return request<OrderSummary>(`/orders/${encodeURIComponent(orderId)}/status`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ status }),
+    });
   },
   syncMetagame(token: string, payload: { includeLimitless?: boolean } = {}) {
     return request<{

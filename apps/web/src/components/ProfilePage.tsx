@@ -39,6 +39,7 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
   const [loading, setLoading] = useState(true);
 
   const [name, setName] = useState(session.user.name || "");
+  const [whatsapp, setWhatsapp] = useState(session.user.whatsapp || "");
   const [profileSlug, setProfileSlug] = useState(session.user.profileSlug || "");
   const [profileBio, setProfileBio] = useState(session.user.profileBio || "");
   const [isPublicProfile, setIsPublicProfile] = useState(session.user.isPublicProfile || false);
@@ -96,6 +97,7 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
       const updatedUser = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
         api.updateUserProfile(token, {
           name,
+          whatsapp,
           profileSlug,
           profileBio,
           isPublicProfile
@@ -214,6 +216,16 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Seu nome ou apelido"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">WhatsApp (Obrigatório para lances/propostas)</label>
+                    <input
+                      className="premium-input w-full"
+                      value={whatsapp}
+                      onChange={(e) => setWhatsapp(e.target.value)}
+                      placeholder="Ex: 11999999999"
                     />
                   </div>
 

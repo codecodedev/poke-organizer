@@ -1,4 +1,5 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
+import { Transform } from "class-transformer";
 import { IsBoolean, IsOptional, IsString } from "class-validator";
 
 export class UpdateProfileDto {
@@ -19,6 +20,12 @@ export class UpdateProfileDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean({ message: 'isPublicProfile deve ser um booleano (verdadeiro/falso)' })
   isPublicProfile?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  whatsapp?: string;
 }

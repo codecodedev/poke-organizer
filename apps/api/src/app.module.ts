@@ -11,11 +11,14 @@ import { RecognitionModule } from "./recognition/recognition.module";
 import { NotificationModule } from "./notification/notification.module";
 import { AuctionModule } from "./auction/auction.module";
 import { UserModule } from "./user/user.module";
+import { EmailModule } from "./email/email.module";
+import { OrderModule } from "./order/order.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    EmailModule,
     AuthModule,
     CardsModule,
     CollectionModule,
@@ -24,7 +27,8 @@ import { UserModule } from "./user/user.module";
     RecognitionModule,
     NotificationModule,
     AuctionModule,
-    UserModule
+    UserModule,
+    OrderModule
   ],
   controllers: [HealthController]
 })

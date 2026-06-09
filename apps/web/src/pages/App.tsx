@@ -40,11 +40,16 @@ import { formatBrl } from "../lib/format";
 import { NotificationBell } from "../components/ui/NotificationBell";
 import { ProfilePage } from "../components/ProfilePage";
 import { BuyPage } from "../components/BuyPage";
+import { OrdersPage } from "../components/OrdersPage";
+import { MyAuctionsPage } from "../components/MyAuctionsPage";
 import { Sidebar } from "../components/layout/Sidebar";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
+import { RequestPasswordResetPanel } from "../components/RequestPasswordResetPanel";
+import { ResetPasswordPanel } from "../components/ResetPasswordPanel";
+import { ConfirmEmailPanel } from "../components/ConfirmEmailPanel";
 
-type View = "home" | "cards" | "collections" | "decks" | "buy" | "proposals" | "profile";
+type View = "home" | "cards" | "collections" | "decks" | "buy" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email";
 type ThemeMode = "light" | "dark";
 type AppRoute = {
   view: View;
@@ -53,6 +58,7 @@ type AppRoute = {
   auction?: string | null;
   collection?: string | null;
   card?: string | null;
+  token?: string | null;
 };
 
 export function App() {
@@ -150,7 +156,7 @@ export function App() {
 
   return (
     <>
-      <RequestFeedback />
+      {/* <RequestFeedback /> */}
       <div className="flex min-h-screen transition-all duration-300">
         {session && (
           <Sidebar
@@ -210,8 +216,34 @@ export function App() {
           )}
 
           <main className={`mx-auto w-full max-w-7xl gap-5 px-5 py-6 ${!session && !isPublicView ? 'flex flex-1 flex-col items-center justify-center' : ''}`}>
-            {!session && !isPublicView && (
-              <AuthPanel onSession={handleSession} theme={theme} />
+            {!session && !isPublicView && view !== "request-password-reset" && view !== "reset-password" && view !== "confirm-email" && (
+              <AuthPanel 
+                onSession={handleSession} 
+                theme={theme} 
+                onRequestPasswordReset={() => navigate({ view: "request-password-reset" })}
+              />
+            )}
+
+            {view === "request-password-reset" && (
+              <RequestPasswordResetPanel 
+                onBack={() => navigate({ view: "home" })} 
+                theme={theme} 
+              />
+            )}
+
+            {view === "reset-password" && (
+              <ResetPasswordPanel 
+                token={route.token || ""} 
+                onSuccess={() => navigate({ view: "home" })} 
+                theme={theme} 
+              />
+            )}
+
+            {view === "confirm-email" && (
+              <ConfirmEmailPanel 
+                token={route.token || ""} 
+                onComplete={() => navigate({ view: "home" })} 
+              />
             )}
 
             {route.publicCollection && (
@@ -220,6 +252,7 @@ export function App() {
                 session={session}
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
+                onNavigate={navigate}
                 theme={theme}
                 onToggleTheme={toggleTheme}
                 hideHeader
@@ -242,6 +275,7 @@ export function App() {
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
                 onSelectProfile={(slug) => navigate({ view: "home", publicProfile: slug })}
+                onNavigate={navigate}
               />
             )}
 
@@ -279,6 +313,7 @@ export function App() {
                   session={session}
                   onSession={handleSession}
                   onUnauthorized={handleUnauthorized}
+                  onNavigate={navigate}
                   refreshKey={refreshKey}
                   title="Todas as cartas"
                   description="Inventario geral das cartas que voce possui."
@@ -317,6 +352,16 @@ export function App() {
               />
             )}
 
+            {!isPublicView && view === "my-auctions" && session && (
+              <MyAuctionsPage
+                session={session}
+                onSession={handleSession}
+                onUnauthorized={handleUnauthorized}
+                onSelectAuction={(id) => navigate({ view: "home", auction: id })}
+                onNavigate={navigate}
+              />
+            )}
+
             {!isPublicView && view === "proposals" && session && (
               <ProfilePage
                 session={session}
@@ -334,6 +379,15 @@ export function App() {
                 onUnauthorized={handleUnauthorized}
                 onBack={() => navigate({ view: "home" })}
                 initialTab="settings"
+              />
+            )}
+
+            {!isPublicView && view === "orders" && session && (
+              <OrdersPage
+                session={session}
+                onSession={handleSession}
+                onUnauthorized={handleUnauthorized}
+                onBack={() => navigate({ view: "home" })}
               />
             )}
           </main>
@@ -399,6 +453,7 @@ function HeroPanel({
 
 function parseRoute(): AppRoute {
   const path = window.location.pathname;
+  const search = new URLSearchParams(window.location.search);
   
   const publicCollectionMatch = path.match(/^\/public\/collections\/([^/]+)\/?$/);
   if (publicCollectionMatch) {
@@ -415,12 +470,19 @@ function parseRoute(): AppRoute {
     return { view: "home", auction: decodeURIComponent(auctionMatch[1]) };
   }
 
+  if (path === "/confirm-email") {
+    return { view: "confirm-email", token: search.get("token") };
+  }
+  if (path === "/reset-password") {
+    return { view: "reset-password", token: search.get("token") };
+  }
+
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
   const view: View =
-    page === "cards" || page === "collections" || page === "decks" || page === "buy" || page === "proposals" || page === "profile"
-      ? page
-      : "home";
+    (page === "cards" || page === "collections" || page === "decks" || page === "buy" || page === "proposals" || page === "profile" || page === "my-auctions" || page === "orders" || page === "request-password-reset")
+      ? page as View
+      : (path.slice(1) || "home") as View;
 
   return {
     view,
@@ -429,6 +491,7 @@ function parseRoute(): AppRoute {
     auction: null,
     collection: (view === "collections" || view === "profile" || view === "proposals") ? params.get("collection") : null,
     card: params.get("card"),
+    token: search.get("token"),
   };
 }
 
@@ -441,6 +504,12 @@ function routeToUrl(route: AppRoute): string {
   }
   if (route.auction) {
     return `/auctions/${encodeURIComponent(route.auction)}`;
+  }
+  if (route.view === "confirm-email") {
+    return `/confirm-email${route.token ? `?token=${encodeURIComponent(route.token)}` : ""}`;
+  }
+  if (route.view === "reset-password") {
+    return `/reset-password${route.token ? `?token=${encodeURIComponent(route.token)}` : ""}`;
   }
 
   const params = new URLSearchParams();

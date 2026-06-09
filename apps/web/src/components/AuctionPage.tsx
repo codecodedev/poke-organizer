@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { Gavel, History, Timer, User, X } from "lucide-react";
 import type { AuctionDetail } from "@poke-organizer/shared";
-import { api, type Session } from "../lib/api";
+import { api, type Session, type AppRoute } from "../lib/api";
 import { withAuthRetry } from "../lib/authRetry";
 import { formatBrl } from "../lib/format";
 import { Panel } from "./ui/Panel";
@@ -14,9 +14,10 @@ type Props = {
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
   onSelectProfile: (slug: string) => void;
+  onNavigate: (route: AppRoute) => void;
 };
 
-export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onSelectProfile }: Props) {
+export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onSelectProfile, onNavigate }: Props) {
   const [auction, setAuction] = useState<AuctionDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -44,6 +45,12 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
 
   async function handleBid() {
     if (!session || !auction) return;
+
+    if (!session.user.whatsapp) {
+      setMessage({ type: "error", text: "Você precisa cadastrar seu WhatsApp no seu perfil para dar lances." });
+      return;
+    }
+
     setMessage(null);
     setSubmitting(true);
     try {
@@ -55,6 +62,60 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
       setMessage({ type: "success", text: "Lance realizado com sucesso!" });
     } catch (err) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao dar lance" });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleClose() {
+    if (!session || !auction) return;
+    if (!confirm("Tem certeza que deseja finalizar este leilão agora?")) return;
+    
+    setSubmitting(true);
+    try {
+      const updated = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.closeAuction(token, auction.id),
+      );
+      setAuction(updated);
+      setMessage({ type: "success", text: "Leilão finalizado com sucesso!" });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao finalizar leilão" });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleSelectWinner(bidId: string) {
+    if (!session || !auction) return;
+    if (!confirm("Confirmar este lance como o vencedor do leilão?")) return;
+    
+    setSubmitting(true);
+    try {
+      const updated = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.selectAuctionWinner(token, auction.id, bidId),
+      );
+      setAuction(updated);
+      setMessage({ type: "success", text: "Vencedor selecionado!" });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao selecionar vencedor" });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleDeleteBid(bidId: string) {
+    if (!session || !auction) return;
+    if (!confirm("Tem certeza que deseja remover este lance? Esta ação é irreversível.")) return;
+    
+    setSubmitting(true);
+    try {
+      const updated = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.deleteAuctionBid(token, auction.id, bidId),
+      );
+      setAuction(updated);
+      setMessage({ type: "success", text: "Lance removido." });
+    } catch (err) {
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao remover lance" });
     } finally {
       setSubmitting(false);
     }
@@ -135,32 +196,61 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
                  <p className="text-sm font-bold text-slate-400">Nenhum lance ainda. Seja o primeiro!</p>
               </div>
             ) : (
-              auction.bids.map((bid, index) => (
-                <div key={bid.id} className={`flex items-center justify-between rounded-2xl border p-4 transition-all ${
-                  index === 0 
-                    ? "border-amber-400 bg-amber-50 shadow-md ring-1 ring-amber-400/20 dark:bg-amber-400/10 dark:ring-amber-400/40" 
-                    : "border-line/70 bg-white dark:bg-black/20 dark:border-white/5"
-                }`}>
-                  <div className="flex items-center gap-4">
-                    <div className={`grid h-10 w-10 place-items-center rounded-xl font-black text-sm ${
-                      index === 0 ? "bg-emerald-600 dark:bg-emerald-400 text-white dark:text-white" : "bg-slate-200 dark:bg-slate-200 text-black/70 dark:text-black"
-                    }`}>
-                      {auction.bids.length - index}
+              auction.bids.map((bid, index) => {
+                const isWinner = auction.winningBidId === bid.id;
+                return (
+                  <div key={bid.id} className={`flex flex-col gap-4 rounded-2xl border p-4 transition-all ${
+                    isWinner
+                      ? "border-emerald-500 bg-emerald-50 shadow-md ring-1 ring-emerald-500/20 dark:bg-emerald-500/10 dark:ring-emerald-500/40"
+                      : index === 0 && isOpen
+                        ? "border-amber-400 bg-amber-50 shadow-md ring-1 ring-amber-400/20 dark:bg-amber-400/10 dark:ring-amber-400/40" 
+                        : "border-line/70 bg-white dark:bg-black/20 dark:border-white/5"
+                  }`}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`grid h-10 w-10 place-items-center rounded-xl font-black text-sm ${
+                          isWinner ? "bg-emerald-600 text-white" : index === 0 && isOpen ? "bg-emerald-600 text-white" : "bg-slate-200 text-black/70"
+                        }`}>
+                          {isWinner ? "★" : auction.bids.length - index}
+                        </div>
+                        <div>
+                          <p className="font-black text-ink dark:text-white">
+                            {bid.bidderName}
+                            {isWinner && <span className="ml-2 text-[10px] bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-tighter">Vencedor</span>}
+                          </p>
+                          <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tighter">
+                            {new Date(bid.createdAt).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className={`text-lg font-black ${isWinner ? "text-emerald-700 dark:text-emerald-400" : index === 0 && isOpen ? "text-amber-700 dark:text-amber-400" : "text-ink dark:text-white"}`}>
+                          {formatBrl(bid.amount)}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-black text-ink dark:text-white">{bid.bidderName}</p>
-                      <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-tighter">
-                        {new Date(bid.createdAt).toLocaleString()}
-                      </p>
-                    </div>
+
+                    {isOwner && (
+                      <div className="flex gap-4 justify-end pt-2 border-t border-line/50 dark:border-white/5">
+                        {auction.status === "closed" && !auction.winningBidId && (
+                          <button
+                            onClick={() => handleSelectWinner(bid.id)}
+                            className="text-[10px] font-black uppercase text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                          >
+                            Escolher como vencedor
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleDeleteBid(bid.id)}
+                          className="text-[10px] font-black uppercase text-red-500 hover:text-red-700"
+                        >
+                          Remover lance
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-right">
-                    <p className={`text-lg font-black ${index === 0 ? "text-amber-700 dark:text-amber-400" : "text-ink dark:text-white"}`}>
-                      {formatBrl(bid.amount)}
-                    </p>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </Panel>
@@ -196,10 +286,20 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
             {isOpen ? (
               <div className="space-y-4">
                 {isOwner ? (
-                  <div className="rounded-2xl bg-white/10 dark:bg-white/5 p-4 border border-white/10">
-                    <p className="text-xs font-bold text-slate-500 dark:text-white/70 text-center">
-                      Você é o dono deste leilão.
-                    </p>
+                  <div className="space-y-4">
+                    <div className="rounded-2xl bg-white/10 dark:bg-white/5 p-4 border border-white/10">
+                      <p className="text-xs font-bold text-slate-500 dark:text-white/70 text-center mb-4">
+                        Você é o dono deste leilão.
+                      </p>
+                      <Button
+                        variant="brand"
+                        className="w-full h-12 text-sm bg-rose-500 hover:bg-rose-600 border-none"
+                        onClick={handleClose}
+                        disabled={submitting}
+                      >
+                        Finalizar Agora
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <>
@@ -220,10 +320,19 @@ export function AuctionPage({ idOrToken, session, onSession, onUnauthorized, onS
                     </div>
 
                     {message && (
-                      <div className={`rounded-xl p-3 text-xs font-bold ${
+                      <div className={`rounded-xl p-4 text-xs font-bold ${
                         message.type === "success" ? "bg-leaf/20 text-emerald-900" : "bg-red-500/20 text-red-200"
                       }`}>
-                        {message.text}
+                        <p>{message.text}</p>
+                        {message.text.includes("WhatsApp") && (
+                          <Button
+                            variant="outline"
+                            className="mt-3 w-full h-10 border-white/20 text-white hover:bg-white/10"
+                            onClick={() => onNavigate({ view: "profile" })}
+                          >
+                            Ir para o Perfil
+                          </Button>
+                        )}
                       </div>
                     )}
 

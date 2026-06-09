@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequestUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { AuthService } from "./auth.service";
-import { LoginDto, RefreshDto, RegisterDto } from "./dto";
+import { LoginDto, RefreshDto, RegisterDto, ConfirmEmailDto, RequestPasswordResetDto, ResetPasswordDto } from "./dto";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -13,6 +13,21 @@ export class AuthController {
   @Post("register")
   register(@Body() dto: RegisterDto) {
     return this.auth.register(dto);
+  }
+
+  @Post("confirm-email")
+  confirmEmail(@Body() dto: ConfirmEmailDto) {
+    return this.auth.confirmEmail(dto);
+  }
+
+  @Post("request-password-reset")
+  requestPasswordReset(@Body() dto: RequestPasswordResetDto) {
+    return this.auth.requestPasswordReset(dto);
+  }
+
+  @Post("reset-password")
+  resetPassword(@Body() dto: ResetPasswordDto) {
+    return this.auth.resetPassword(dto);
   }
 
   @Post("login")

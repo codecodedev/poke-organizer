@@ -32,3 +32,26 @@ export class RefreshDto {
   @IsString()
   refreshToken!: string;
 }
+
+export class RequestPasswordResetDto {
+  @ApiProperty({ example: "ash@example.com" })
+  @IsEmail()
+  email!: string;
+}
+
+export class ResetPasswordDto {
+  @ApiProperty()
+  @IsString()
+  token!: string;
+
+  @ApiProperty({ minLength: 8 })
+  @IsString()
+  @MinLength(8)
+  password!: string;
+}
+
+export class ConfirmEmailDto {
+  @ApiProperty()
+  @IsString()
+  token!: string;
+}

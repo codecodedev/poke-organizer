@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { toCardSummary } from "../common/mappers";
 import { CreateAuctionDto, PlaceAuctionBidDto } from "./dto";
+import { EmailService } from "../email/email.service";
 
 const auctionInclude = {
   seller: true,
@@ -25,7 +26,10 @@ type AuctionWithRelations = Prisma.AuctionGetPayload<{
 
 @Injectable()
 export class AuctionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService
+  ) {}
 
   async listActive(): Promise<AuctionSummary[]> {
     const auctions = await this.prisma.auction.findMany({
@@ -33,6 +37,15 @@ export class AuctionService {
         status: "OPEN",
         endsAt: { gte: new Date() },
       },
+      include: auctionInclude,
+      orderBy: { createdAt: "desc" },
+    });
+    return auctions.map((a) => this.mapSummary(a));
+  }
+
+  async listByUser(userId: string): Promise<AuctionSummary[]> {
+    const auctions = await this.prisma.auction.findMany({
+      where: { sellerId: userId },
       include: auctionInclude,
       orderBy: { createdAt: "desc" },
     });
@@ -73,6 +86,11 @@ export class AuctionService {
   }
 
   async placeBid(userId: string, id: string, dto: PlaceAuctionBidDto): Promise<AuctionDetail> {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user?.whatsapp) {
+      throw new BadRequestException("Você precisa cadastrar um número de WhatsApp no seu perfil para dar lances.");
+    }
+
     const auction = await this.prisma.auction.findUnique({
       where: { id },
       include: { bids: { take: 1, orderBy: { amountBrl: "desc" } } },
@@ -111,10 +129,17 @@ export class AuctionService {
           userId: auction.sellerId,
           title: "Novo Lance no Leilão!",
           message: `O seu leilão recebeu um novo lance de R$ ${dto.amountBrl.toFixed(2)}.`,
-          link: `/profile?tab=auctions`,
+          link: `/auctions/${auction.shareToken}`,
         },
       }),
     ]);
+
+    // Send email notification
+    const seller = await this.prisma.user.findUnique({ where: { id: auction.sellerId } });
+    if (seller) {
+      void this.emailService.sendNewBidEmail(seller.email, auction.title || "Carta Pokémon", dto.amountBrl, auction.shareToken)
+        .catch(err => console.error("Failed to send bid email", err));
+    }
 
     return this.getById(id);
   }
@@ -132,6 +157,103 @@ export class AuctionService {
     });
 
     return this.mapDetail(updated);
+  }
+
+  async selectWinner(userId: string, id: string, bidId: string): Promise<AuctionDetail> {
+    const auction = await this.prisma.auction.findFirst({
+      where: { id, sellerId: userId },
+      include: { bids: true, collectionItem: { include: { card: true } } },
+    });
+
+    if (!auction) throw new NotFoundException("Leilão não encontrado");
+    
+    const bid = auction.bids.find(b => b.id === bidId);
+    if (!bid) throw new NotFoundException("Lance não encontrado");
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const auctionUpdated = await tx.auction.update({
+        where: { id },
+        data: { 
+          winningBidId: bidId,
+          status: "CLOSED" 
+        },
+        include: auctionInclude,
+      });
+
+      // Create Order
+      await tx.order.create({
+        data: {
+          sellerId: userId,
+          buyerId: bid.bidderId,
+          status: "PENDING",
+          totalAmountBrl: bid.amountBrl,
+          auctionId: id,
+          items: {
+            create: {
+              name: auction.collectionItem.card.name,
+              quantity: 1,
+              priceBrl: bid.amountBrl,
+              imageSmall: auction.collectionItem.card.imageSmall,
+              condition: auction.collectionItem.condition,
+              variant: auction.collectionItem.variant,
+            }
+          }
+        }
+      });
+
+      return auctionUpdated;
+    });
+
+    // Notify winner
+    const bidder = await this.prisma.user.findUnique({ where: { id: bid.bidderId } });
+    if (bidder) {
+      await this.prisma.notification.create({
+        data: {
+          userId: bid.bidderId,
+          title: "Seu lance venceu!",
+          message: `Parabéns! Seu lance de R$ ${Number(bid.amountBrl).toFixed(2)} no leilão "${auction.title || 'Carta Pokémon'}" foi o vencedor.`,
+          link: `/orders?tab=purchases`,
+        },
+      });
+
+      void this.emailService.sendAuctionWinnerEmail(
+        bidder.email, 
+        updated.seller.name || updated.seller.email, 
+        auction.title || "Leilão de Carta", 
+        Number(bid.amountBrl)
+      ).catch(err => console.error("Failed to send bid winner email", err));
+    }
+
+    return this.mapDetail(updated);
+  }
+
+  async deleteBid(userId: string, id: string, bidId: string): Promise<AuctionDetail> {
+    const auction = await this.prisma.auction.findFirst({
+      where: { id, sellerId: userId },
+    });
+
+    if (!auction) throw new NotFoundException("Leilão não encontrado");
+
+    const bid = await this.prisma.auctionBid.findFirst({
+      where: { id: bidId, auctionId: id }
+    });
+
+    if (!bid) throw new NotFoundException("Lance não encontrado");
+
+    await this.prisma.auctionBid.delete({ where: { id: bidId } });
+
+    // Recalculate current bid
+    const highestBid = await this.prisma.auctionBid.findFirst({
+      where: { auctionId: id },
+      orderBy: { amountBrl: "desc" }
+    });
+
+    await this.prisma.auction.update({
+      where: { id },
+      data: { currentBidBrl: highestBid ? highestBid.amountBrl : null }
+    });
+
+    return this.getById(id);
   }
 
   private mapSummary(a: AuctionWithRelations): AuctionSummary {
@@ -160,6 +282,7 @@ export class AuctionService {
       status: a.status.toLowerCase() as AuctionStatus,
       shareToken: a.shareToken,
       bidCount: a.bids.length,
+      winningBidId: a.winningBidId,
       createdAt: a.createdAt.toISOString(),
     };
   }

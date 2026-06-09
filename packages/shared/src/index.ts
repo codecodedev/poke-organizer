@@ -177,6 +177,7 @@ export type AuctionSummary = {
   status: AuctionStatus;
   shareToken: string;
   bidCount: number;
+  winningBidId?: string | null;
   createdAt: string;
 };
 
@@ -389,6 +390,35 @@ export type DeckAiAnalysis = {
   improvements: string[];
   suggestedChanges: DeckAiSuggestedChange[];
   playTips: string[];
+};
+
+export type OrderStatus = "pending" | "delivered" | "cancelled";
+
+export type OrderItem = {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+  imageSmall?: string | null;
+  condition?: string | null;
+  variant?: string | null;
+};
+
+export type OrderSummary = {
+  id: string;
+  sellerId: string;
+  sellerName: string;
+  sellerWhatsapp?: string | null;
+  buyerId: string;
+  buyerName: string;
+  buyerWhatsapp?: string | null;
+  status: OrderStatus;
+  totalAmount: number;
+  auctionId?: string | null;
+  proposalId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  items: OrderItem[];
 };
 
 export function normalizeCardNumber(value: string): string {

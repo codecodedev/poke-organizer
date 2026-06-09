@@ -666,7 +666,12 @@ export function CollectionsPage({
       return;
     }
     if (collectionRoute) {
-      void loadFolder(collectionRoute);
+      void loadFolder(collectionRoute).then(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get("openProposals") === "true") {
+          setShowOffersModal(true);
+        }
+      });
       return;
     }
     showList();

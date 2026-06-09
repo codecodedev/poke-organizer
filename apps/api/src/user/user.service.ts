@@ -92,7 +92,8 @@ export class UserService {
         name: dto.name,
         profileSlug: dto.profileSlug,
         profileBio: dto.profileBio,
-        isPublicProfile: dto.isPublicProfile
+        isPublicProfile: dto.isPublicProfile,
+        whatsapp: dto.whatsapp
       }
     });
   }
