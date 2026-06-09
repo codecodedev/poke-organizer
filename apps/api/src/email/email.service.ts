@@ -9,21 +9,24 @@ export class EmailService {
   private readonly brandGradient = "linear-gradient(to bottom right, #22d3ee, #d946ef)";
 
   constructor(private config: ConfigService) {
+    const port = Number(this.config.get("SMTP_PORT"));
+    const secure = port === 465 || this.config.get("SMTP_SECURE") === "true";
+
     this.transporter = nodemailer.createTransport({
       host: this.config.get("SMTP_HOST"),
-      port: Number(this.config.get("SMTP_PORT")),
-      secure: this.config.get("SMTP_SECURE") === "true",
+      port,
+      secure,
       auth: {
         user: this.config.get("SMTP_USER"),
         pass: this.config.get("SMTP_PASS"),
       },
-      family: 4, // Força o uso de IPv4 para evitar erros ENETUNREACH em ambientes cloud
       tls: {
         // Não falha em certificados auto-assinados (comum em alguns ambientes Hostinger)
         rejectUnauthorized: false
       },
-      connectionTimeout: 10000,
-      greetingTimeout: 10000,
+      connectionTimeout: 20000, // Aumentado para 20s para ambientes cloud
+      greetingTimeout: 20000,
+      socketTimeout: 20000,
     } as any);
   }
 
