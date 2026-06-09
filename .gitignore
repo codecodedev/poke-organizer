@@ -17,3 +17,4 @@ apps/pricing-service/prisma/client
 apps/pricing-service/src/generated
 apps/api/prisma/migrations/*/migration_lock.toml
 apps/api/public/banners/*
+images-gemini

@@ -10,6 +10,7 @@ import { createWriteStream } from "node:fs";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import sharp from "sharp";
+import { StorageService } from "../storage/storage.service";
 import {
   CollectionAddResult,
   CollectionCartOffer,
@@ -97,6 +98,7 @@ export class CollectionService {
     private readonly auth: AuthService,
     private readonly emailService: EmailService,
     private readonly config: ConfigService,
+    private readonly storage: StorageService,
   ) {}
 
   async clearCollection(userId: string, dto: ClearCollectionDto) {
@@ -317,14 +319,8 @@ export class CollectionService {
   ): Promise<CollectionFolderDetail> {
     await this.assertOwnsFolder(userId, id);
 
-    const ext = file.filename.split(".").pop();
-    const fileName = `${id}_${randomBytes(4).toString("hex")}.${ext}`;
-    const filePath = join(process.cwd(), "public", "banners", fileName);
-
-    await pipeline(file.file, createWriteStream(filePath));
-
-    const baseUrl = this.config.get<string>("API_BASE_URL") ?? "http://localhost:3333";
-    const bannerUrl = `${baseUrl}/public/banners/${fileName}`;
+    const buffer = await file.toBuffer();
+    const bannerUrl = await this.storage.uploadBanner(id, buffer, file.mimetype);
 
     await this.prisma.collectionFolder.update({
       where: { id },

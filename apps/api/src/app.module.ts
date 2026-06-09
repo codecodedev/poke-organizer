@@ -13,12 +13,14 @@ import { AuctionModule } from "./auction/auction.module";
 import { UserModule } from "./user/user.module";
 import { EmailModule } from "./email/email.module";
 import { OrderModule } from "./order/order.module";
+import { StorageModule } from "./storage/storage.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     EmailModule,
+    StorageModule,
     AuthModule,
     CardsModule,
     CollectionModule,

@@ -2102,17 +2102,31 @@ function CollectionDetailScreen({
             </div>
           </CollapsibleSection>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setShowFiltersModal(true)}
-              icon={<Filter size={18} />}
-              className={(typeFilter || rarityFilter || variantFilter) ? "border-brand/40 bg-brand/5 text-brand" : ""}
-            >
-              Filtros e Ordenação
-            </Button>
-          </div>
+          <div className="flex flex-col items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-3 w-full">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowFiltersModal(true)}
+                icon={<Filter size={18} />}
+                className={(typeFilter || rarityFilter || variantFilter) ? "border-brand/40 bg-brand/5 text-brand w-full" : "w-full"}
+              >
+                Filtros e Ordenação
+              </Button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 w-full">
+              <Button
+                type="button"
+                variant="primary"
+                className="px-8 dark:bg-slate-500 w-full"
+                icon={<Plus size={20} />}
+                onClick={() => onTogglePickerModal(true)}
+              >
+                Adicionar carta
+              </Button>
+            </div>
+          </div >
 
           {showFiltersModal && (
             <Modal title="Filtros e Ordenação" onClose={() => setShowFiltersModal(false)} maxWidthClass="max-w-xl">
