@@ -4,6 +4,21 @@
   "installCommand": "cd ../.. && corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile",
   "rewrites": [
     {
+      "source": "/p/:token",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*(WhatsApp|Twitterbot|facebookexternalhit|LinkedInBot|Embedly|Slackbot|TelegramBot|discordbot|googlebot|bingbot|applebot).*"
+        }
+      ],
+      "destination": "https://poke-organizer-api.onrender.com/public/collections/:token/share"
+    },
+    {
+      "source": "/p/:token",
+      "destination": "/index.html"
+    },
+    {
       "source": "/(.*)",
       "destination": "/index.html"
     }

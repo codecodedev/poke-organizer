@@ -1337,48 +1337,6 @@ export class CollectionService {
   }
 
   async getPreviewImage(shareToken: string): Promise<Buffer> {
-    const width = 1200;
-    const height = 630;
-    const maxBytes = 300 * 1024;
-
-    const toOgJpeg = async (input: Buffer): Promise<Buffer> => {
-      for (const quality of [82, 76, 70, 64, 58, 52]) {
-        const output = await sharp(input)
-          .rotate()
-          .resize(width, height, {
-            fit: "cover",
-            position: "center",
-          })
-          .flatten({
-            background: { r: 17, g: 24, b: 39 },
-          })
-          .jpeg({
-            quality,
-            mozjpeg: true,
-            progressive: true,
-          })
-          .toBuffer();
-
-        if (output.length <= maxBytes) return output;
-      }
-
-      return sharp(input)
-        .rotate()
-        .resize(width, height, {
-          fit: "cover",
-          position: "center",
-        })
-        .flatten({
-          background: { r: 17, g: 24, b: 39 },
-        })
-        .jpeg({
-          quality: 48,
-          mozjpeg: true,
-          progressive: true,
-        })
-        .toBuffer();
-    };
-
     const folder = await this.prisma.collectionFolder.findUnique({
       where: { shareToken },
       include: {
@@ -1400,26 +1358,37 @@ export class CollectionService {
       throw new NotFoundException("Coleção não encontrada");
     }
 
+    // Tentar carregar o banner primeiro
     if (folder.bannerUrl && !folder.bannerUrl.includes("preview-image")) {
       try {
-        console.log(`[Preview] Buscando banner: ${folder.bannerUrl}`);
+        const baseUrl = this.config.get<string>("API_BASE_URL")?.replace(/\/$/, "");
+        
+        // Se for um banner local, tentar ler direto do disco
+        if (baseUrl && folder.bannerUrl.startsWith(baseUrl)) {
+          const filename = folder.bannerUrl.split("/").pop();
+          if (filename) {
+            const filePath = join(process.cwd(), "public", "banners", filename);
+            const bannerBuffer = await fs.readFile(filePath);
+            return this.toOgJpeg(bannerBuffer);
+          }
+        }
 
+        // Se for externo
         const response = await fetch(folder.bannerUrl, {
           signal: AbortSignal.timeout(5000),
         });
 
         if (response.ok) {
           const arrayBuffer = await response.arrayBuffer();
-          const bannerBuffer = Buffer.from(arrayBuffer);
-
-          console.log(`[Preview] Banner carregado com sucesso (${bannerBuffer.length} bytes)`);
-
-          return toOgJpeg(bannerBuffer);
+          return this.toOgJpeg(Buffer.from(arrayBuffer));
         }
       } catch (e: any) {
-        console.error(`[Preview] Falha ao buscar banner: ${e.message}`);
+        console.error(`[Preview] Falha ao carregar banner: ${e.message}`);
       }
     }
+
+    const width = 1200;
+    const height = 630;
 
     const fallbackLogo = async (): Promise<Buffer> => {
       const possiblePaths = [
@@ -1428,11 +1397,9 @@ export class CollectionService {
       ];
 
       let logoBuffer: Buffer | null = null;
-
       for (const path of possiblePaths) {
         try {
           logoBuffer = await fs.readFile(path);
-          console.log(`[Preview] Logo encontrada em: ${path}`);
           break;
         } catch {}
       }
@@ -1463,13 +1430,11 @@ export class CollectionService {
             .png()
             .toBuffer();
 
-          return toOgJpeg(generated);
+          return this.toOgJpeg(generated);
         } catch (e: any) {
-          console.error(`[Preview] Erro ao processar logo com sharp: ${e.message}`);
+          console.error(`[Preview] Erro ao processar logo: ${e.message}`);
         }
       }
-
-      console.warn("[Preview] Nenhuma logo encontrada, usando fundo padrão.");
 
       const generated = await sharp({
         create: {
@@ -1482,56 +1447,29 @@ export class CollectionService {
         .png()
         .toBuffer();
 
-      return toOgJpeg(generated);
+      return this.toOgJpeg(generated);
     };
 
     const cardImages = folder.items
       .map((item) => item.collectionItem?.card?.imageSmall)
       .filter(Boolean) as string[];
 
-    if (cardImages.length === 0) {
-      console.log("[Preview] Coleção vazia, usando logo fallback.");
-      return fallbackLogo();
-    }
-
-    console.log(`[Preview] Buscando ${cardImages.length} imagens de cartas...`);
+    if (cardImages.length === 0) return fallbackLogo();
 
     const images = await Promise.all(
       cardImages.map(async (url) => {
         try {
-          const response = await fetch(url, {
-            signal: AbortSignal.timeout(5000),
-          });
-
+          const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
           if (!response.ok) return null;
-
           return Buffer.from(await response.arrayBuffer());
-        } catch {
-          return null;
-        }
+        } catch { return null; }
       }),
     );
 
-    const validImages = images.filter((img): img is NonNullable<typeof img> => img !== null);
-
-    console.log(`[Preview] ${validImages.length} imagens de cartas carregadas.`);
-
-    if (validImages.length === 0) {
-      console.log("[Preview] Nenhuma imagem de carta carregada, usando logo fallback.");
-      return fallbackLogo();
-    }
-
-    const canvas = sharp({
-      create: {
-        width,
-        height,
-        channels: 4,
-        background: { r: 17, g: 24, b: 39, alpha: 1 },
-      },
-    });
+    const validImages = images.filter((img): img is Buffer => img !== null);
+    if (validImages.length === 0) return fallbackLogo();
 
     const composites: sharp.OverlayOptions[] = [];
-
     const cardWidth = 240;
     const cardHeight = 335;
     const gap = 40;
@@ -1540,18 +1478,10 @@ export class CollectionService {
     const startY = (height - cardHeight) / 2;
 
     for (let i = 0; i < validImages.length; i++) {
-      const image = validImages[i];
-
-      const cardBuffer = await sharp(image)
+      const cardBuffer = await sharp(validImages[i])
         .rotate()
-        .resize(cardWidth, cardHeight, {
-          fit: "cover",
-          position: "center",
-        })
-        .jpeg({
-          quality: 85,
-          mozjpeg: true,
-        })
+        .resize(cardWidth, cardHeight, { fit: "cover", position: "center" })
+        .jpeg({ quality: 90 })
         .toBuffer();
 
       composites.push({
@@ -1561,9 +1491,19 @@ export class CollectionService {
       });
     }
 
-    const generated = await canvas.composite(composites).png().toBuffer();
+    const generated = await sharp({
+      create: {
+        width,
+        height,
+        channels: 4,
+        background: { r: 17, g: 24, b: 39, alpha: 1 },
+      },
+    })
+      .composite(composites)
+      .png()
+      .toBuffer();
 
-    return toOgJpeg(generated);
+    return this.toOgJpeg(generated);
   }
 
   async getShareHtml(shareToken: string): Promise<string> {
@@ -1577,8 +1517,10 @@ export class CollectionService {
     const baseUrl = this.config.getOrThrow<string>("API_BASE_URL").replace(/\/$/, "");
     const frontUrl = this.config.getOrThrow<string>("FRONT_URL").replace(/\/$/, "");
 
-    const imageUrl = `${baseUrl}/public/collections/${shareToken}/preview-image`;
-    const redirectUrl = `${frontUrl}/public/collections/${shareToken}`;
+    // Usar o formato curto para a URL de compartilhamento no OG
+    const redirectUrl = `${frontUrl}/p/${shareToken}`;
+    const version = folder.updatedAt.getTime();
+    const imageUrl = `${baseUrl}/public/collections/${shareToken}/preview-image?v=${version}`;
 
     const title = this.escapeHtml(
       `${folder.name} - Coleção de ${folder.user.name?.trim() || "um colecionador"}`,
@@ -1588,45 +1530,46 @@ export class CollectionService {
       "Confira minha coleção de cartas Pokémon no Coleciona Card!",
     );
 
-    return `
+    return \`
   <!DOCTYPE html>
   <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <title>${title}</title>
+    <title>\${title}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
     <meta property="og:type" content="website" />
-    <meta property="og:url" content="${redirectUrl}" />
-    <meta property="og:title" content="${title}" />
-    <meta property="og:description" content="${description}" />
-    <meta property="og:image" content="${imageUrl}" />
-    <meta property="og:image:secure_url" content="${imageUrl}" />
+    <meta property="og:url" content="\${redirectUrl}" />
+    <meta property="og:site_name" content="Coleciona Card" />
+    <meta property="og:title" content="\${title}" />
+    <meta property="og:description" content="\${description}" />
+    <meta property="og:image" content="\${imageUrl}" />
+    <meta property="og:image:secure_url" content="\${imageUrl}" />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
 
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:url" content="${redirectUrl}" />
-    <meta name="twitter:title" content="${title}" />
-    <meta name="twitter:description" content="${description}" />
-    <meta name="twitter:image" content="${imageUrl}" />
+    <meta name="twitter:url" content="\${redirectUrl}" />
+    <meta name="twitter:title" content="\${title}" />
+    <meta name="twitter:description" content="\${description}" />
+    <meta name="twitter:image" content="\${imageUrl}" />
 
-    <meta http-equiv="refresh" content="1;url=${redirectUrl}" />
+    <meta http-equiv="refresh" content="1;url=\${redirectUrl}" />
   </head>
   <body style="background:#111827;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
     <div style="text-align:center;">
       <p>Redirecionando para a coleção...</p>
-      <a href="${redirectUrl}" style="color:#3b82f6;">Abrir coleção</a>
+      <a href="\${redirectUrl}" style="color:#3b82f6;">Abrir coleção</a>
     </div>
 
     <script>
       setTimeout(function () {
-        window.location.href = "${redirectUrl}";
+        window.location.href = "\${redirectUrl}";
       }, 800);
     </script>
   </body>
-  </html>`;
+  </html>\`;
   }
 
   private escapeHtml(value: string): string {
@@ -1641,43 +1584,23 @@ export class CollectionService {
   private async toOgJpeg(buffer: Buffer): Promise<Buffer> {
     const width = 1200;
     const height = 630;
-    const maxBytes = 300 * 1024;
+    const maxBytes = 250 * 1024;
 
-    for (const quality of [82, 76, 70, 64, 58, 52]) {
-      const output = await sharp(buffer)
-        .rotate()
-        .resize(width, height, {
-          fit: "cover",
-          position: "center",
-        })
-        .flatten({
-          background: { r: 17, g: 24, b: 39 },
-        })
-        .jpeg({
-          quality,
-          mozjpeg: true,
-          progressive: true,
-        })
+    const resized = await sharp(buffer)
+      .rotate()
+      .resize(width, height, { fit: "cover", position: "center" })
+      .flatten({ background: { r: 17, g: 24, b: 39 } })
+      .toBuffer();
+
+    for (const quality of [82, 75, 68, 60, 52, 45, 38]) {
+      const output = await sharp(resized)
+        .jpeg({ quality, mozjpeg: true, progressive: true })
         .toBuffer();
 
       if (output.length <= maxBytes) return output;
     }
 
-    return sharp(buffer)
-      .rotate()
-      .resize(width, height, {
-        fit: "cover",
-        position: "center",
-      })
-      .flatten({
-        background: { r: 17, g: 24, b: 39 },
-      })
-      .jpeg({
-        quality: 48,
-        mozjpeg: true,
-        progressive: true,
-      })
-      .toBuffer();
+    return sharp(resized).jpeg({ quality: 30, mozjpeg: true, progressive: true }).toBuffer();
   }
 }
 

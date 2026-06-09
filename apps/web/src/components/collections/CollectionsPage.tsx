@@ -2713,9 +2713,9 @@ function getLanguageFlag(language: string): string {
 }
 
 function publicCollectionUrl(shareToken: string): string {
-  // Use o link de compartilhamento da API para obter o preview do Open Graph no WhatsApp
-  const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
-  return `${baseUrl}/public/collections/${encodeURIComponent(shareToken)}/share`;
+  // Use o domínio atual para links profissionais e curtos
+  const baseUrl = window.location.origin;
+  return `${baseUrl}/p/${encodeURIComponent(shareToken)}`;
 }
 
 function InfoPill({ label, value }: { label: string; value: string }) {

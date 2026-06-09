@@ -455,6 +455,12 @@ function parseRoute(): AppRoute {
   const path = window.location.pathname;
   const search = new URLSearchParams(window.location.search);
   
+  // Aliases para links curtos e profissionais
+  const shortPublicCollectionMatch = path.match(/^\/p\/([^/]+)\/?$/);
+  if (shortPublicCollectionMatch) {
+    return { view: "home", publicCollection: decodeURIComponent(shortPublicCollectionMatch[1]) };
+  }
+
   const publicCollectionMatch = path.match(/^\/public\/collections\/([^/]+)\/?$/);
   if (publicCollectionMatch) {
     return { view: "home", publicCollection: decodeURIComponent(publicCollectionMatch[1]) };
@@ -497,7 +503,7 @@ function parseRoute(): AppRoute {
 
 function routeToUrl(route: AppRoute): string {
   if (route.publicCollection) {
-    return `/public/collections/${encodeURIComponent(route.publicCollection)}`;
+    return `/p/${encodeURIComponent(route.publicCollection)}`;
   }
   if (route.publicProfile) {
     return `/public/profile/${encodeURIComponent(route.publicProfile)}`;
