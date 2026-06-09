@@ -348,7 +348,7 @@ export const api = {
   updateCollectionFolderSharing(
     token: string,
     id: string,
-    payload: { isPublic?: boolean; ensureToken?: boolean; bannerUrl?: string },
+    payload: { isPublic?: boolean; ensureToken?: boolean; bannerUrl?: string | null },
   ) {
     return request<CollectionFolderDetail>(
       `/collection/folders/${encodeURIComponent(id)}/sharing`,

@@ -350,7 +350,7 @@ export function CollectionsPage({
     }
   }
 
-  async function updateFolderSharing(payload: { isPublic?: boolean; bannerUrl?: string }) {
+  async function updateFolderSharing(payload: { isPublic?: boolean; bannerUrl?: string | null }) {
     if (!activeFolder) return;
     setError(null);
     setMessage(null);
@@ -1773,6 +1773,7 @@ function CollectionDetailScreen({
   onManagePermissions,
 }: {
   activeName: string;
+  hasChanges: boolean;
   selectedItems: CollectionItem[];
   unsoldCount: number;
   visibleItems: CollectionItem[];
