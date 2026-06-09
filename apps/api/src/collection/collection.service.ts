@@ -1496,7 +1496,7 @@ export class CollectionService {
     const frontUrl = this.config.get<string>("FRONT_URL") || "http://localhost:5173";
 
     // A imagem do preview continua sendo gerada pela API (backend) pois o robô do WhatsApp não executa JS.
-    const imageUrl = `${baseUrl}/collection/folders/${shareToken}/preview-image`;
+    const imageUrl = `${baseUrl}/public/collections/${shareToken}/preview-image`;
     // O link de redirecionamento agora é o do seu FRONTEND usando a rota de share amigável.
     const redirectUrl = `${frontUrl}/share/${shareToken}`;
     
