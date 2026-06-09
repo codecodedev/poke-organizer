@@ -20,6 +20,7 @@ export class EmailService {
         user: this.config.get("SMTP_USER"),
         pass: this.config.get("SMTP_PASS"),
       },
+      family: 4, // Força o uso de IPv4 para evitar erros ENETUNREACH em ambientes cloud
       tls: {
         // Não falha em certificados auto-assinados (comum em alguns ambientes Hostinger)
         rejectUnauthorized: false
