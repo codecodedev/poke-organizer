@@ -1,34 +1,22 @@
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
-import * as nodemailer from "nodemailer";
+import { Resend } from "resend";
 
 @Injectable()
 export class EmailService {
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
   private readonly brandColor = "#22d3ee"; // Cyan
   private readonly brandGradient = "linear-gradient(to bottom right, #22d3ee, #d946ef)";
 
   constructor(private config: ConfigService) {
-    const port = Number(this.config.get("SMTP_PORT"));
-    const secure = port === 465 || this.config.get("SMTP_SECURE") === "true";
-
-    this.transporter = nodemailer.createTransport({
-      host: this.config.get("SMTP_HOST"),
-      port,
-      secure,
-      auth: {
-        user: this.config.get("SMTP_USER"),
-        pass: this.config.get("SMTP_PASS"),
-      },
-      family: 4, // Força o uso de IPv4 para evitar erros ENETUNREACH em ambientes cloud
-      tls: {
-        // Não falha em certificados auto-assinados (comum em alguns ambientes Hostinger)
-        rejectUnauthorized: false
-      },
-      connectionTimeout: 20000, // Aumentado para 20s para ambientes cloud
-      greetingTimeout: 20000,
-      socketTimeout: 20000,
-    } as any);
+    const apiKey = this.config.get("RESEND_API_KEY");
+    this.resend = new Resend(apiKey);
+    
+    if (!apiKey) {
+      console.warn("[EmailService] RESEND_API_KEY not found. Emails will fail to send.");
+    } else {
+      console.log("[EmailService] Resend initialized (HTTP API mode)");
+    }
   }
 
   private wrapHtml(content: string, previewText: string) {
@@ -93,13 +81,18 @@ export class EmailService {
     `, "Bem-vindo ao Coleciona Cards! Confirme seu e-mail.");
 
     try {
-      await this.transporter.sendMail({
-        from: this.config.get("SMTP_FROM") || '"Coleciona Cards" <no-reply@coleciona.cards>',
-        to: email,
+      const { data, error } = await this.resend.emails.send({
+        from: this.config.get("SMTP_FROM") || "Coleciona Cards <onboarding@resend.dev>",
+        to: [email],
         subject: "Seja bem-vindo! Confirme seu e-mail",
         html,
       });
-      console.log(`[EmailService] Welcome email sent successfully to ${email}`);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(`[EmailService] Welcome email sent successfully to ${email} (ID: ${data?.id})`);
     } catch (error) {
       console.error(`[EmailService] Failed to send welcome email to ${email}:`, error);
     }
@@ -120,13 +113,18 @@ export class EmailService {
     `, "Link para redefinir sua senha no Coleciona Cards");
 
     try {
-      await this.transporter.sendMail({
-        from: this.config.get("SMTP_FROM") || '"Coleciona Cards" <no-reply@coleciona.cards>',
-        to: email,
+      const { data, error } = await this.resend.emails.send({
+        from: this.config.get("SMTP_FROM") || "Coleciona Cards <onboarding@resend.dev>",
+        to: [email],
         subject: "Recuperação de Senha",
         html,
       });
-      console.log(`[EmailService] Password reset email sent successfully to ${email}`);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(`[EmailService] Password reset email sent successfully to ${email} (ID: ${data?.id})`);
     } catch (error) {
       console.error(`[EmailService] Failed to send password reset email to ${email}:`, error);
     }
@@ -150,13 +148,18 @@ export class EmailService {
     `, `Novo lance de R$ ${amount.toFixed(2)} no seu leilão!`);
 
     try {
-      await this.transporter.sendMail({
-        from: this.config.get("SMTP_FROM") || '"Coleciona Cards" <no-reply@coleciona.cards>',
-        to: email,
+      const { data, error } = await this.resend.emails.send({
+        from: this.config.get("SMTP_FROM") || "Coleciona Cards <onboarding@resend.dev>",
+        to: [email],
         subject: "Novo lance no seu leilão!",
         html,
       });
-      console.log(`[EmailService] Bid notification sent successfully to ${email}`);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(`[EmailService] Bid notification sent successfully to ${email} (ID: ${data?.id})`);
     } catch (error) {
       console.error(`[EmailService] Failed to send bid notification to ${email}:`, error);
     }
@@ -180,13 +183,18 @@ export class EmailService {
     `, `Nova proposta de R$ ${total.toFixed(2)} recebida!`);
 
     try {
-      await this.transporter.sendMail({
-        from: this.config.get("SMTP_FROM") || '"Coleciona Cards" <no-reply@coleciona.cards>',
-        to: email,
+      const { data, error } = await this.resend.emails.send({
+        from: this.config.get("SMTP_FROM") || "Coleciona Cards <onboarding@resend.dev>",
+        to: [email],
         subject: "Você recebeu uma nova proposta!",
         html,
       });
-      console.log(`[EmailService] Proposal notification sent successfully to ${email}`);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(`[EmailService] Proposal notification sent successfully to ${email} (ID: ${data?.id})`);
     } catch (error) {
       console.error(`[EmailService] Failed to send proposal notification to ${email}:`, error);
     }
@@ -213,13 +221,18 @@ export class EmailService {
     `, `Sua proposta foi ${isAccepted ? "aceita" : "recusada"}`);
 
     try {
-      await this.transporter.sendMail({
-        from: this.config.get("SMTP_FROM") || '"Coleciona Cards" <no-reply@coleciona.cards>',
-        to: email,
+      const { data, error } = await this.resend.emails.send({
+        from: this.config.get("SMTP_FROM") || "Coleciona Cards <onboarding@resend.dev>",
+        to: [email],
         subject: `Sua proposta foi ${isAccepted ? "aceita" : "recusada"}!`,
         html,
       });
-      console.log(`[EmailService] Proposal decision notification sent successfully to ${email}`);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(`[EmailService] Proposal decision notification sent successfully to ${email} (ID: ${data?.id})`);
     } catch (error) {
       console.error(`[EmailService] Failed to send decision notification to ${email}:`, error);
     }
@@ -243,13 +256,18 @@ export class EmailService {
     `, `Parabéns! Você venceu o leilão "${auctionTitle}"!`);
 
     try {
-      await this.transporter.sendMail({
-        from: this.config.get("SMTP_FROM") || '"Coleciona Cards" <no-reply@coleciona.cards>',
-        to: email,
+      const { data, error } = await this.resend.emails.send({
+        from: this.config.get("SMTP_FROM") || "Coleciona Cards <onboarding@resend.dev>",
+        to: [email],
         subject: `Você venceu o leilão: ${auctionTitle}!`,
         html,
       });
-      console.log(`[EmailService] Auction winner email sent successfully to ${email}`);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(`[EmailService] Auction winner email sent successfully to ${email} (ID: ${data?.id})`);
     } catch (error) {
       console.error(`[EmailService] Failed to send auction winner email to ${email}:`, error);
     }
@@ -272,13 +290,18 @@ export class EmailService {
     `, `Seu pedido #${orderId.slice(-6).toUpperCase()} foi ${statusText.toLowerCase()}`);
 
     try {
-      await this.transporter.sendMail({
-        from: this.config.get("SMTP_FROM") || '"Coleciona Cards" <no-reply@coleciona.cards>',
-        to: email,
+      const { data, error } = await this.resend.emails.send({
+        from: this.config.get("SMTP_FROM") || "Coleciona Cards <onboarding@resend.dev>",
+        to: [email],
         subject: `Pedido #${orderId.slice(-6).toUpperCase()} ${statusText.toLowerCase()}`,
         html,
       });
-      console.log(`[EmailService] Order status email sent successfully to ${email}`);
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(`[EmailService] Order status email sent successfully to ${email} (ID: ${data?.id})`);
     } catch (error) {
       console.error(`[EmailService] Failed to send order status email to ${email}:`, error);
     }
