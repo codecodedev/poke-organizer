@@ -1497,8 +1497,9 @@ export class CollectionService {
 
     // A imagem do preview continua sendo gerada pela API (backend) pois o robô do WhatsApp não executa JS.
     const imageUrl = `${baseUrl}/public/collections/${shareToken}/preview-image`;
-    // O link de redirecionamento agora é o do seu FRONTEND usando a rota de share amigável.
-    const redirectUrl = `${frontUrl}/share/${shareToken}`;
+    // O link de redirecionamento para o humano deve ser a página REAL da coleção no frontend.
+    // NÃO use /share/ aqui para evitar loop infinito com o vercel.json.
+    const redirectUrl = `${frontUrl}/public/collections/${shareToken}`;
     
     const title = `${folder.name} - Coleção de ${folder.user.name?.trim() || "um colecionador"}`;
     const description = `Confira minha coleção de cartas Pokémon no Coleciona Card!`;
