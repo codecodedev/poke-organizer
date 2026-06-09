@@ -64,7 +64,7 @@ export class AuthService {
       return { 
         message: "Cadastro realizado com sucesso. Por favor, verifique seu e-mail para confirmar sua conta." 
       };
-    } catch (error) {
+    } catch (error: any) {
       // Handle Prisma unique constraint violation (P2002)
       if (error.code === "P2002") {
         throw new ConflictException("E-mail já está em uso");

@@ -24,7 +24,7 @@ export class EmailService {
       },
       connectionTimeout: 10000,
       greetingTimeout: 10000,
-    });
+    } as any);
   }
 
   private wrapHtml(content: string, previewText: string) {
