@@ -1309,7 +1309,7 @@ function OffersModal({
                     <div key={entry.item.id} className="flex items-center justify-between text-xs font-bold dark:bg-white/40 p-2 rounded-lg">
                       <div className="flex flex-col gap-1">
                         <span className="text-slate-600 dark:text-slate-300">
-                          {entry.quantity}x {entry.item.card.name}
+                          {entry.quantity}x {entry.item.card.name} - {entry.item.card.setCode}
                         </span>
                         <span className="text-[10px] font-semibold text-slate-400">
                           {entry.item.condition} • {getLanguageFlag(entry.item.language)} {entry.item.language} • {formatCardVariant(entry.item.variant)}
