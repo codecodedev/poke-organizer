@@ -1356,14 +1356,16 @@ export class CollectionService {
 
     if (folder.bannerUrl && !folder.bannerUrl.includes("preview-image")) {
       try {
+        console.log(`[Preview] Buscando banner: ${folder.bannerUrl}`);
         const response = await fetch(folder.bannerUrl, { signal: AbortSignal.timeout(5000) });
         if (response.ok) {
           const arrayBuffer = await response.arrayBuffer();
+          console.log(`[Preview] Banner carregado com sucesso (${arrayBuffer.byteLength} bytes)`);
           // Resize and compress to JPEG for WhatsApp compatibility (< 300KB)
           return sharp(Buffer.from(arrayBuffer)).resize(width, height, { fit: "cover" }).jpeg({ quality: 80 }).toBuffer();
         }
-      } catch (e) {
-        console.error("Failed to fetch banner", e);
+      } catch (e: any) {
+        console.error(`[Preview] Falha ao buscar banner: ${e.message}`);
       }
     }
 
@@ -1372,46 +1374,66 @@ export class CollectionService {
       .filter(Boolean) as string[];
 
     const fallbackLogo = async () => {
-      const logoPath = join(process.cwd(), "public", "images", "logo-preview.png");
-      try {
-        const logoBuffer = await fs.readFile(logoPath);
-        return sharp({
-          create: {
-            width,
-            height,
-            channels: 4,
-            background: { r: 17, g: 24, b: 39, alpha: 1 }, // slate-900
-          },
-        })
-          .composite([
-            {
-              input: await sharp(logoBuffer)
-                .resize({ width: 600, height: 400, fit: "inside", withoutEnlargement: true })
-                .toBuffer(),
-              gravity: "center",
-            },
-          ])
-          .jpeg({ quality: 80 })
-          .toBuffer();
-      } catch (e) {
-        // Ultimate fallback if logo also fails
-        return sharp({
-          create: {
-            width,
-            height,
-            channels: 4,
-            background: { r: 31, g: 41, b: 55, alpha: 1 }, // slate-800
-          },
-        })
-          .jpeg({ quality: 80 })
-          .toBuffer();
+      // Tenta achar a logo em caminhos relativos ao CWD (raiz ou pasta da api)
+      const possiblePaths = [
+        join(process.cwd(), "public", "images", "logo-preview.png"),
+        join(process.cwd(), "apps", "api", "public", "images", "logo-preview.png"),
+      ];
+
+      let logoBuffer: Buffer | null = null;
+      for (const p of possiblePaths) {
+        try {
+          logoBuffer = await fs.readFile(p);
+          console.log(`[Preview] Logo encontrada em: ${p}`);
+          break;
+        } catch (err) {}
       }
+
+      if (logoBuffer) {
+        try {
+          return sharp({
+            create: {
+              width,
+              height,
+              channels: 4,
+              background: { r: 17, g: 24, b: 39, alpha: 1 }, // slate-900
+            },
+          })
+            .composite([
+              {
+                input: await sharp(logoBuffer)
+                  .resize({ width: 600, height: 400, fit: "inside", withoutEnlargement: true })
+                  .toBuffer(),
+                gravity: "center",
+              },
+            ])
+            .jpeg({ quality: 80 })
+            .toBuffer();
+        } catch (e: any) {
+          console.error(`[Preview] Erro ao processar logo com sharp: ${e.message}`);
+        }
+      }
+
+      console.warn(`[Preview] Nenhuma logo encontrada, usando fundo padrao.`);
+      // Ultimate fallback if logo also fails
+      return sharp({
+        create: {
+          width,
+          height,
+          channels: 4,
+          background: { r: 31, g: 41, b: 55, alpha: 1 }, // slate-800
+        },
+      })
+        .jpeg({ quality: 80 })
+        .toBuffer();
     };
 
     if (cardImages.length === 0) {
+      console.log(`[Preview] Colecao vazia, usando logo fallback.`);
       return fallbackLogo();
     }
 
+    console.log(`[Preview] Buscando ${cardImages.length} imagens de cartas...`);
     const images = await Promise.all(
       cardImages.map(async (url) => {
         try {
@@ -1425,8 +1447,10 @@ export class CollectionService {
     );
 
     const validImages = images.filter((img): img is NonNullable<typeof img> => img !== null);
+    console.log(`[Preview] ${validImages.length} imagens de cartas carregadas.`);
 
     if (validImages.length === 0) {
+      console.log(`[Preview] Nenhuma imagem de carta carregada, usando logo fallback.`);
       return fallbackLogo();
     }
 
