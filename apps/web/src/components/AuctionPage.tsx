@@ -2,7 +2,8 @@
 import { useEffect, useState } from "react";
 import { Gavel, History, Timer, User, X } from "lucide-react";
 import type { AuctionDetail } from "@poke-organizer/shared";
-import { api, type Session, type AppRoute } from "../lib/api";
+import { api, type Session } from "../lib/api";
+import { type AppRoute } from "../pages/App";
 import { withAuthRetry } from "../lib/authRetry";
 import { formatBrl } from "../lib/format";
 import { Panel } from "./ui/Panel";

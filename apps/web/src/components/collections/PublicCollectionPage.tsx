@@ -7,7 +7,8 @@ import type {
   PublicCollectionDetail,
   CollectionCartOffer,
 } from "@poke-organizer/shared";
-import { api, type Session, type AppRoute } from "../../lib/api";
+import { api, type Session } from "../../lib/api";
+import { type AppRoute } from "../../pages/App";
 import { withAuthRetry } from "../../lib/authRetry";
 import { formatBrl } from "../../lib/format";
 import { CollectionItemCard } from "../collection/CollectionItemCard";

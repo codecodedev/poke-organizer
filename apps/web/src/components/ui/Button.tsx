@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-type ButtonVariant = "primary" | "brand" | "ghost" | "gradient";
+type ButtonVariant = "primary" | "brand" | "ghost" | "gradient" | "outline";
 
 type ButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
@@ -11,7 +11,8 @@ const variants: Record<ButtonVariant, string> = {
   primary: "btn-primary",
   brand: "btn-brand",
   ghost: "btn-ghost",
-  gradient: "btn-gradient h-12 px-6 rounded-2xl"
+  gradient: "btn-gradient h-12 px-6 rounded-2xl",
+  outline: "border border-line bg-transparent hover:bg-field transition-colors"
 };
 
 export function Button({ variant = "ghost", icon, className = "", children, ...props }: ButtonProps) {

@@ -2,7 +2,8 @@ import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { Gavel, X, Search, Plus } from "lucide-react";
 import type { CollectionItem } from "@poke-organizer/shared";
-import { api, type Session, type AppRoute } from "../lib/api";
+import { api, type Session } from "../lib/api";
+import { type AppRoute } from "../pages/App";
 import { withAuthRetry } from "../lib/authRetry";
 import { AuctionCreationModal } from "./AuctionCreationModal";
 
@@ -115,7 +116,7 @@ export function AuctionWizardModal({ session, onSession, onUnauthorized, onClose
                   >
                     <div className="aspect-[3/4] w-full overflow-hidden rounded-xl bg-slate-50">
                       <img
-                        src={item.card.imageSmall}
+                        src={item.card.imageSmall || undefined}
                         alt={item.card.name}
                         className="h-full w-full object-contain transition group-hover:scale-105"
                       />

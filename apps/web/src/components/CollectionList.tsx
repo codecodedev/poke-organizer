@@ -16,7 +16,8 @@ import {
   type CollectionItem,
   type CollectionFolderSort,
 } from "@poke-organizer/shared";
-import { api, type Session, type AppRoute } from "../lib/api";
+import { api, type Session } from "../lib/api";
+import { type AppRoute } from "../pages/App";
 import { withAuthRetry } from "../lib/authRetry";
 import { formatBrl } from "../lib/format";
 import { CardDetailModal, type UpdateCardDetails } from "./CardDetailModal";
@@ -84,6 +85,7 @@ export function CollectionList({
   session,
   onSession,
   onUnauthorized,
+  onNavigate,
   refreshKey,
   limit,
   title = "Minha colecao",

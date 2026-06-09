@@ -51,7 +51,7 @@ import { ConfirmEmailPanel } from "../components/ConfirmEmailPanel";
 
 type View = "home" | "cards" | "collections" | "decks" | "buy" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email";
 type ThemeMode = "light" | "dark";
-type AppRoute = {
+export type AppRoute = {
   view: View;
   publicCollection?: string | null;
   publicProfile?: string | null;
@@ -161,7 +161,7 @@ export function App() {
         {session && (
           <Sidebar
             session={session}
-            activeView={view}
+            activeView={view as any}
             onNavigate={(nextView) => navigate({ view: nextView })}
             onLogout={() => setShowLogoutConfirm(true)}
             theme={theme}

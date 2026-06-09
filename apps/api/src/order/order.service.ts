@@ -64,7 +64,7 @@ export class OrderService {
           where: {
             OR: [
               { id: order.proposalId ? (await tx.collectionCartOffer.findUnique({ where: { id: order.proposalId } }))?.folderId : undefined },
-              { items: { some: { auctions: { some: { id: order.auctionId || undefined } } } } }
+              { items: { some: { collectionItem: { auctions: { some: { id: order.auctionId || undefined } } } } } }
             ]
           }
         });

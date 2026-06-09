@@ -2,7 +2,8 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { Gavel, X } from "lucide-react";
 import type { CollectionItem } from "@poke-organizer/shared";
-import { api, type Session, type AppRoute } from "../lib/api";
+import { api, type Session } from "../lib/api";
+import { type AppRoute } from "../pages/App";
 import { withAuthRetry } from "../lib/authRetry";
 import { Button } from "./ui/Button";
 
