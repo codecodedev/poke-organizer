@@ -6,9 +6,6 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomBytes } from "node:crypto";
-import { createWriteStream } from "node:fs";
-import { join } from "node:path";
-import { pipeline } from "node:stream/promises";
 import sharp from "sharp";
 import { StorageService } from "../storage/storage.service";
 import {
@@ -1334,8 +1331,8 @@ export class CollectionService {
         const response = await fetch(folder.bannerUrl);
         if (response.ok) {
           const arrayBuffer = await response.arrayBuffer();
-          // Resize/Format if needed to ensure OG compatibility
-          return sharp(Buffer.from(arrayBuffer)).resize(width, height, { fit: "cover" }).png().toBuffer();
+          // Resize and compress to JPEG for WhatsApp compatibility (< 300KB)
+          return sharp(Buffer.from(arrayBuffer)).resize(width, height, { fit: "cover" }).jpeg({ quality: 80 }).toBuffer();
         }
       } catch (e) {
         console.error("Failed to fetch banner", e);
@@ -1355,7 +1352,7 @@ export class CollectionService {
           background: { r: 31, g: 41, b: 55, alpha: 1 }, // slate-800
         },
       })
-        .png()
+        .jpeg({ quality: 80 })
         .toBuffer();
     }
 
@@ -1400,7 +1397,7 @@ export class CollectionService {
       });
     }
 
-    return canvas.composite(composites).png().toBuffer();
+    return canvas.composite(composites).jpeg({ quality: 80 }).toBuffer();
   }
 
   async getShareHtml(shareToken: string): Promise<string> {
@@ -1414,10 +1411,8 @@ export class CollectionService {
     const baseUrl = this.config.get<string>("API_BASE_URL");
     const frontUrl = this.config.get<string>("FRONT_URL");
 
-    const imageUrl =
-      folder.bannerUrl && !folder.bannerUrl.includes("preview-image")
-        ? folder.bannerUrl
-        : `${baseUrl}/public/collections/${shareToken}/preview-image`;
+    // Always route through preview-image endpoint to ensure WhatsApp compatible size & format (JPEG < 300KB)
+    const imageUrl = `${baseUrl}/public/collections/${shareToken}/preview-image`;
     const redirectUrl = `${frontUrl}/public/collections/${shareToken}`;
     const title = `${folder.name} - Coleção de ${folder.user.name?.trim() || "um colecionador"}`;
     const description = `Confira minha coleção de cartas Pokémon no Coleciona Card!`;

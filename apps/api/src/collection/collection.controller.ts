@@ -212,7 +212,7 @@ export class PublicCollectionController {
   @Get(":shareToken/preview-image")
   async getPreviewImage(@Param("shareToken") shareToken: string, @Res() res: FastifyReply) {
     const buffer = await this.collection.getPreviewImage(shareToken);
-    res.type("image/png").send(buffer);
+    res.type("image/jpeg").send(buffer);
   }
 
   @Post(":shareToken/offers")

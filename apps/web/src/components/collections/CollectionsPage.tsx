@@ -1904,17 +1904,18 @@ function CollectionDetailScreen({
                 }}
               />
             </label>
-            <div className="flex absolute right-6 top-6 items-center gap-3">
-              {bannerUrl && (
-                <button
-                  type="button"
-                  className="text-[10px] font-black text-red-500 hover:text-red-700 hover:underline uppercase tracking-wider"
-                  onClick={() => onRemoveBanner()}
-                >
-                  <Trash2 size={20} />
-                </button>
-              )}
-            </div>
+            {bannerUrl && (
+              <div className="flex absolute right-6 top-6 items-center gap-3 bg-slate-100 p-2 rounded-full">
+                
+                  <button
+                    type="button"
+                    className="text-[10px] uppercase tracking-wider"
+                    onClick={() => onRemoveBanner()}
+                  >
+                    <Trash2 className="text-red-700 " size={22} />
+                  </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -1956,7 +1957,7 @@ function CollectionDetailScreen({
               </span>
             </div>
             <input
-              className="w-full rounded-none border-0 bg-transparent p-0 text-3xl font-black text-ink outline-none placeholder:text-slate-300"
+              className="w-full bg-slate-800 p-4 rounded-2xl border-0 text-3xl font-black text-ink outline-none placeholder:text-slate-300"
               value={activeName}
               onChange={(event) => onNameChange(event.target.value)}
               placeholder="Nome da colecao"

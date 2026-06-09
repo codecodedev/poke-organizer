@@ -391,7 +391,7 @@ body {
 }
 
 :root[data-theme="dark"] [class*="text-red-"] {
-  color: #fca5a5 !important;
+  /* color: #fca5a5 !important; */
 }
 
 :root[data-theme="dark"] [class*="bg-lilac"],
