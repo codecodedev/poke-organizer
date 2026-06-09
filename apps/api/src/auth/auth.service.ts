@@ -24,35 +24,53 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const email = dto.email.toLowerCase().trim();
-    const existing = await this.prisma.user.findUnique({ where: { email } });
+    
+    // Check if user or identity already exists
+    const existing = await this.prisma.user.findFirst({ 
+      where: { 
+        OR: [
+          { email },
+          { identities: { some: { provider: "password", providerUserId: email } } }
+        ]
+      } 
+    });
+
     if (existing) {
-      throw new ConflictException("Email already registered");
+      throw new ConflictException("E-mail já cadastrado");
     }
 
     const emailConfirmationToken = randomstring.generate(32);
 
-    const user = await this.prisma.user.create({
-      data: {
-        email,
-        name: dto.name?.trim() || null,
-        passwordHash: await argon2.hash(dto.password),
-        emailConfirmationToken,
-        identities: {
-          create: {
-            provider: "password",
-            providerUserId: email
+    try {
+      const user = await this.prisma.user.create({
+        data: {
+          email,
+          name: dto.name?.trim() || null,
+          passwordHash: await argon2.hash(dto.password),
+          emailConfirmationToken,
+          identities: {
+            create: {
+              provider: "password",
+              providerUserId: email
+            }
           }
         }
+      });
+
+      // Send welcome email asynchronously
+      void this.emailService.sendWelcomeEmail(user.email, user.name || "Treinador", emailConfirmationToken)
+        .catch(err => console.error("Failed to send welcome email", err));
+
+      return { 
+        message: "Cadastro realizado com sucesso. Por favor, verifique seu e-mail para confirmar sua conta." 
+      };
+    } catch (error) {
+      // Handle Prisma unique constraint violation (P2002)
+      if (error.code === "P2002") {
+        throw new ConflictException("E-mail já está em uso");
       }
-    });
-
-    // Send welcome email asynchronously
-    void this.emailService.sendWelcomeEmail(user.email, user.name || "Treinador", emailConfirmationToken)
-      .catch(err => console.error("Failed to send welcome email", err));
-
-    return { 
-      message: "Registration successful. Please check your email to confirm your account." 
-    };
+      throw error;
+    }
   }
 
   async confirmEmail(dto: ConfirmEmailDto) {

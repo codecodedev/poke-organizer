@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
   { id: "orders", label: "Pedidos", icon: <Package size={20} /> },
   { id: "cards", label: "Minhas Cartas", icon: <LibraryBig size={20} /> },
   { id: "collections", label: "Coleções", icon: <FolderOpen size={20} /> },
-  { id: "decks", label: "Decks", icon: <Swords size={20} /> },
+  // { id: "decks", label: "Decks", icon: <Swords size={20} /> },
   { id: "proposals", label: "Propostas", icon: <MessageSquare size={20} /> },
   { id: "profile", label: "Perfil", icon: <UserIcon size={20} /> },
 ];
