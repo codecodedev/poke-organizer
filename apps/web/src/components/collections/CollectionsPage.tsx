@@ -1839,6 +1839,7 @@ function CollectionDetailScreen({
   onManagePermissions: () => void;
 }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
+  const [isEditingName, setIsEditingName] = useState(false);
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
@@ -1871,7 +1872,7 @@ function CollectionDetailScreen({
   return (
     <>
         <div className="mb-6 overflow-hidden rounded-[32px] border border-line/80 bg-white/70 shadow-sm w-full">
-          <div className={`relative w-full overflow-hidden bg-slate-900 ${bannerUrl ? "aspect-[21/9] sm:aspect-[4/1]": "min-h-28"}`}>
+          <div className={`relative w-full overflow-hidden bg-slate-900 ${bannerUrl ? "aspect-[21/9] sm:aspect-[4/1]": "min-h-32"}`}>
             {bannerUrl && (
                <img 
                 src={bannerUrl} 
@@ -1883,14 +1884,49 @@ function CollectionDetailScreen({
 
             <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
 
-            <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between gap-4">
-               <div>
-                 <h1 className="text-2xl font-black text-white drop-shadow-md sm:text-4xl">{activeName}</h1>
+            <div className="absolute top-6 left-6 right-6 flex items-end justify-between gap-4">
+               <div className="flex flex-col gap-2">
+                 {isEditingName ? (
+                   <div className="flex items-center gap-2 max-w-2xl">
+                     <input
+                       autoFocus
+                       className="bg-white/20 p-1.5 pl-4 rounded-xl font-black text-white outline-none placeholder:text-white/50 backdrop-blur-md border border-white/30 sm:text-4xl"
+                       value={activeName}
+                       onChange={(e) => onNameChange(e.target.value)}
+                       onKeyDown={(e) => {
+                         if (e.key === 'Enter') setIsEditingName(false);
+                         if (e.key === 'Escape') setIsEditingName(false);
+                       }}
+                       onBlur={() => setIsEditingName(false)}
+                     />
+                     <button 
+                       onClick={() => setIsEditingName(false)}
+                       className="p-2 z-10 bg-leaf rounded-xl text-white shadow-lg shrink-0"
+                     >
+                       <Check size={24} />
+                     </button>
+                   </div>
+                 ) : (
+                   <div className="flex items-center gap-3 group">
+                     <h1 
+                       className="text-2xl font-black text-white drop-shadow-md sm:text-4xl cursor-pointer hover:text-white/90"
+                       onClick={() => setIsEditingName(true)}
+                     >
+                       {activeName}
+                     </h1>
+                     <button 
+                        onClick={() => setIsEditingName(true)}
+                        className=""
+                     >
+                        <Pencil className="text-white dark:text-white" size={18} />
+                     </button>
+                   </div>
+                 )}
                  <p className="mt-1 text-sm font-bold text-slate-200 drop-shadow-sm">{unsoldCount} cartas - {formatBrl(selectedTotalValue)}</p>
                </div>
             </div>
             
-            <label className="absolute flex flex-row items-center gap-1 right-8 bottom-6 cursor-pointer text-[10px] font-black text-white hover:text-brand-light hover:underline uppercase tracking-wider">
+            <label className="absolute flex flex-row items-center gap-1 right-auto left-6 sm:left-auto sm:right-8 bottom-4 sm:bottom-6 cursor-pointer text-[10px] font-black text-white hover:text-brand-light hover:underline uppercase tracking-wider">
               {bannerUploading ? "Enviando..." : (bannerUrl ? <>Alterar Banner<Pencil size={12} /></> : <>Adicionar Banner<Plus className="text-brand" size={16} /></>)} 
               <input
                 type="file"
@@ -1904,6 +1940,7 @@ function CollectionDetailScreen({
                 }}
               />
             </label>
+            
             {bannerUrl && (
               <div className="flex absolute right-6 top-6 items-center gap-3 bg-slate-100 p-2 rounded-full">
                 
@@ -1923,7 +1960,7 @@ function CollectionDetailScreen({
         <div className="grid gap-5">
           <ScreenHeader
             eyebrow="Detalhes"
-            title={bannerUrl ? "Configurações" : (activeName || "Colecao")}
+            title={""}
             description={bannerUrl ? "Gerencie sua coleção e links" : `${unsoldCount} cartas - ${formatBrl(selectedTotalValue)}`}
             onBack={onBack}
             notification={pendingOffersCount > 0}
@@ -1950,19 +1987,7 @@ function CollectionDetailScreen({
             }
           />
 
-          <label className="grid gap-2 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm relative">
-            <div className="flex items-center justify-between gap-4">
-              <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                Nome da colecao
-              </span>
-            </div>
-            <input
-              className="w-full bg-slate-800 p-4 rounded-2xl border-0 text-3xl font-black text-ink outline-none placeholder:text-slate-300"
-              value={activeName}
-              onChange={(event) => onNameChange(event.target.value)}
-              placeholder="Nome da colecao"
-            />
-          </label>
+
 
           <CollapsibleSection 
             title="Compartilhamento" 
