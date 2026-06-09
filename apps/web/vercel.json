@@ -2,13 +2,6 @@
   "buildCommand": "cd ../.. && corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm --filter web build",
   "outputDirectory": "dist",
   "installCommand": "cd ../.. && corepack enable && corepack prepare pnpm@9.15.4 --activate && pnpm install --frozen-lockfile",
-  "redirects": [
-    {
-      "source": "/share/:token",
-      "destination": "https://poke-organizer-api.onrender.com/public/collections/:token/share",
-      "permanent": false
-    }
-  ],
   "rewrites": [
     {
       "source": "/(.*)",

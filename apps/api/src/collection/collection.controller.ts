@@ -204,15 +204,28 @@ export class PublicCollectionController {
   }
 
   @Get(":shareToken/share")
-  async getShareHtml(@Param("shareToken") shareToken: string, @Res() res: FastifyReply) {
+  async getShareHtml(
+    @Param("shareToken") shareToken: string,
+    @Res() res: FastifyReply,
+  ) {
     const html = await this.collection.getShareHtml(shareToken);
-    res.type("text/html").send(html);
+    res
+      .header("Cache-Control", "public, max-age=3600")
+      .type("text/html; charset=utf-8")
+      .send(html);
   }
 
   @Get(":shareToken/preview-image")
-  async getPreviewImage(@Param("shareToken") shareToken: string, @Res() res: FastifyReply) {
+  async getPreviewImage(
+    @Param("shareToken") shareToken: string,
+    @Res() res: FastifyReply,
+  ) {
     const buffer = await this.collection.getPreviewImage(shareToken);
-    res.type("image/jpeg").send(buffer);
+    res
+      .header("Cache-Control", "public, max-age=86400")
+      .header("Content-Length", buffer.length)
+      .type("image/jpeg")
+      .send(buffer);
   }
 
   @Post(":shareToken/offers")

@@ -1337,109 +1337,175 @@ export class CollectionService {
   }
 
   async getPreviewImage(shareToken: string): Promise<Buffer> {
+    const width = 1200;
+    const height = 630;
+    const maxBytes = 300 * 1024;
+
+    const toOgJpeg = async (input: Buffer): Promise<Buffer> => {
+      for (const quality of [82, 76, 70, 64, 58, 52]) {
+        const output = await sharp(input)
+          .rotate()
+          .resize(width, height, {
+            fit: "cover",
+            position: "center",
+          })
+          .flatten({
+            background: { r: 17, g: 24, b: 39 },
+          })
+          .jpeg({
+            quality,
+            mozjpeg: true,
+            progressive: true,
+          })
+          .toBuffer();
+
+        if (output.length <= maxBytes) return output;
+      }
+
+      return sharp(input)
+        .rotate()
+        .resize(width, height, {
+          fit: "cover",
+          position: "center",
+        })
+        .flatten({
+          background: { r: 17, g: 24, b: 39 },
+        })
+        .jpeg({
+          quality: 48,
+          mozjpeg: true,
+          progressive: true,
+        })
+        .toBuffer();
+    };
+
     const folder = await this.prisma.collectionFolder.findUnique({
       where: { shareToken },
       include: {
         items: {
           take: 4,
           orderBy: { createdAt: "desc" },
-          include: { collectionItem: { include: { card: true } } },
+          include: {
+            collectionItem: {
+              include: {
+                card: true,
+              },
+            },
+          },
         },
       },
     });
 
-    if (!folder) throw new NotFoundException("Coleção não encontrada");
-
-    // Default image size for OG: 1200x630
-    const width = 1200;
-    const height = 630;
+    if (!folder) {
+      throw new NotFoundException("Coleção não encontrada");
+    }
 
     if (folder.bannerUrl && !folder.bannerUrl.includes("preview-image")) {
       try {
         console.log(`[Preview] Buscando banner: ${folder.bannerUrl}`);
-        const response = await fetch(folder.bannerUrl, { signal: AbortSignal.timeout(5000) });
+
+        const response = await fetch(folder.bannerUrl, {
+          signal: AbortSignal.timeout(5000),
+        });
+
         if (response.ok) {
           const arrayBuffer = await response.arrayBuffer();
-          console.log(`[Preview] Banner carregado com sucesso (${arrayBuffer.byteLength} bytes)`);
-          // Resize and compress to JPEG for WhatsApp compatibility (< 300KB)
-          return sharp(Buffer.from(arrayBuffer)).resize(width, height, { fit: "cover" }).jpeg({ quality: 80 }).toBuffer();
+          const bannerBuffer = Buffer.from(arrayBuffer);
+
+          console.log(`[Preview] Banner carregado com sucesso (${bannerBuffer.length} bytes)`);
+
+          return toOgJpeg(bannerBuffer);
         }
       } catch (e: any) {
         console.error(`[Preview] Falha ao buscar banner: ${e.message}`);
       }
     }
 
-    const cardImages = folder.items
-      .map((item) => item.collectionItem.card.imageSmall)
-      .filter(Boolean) as string[];
-
-    const fallbackLogo = async () => {
-      // Tenta achar a logo em caminhos relativos ao CWD (raiz ou pasta da api)
+    const fallbackLogo = async (): Promise<Buffer> => {
       const possiblePaths = [
         join(process.cwd(), "public", "images", "logo-preview.png"),
         join(process.cwd(), "apps", "api", "public", "images", "logo-preview.png"),
       ];
 
       let logoBuffer: Buffer | null = null;
-      for (const p of possiblePaths) {
+
+      for (const path of possiblePaths) {
         try {
-          logoBuffer = await fs.readFile(p);
-          console.log(`[Preview] Logo encontrada em: ${p}`);
+          logoBuffer = await fs.readFile(path);
+          console.log(`[Preview] Logo encontrada em: ${path}`);
           break;
-        } catch (err) {}
+        } catch {}
       }
 
       if (logoBuffer) {
         try {
-          return sharp({
+          const generated = await sharp({
             create: {
               width,
               height,
               channels: 4,
-              background: { r: 17, g: 24, b: 39, alpha: 1 }, // slate-900
+              background: { r: 17, g: 24, b: 39, alpha: 1 },
             },
           })
             .composite([
               {
                 input: await sharp(logoBuffer)
-                  .resize({ width: 600, height: 400, fit: "inside", withoutEnlargement: true })
+                  .resize({
+                    width: 600,
+                    height: 400,
+                    fit: "inside",
+                    withoutEnlargement: true,
+                  })
                   .toBuffer(),
                 gravity: "center",
               },
             ])
-            .jpeg({ quality: 80 })
+            .png()
             .toBuffer();
+
+          return toOgJpeg(generated);
         } catch (e: any) {
           console.error(`[Preview] Erro ao processar logo com sharp: ${e.message}`);
         }
       }
 
-      console.warn(`[Preview] Nenhuma logo encontrada, usando fundo padrao.`);
-      // Ultimate fallback if logo also fails
-      return sharp({
+      console.warn("[Preview] Nenhuma logo encontrada, usando fundo padrão.");
+
+      const generated = await sharp({
         create: {
           width,
           height,
           channels: 4,
-          background: { r: 31, g: 41, b: 55, alpha: 1 }, // slate-800
+          background: { r: 31, g: 41, b: 55, alpha: 1 },
         },
       })
-        .jpeg({ quality: 80 })
+        .png()
         .toBuffer();
+
+      return toOgJpeg(generated);
     };
 
+    const cardImages = folder.items
+      .map((item) => item.collectionItem?.card?.imageSmall)
+      .filter(Boolean) as string[];
+
     if (cardImages.length === 0) {
-      console.log(`[Preview] Colecao vazia, usando logo fallback.`);
+      console.log("[Preview] Coleção vazia, usando logo fallback.");
       return fallbackLogo();
     }
 
     console.log(`[Preview] Buscando ${cardImages.length} imagens de cartas...`);
+
     const images = await Promise.all(
       cardImages.map(async (url) => {
         try {
-          const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-          if (!res.ok) return null;
-          return Buffer.from(await res.arrayBuffer());
+          const response = await fetch(url, {
+            signal: AbortSignal.timeout(5000),
+          });
+
+          if (!response.ok) return null;
+
+          return Buffer.from(await response.arrayBuffer());
         } catch {
           return null;
         }
@@ -1447,10 +1513,11 @@ export class CollectionService {
     );
 
     const validImages = images.filter((img): img is NonNullable<typeof img> => img !== null);
+
     console.log(`[Preview] ${validImages.length} imagens de cartas carregadas.`);
 
     if (validImages.length === 0) {
-      console.log(`[Preview] Nenhuma imagem de carta carregada, usando logo fallback.`);
+      console.log("[Preview] Nenhuma imagem de carta carregada, usando logo fallback.");
       return fallbackLogo();
     }
 
@@ -1459,13 +1526,12 @@ export class CollectionService {
         width,
         height,
         channels: 4,
-        background: { r: 17, g: 24, b: 39, alpha: 1 }, // slate-900
+        background: { r: 17, g: 24, b: 39, alpha: 1 },
       },
     });
 
     const composites: sharp.OverlayOptions[] = [];
 
-    // Simple grid logic
     const cardWidth = 240;
     const cardHeight = 335;
     const gap = 40;
@@ -1474,14 +1540,30 @@ export class CollectionService {
     const startY = (height - cardHeight) / 2;
 
     for (let i = 0; i < validImages.length; i++) {
+      const image = validImages[i];
+
+      const cardBuffer = await sharp(image)
+        .rotate()
+        .resize(cardWidth, cardHeight, {
+          fit: "cover",
+          position: "center",
+        })
+        .jpeg({
+          quality: 85,
+          mozjpeg: true,
+        })
+        .toBuffer();
+
       composites.push({
-        input: await sharp(validImages[i]).resize(cardWidth, cardHeight).toBuffer(),
+        input: cardBuffer,
         top: Math.round(startY),
         left: Math.round(startX + i * (cardWidth + gap)),
       });
     }
 
-    return canvas.composite(composites).jpeg({ quality: 80 }).toBuffer();
+    const generated = await canvas.composite(composites).png().toBuffer();
+
+    return toOgJpeg(generated);
   }
 
   async getShareHtml(shareToken: string): Promise<string> {
@@ -1492,46 +1574,110 @@ export class CollectionService {
 
     if (!folder) throw new NotFoundException();
 
-    const baseUrl = this.config.get<string>("API_BASE_URL");
-    const frontUrl = this.config.get<string>("FRONT_URL") || "http://localhost:5173";
+    const baseUrl = this.config.getOrThrow<string>("API_BASE_URL").replace(/\/$/, "");
+    const frontUrl = this.config.getOrThrow<string>("FRONT_URL").replace(/\/$/, "");
 
-    // A imagem do preview continua sendo gerada pela API (backend) pois o robô do WhatsApp não executa JS.
     const imageUrl = `${baseUrl}/public/collections/${shareToken}/preview-image`;
-    // O link de redirecionamento para o humano deve ser a página REAL da coleção no frontend.
-    // NÃO use /share/ aqui para evitar loop infinito com o vercel.json.
     const redirectUrl = `${frontUrl}/public/collections/${shareToken}`;
-    
-    const title = `${folder.name} - Coleção de ${folder.user.name?.trim() || "um colecionador"}`;
-    const description = `Confira minha coleção de cartas Pokémon no Coleciona Card!`;
+
+    const title = this.escapeHtml(
+      `${folder.name} - Coleção de ${folder.user.name?.trim() || "um colecionador"}`,
+    );
+
+    const description = this.escapeHtml(
+      "Confira minha coleção de cartas Pokémon no Coleciona Card!",
+    );
 
     return `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
+  <!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
     <title>${title}</title>
-    <!-- Metatags para Redes Sociais (WhatsApp, Facebook, Twitter) -->
-    <meta property="og:type" content="website">
-    <meta property="og:url" content="${redirectUrl}">
-    <meta property="og:title" content="${title}">
-    <meta property="og:description" content="${description}">
-    <meta property="og:image" content="${imageUrl}">
-    <meta property="og:image:width" content="1200">
-    <meta property="og:image:height" content="630">
-    <meta name="twitter:card" content="summary_large_image">
-    
-    <!-- Redirecionamento instantâneo para o usuário humano -->
-    <meta http-equiv="refresh" content="0;url=${redirectUrl}">
-    <script>window.location.href = "${redirectUrl}";</script>
-</head>
-<body style="background: #111827; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh;">
-    <div style="text-align: center;">
-        <p>Redirecionando para a coleção...</p>
-        <a href="${redirectUrl}" style="color: #3b82f6;">Clique aqui se não for redirecionado</a>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="${redirectUrl}" />
+    <meta property="og:title" content="${title}" />
+    <meta property="og:description" content="${description}" />
+    <meta property="og:image" content="${imageUrl}" />
+    <meta property="og:image:secure_url" content="${imageUrl}" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="${redirectUrl}" />
+    <meta name="twitter:title" content="${title}" />
+    <meta name="twitter:description" content="${description}" />
+    <meta name="twitter:image" content="${imageUrl}" />
+
+    <meta http-equiv="refresh" content="1;url=${redirectUrl}" />
+  </head>
+  <body style="background:#111827;color:white;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;">
+    <div style="text-align:center;">
+      <p>Redirecionando para a coleção...</p>
+      <a href="${redirectUrl}" style="color:#3b82f6;">Abrir coleção</a>
     </div>
-</body>
-</html>
-`;
+
+    <script>
+      setTimeout(function () {
+        window.location.href = "${redirectUrl}";
+      }, 800);
+    </script>
+  </body>
+  </html>`;
+  }
+
+  private escapeHtml(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  private async toOgJpeg(buffer: Buffer): Promise<Buffer> {
+    const width = 1200;
+    const height = 630;
+    const maxBytes = 300 * 1024;
+
+    for (const quality of [82, 76, 70, 64, 58, 52]) {
+      const output = await sharp(buffer)
+        .rotate()
+        .resize(width, height, {
+          fit: "cover",
+          position: "center",
+        })
+        .flatten({
+          background: { r: 17, g: 24, b: 39 },
+        })
+        .jpeg({
+          quality,
+          mozjpeg: true,
+          progressive: true,
+        })
+        .toBuffer();
+
+      if (output.length <= maxBytes) return output;
+    }
+
+    return sharp(buffer)
+      .rotate()
+      .resize(width, height, {
+        fit: "cover",
+        position: "center",
+      })
+      .flatten({
+        background: { r: 17, g: 24, b: 39 },
+      })
+      .jpeg({
+        quality: 48,
+        mozjpeg: true,
+        progressive: true,
+      })
+      .toBuffer();
   }
 }
 

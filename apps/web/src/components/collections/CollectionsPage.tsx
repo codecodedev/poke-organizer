@@ -2713,10 +2713,9 @@ function getLanguageFlag(language: string): string {
 }
 
 function publicCollectionUrl(shareToken: string): string {
-  // Agora usamos o link do proprio frontend para um marketing amigavel
-  // O preview continuara funcionando pois a rota /share redireciona robos para a API
-  const frontUrl = window.location.origin;
-  return `${frontUrl}/share/${encodeURIComponent(shareToken)}`;
+  // Use o link de compartilhamento da API para obter o preview do Open Graph no WhatsApp
+  const baseUrl = import.meta.env.VITE_API_URL ?? "http://localhost:3333";
+  return `${baseUrl}/public/collections/${encodeURIComponent(shareToken)}/share`;
 }
 
 function InfoPill({ label, value }: { label: string; value: string }) {
