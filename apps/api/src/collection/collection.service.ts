@@ -1493,11 +1493,13 @@ export class CollectionService {
     if (!folder) throw new NotFoundException();
 
     const baseUrl = this.config.get<string>("API_BASE_URL");
-    const frontUrl = this.config.get<string>("FRONT_URL");
+    const frontUrl = this.config.get<string>("FRONT_URL") || "http://localhost:5173";
 
-    // Always route through preview-image endpoint to ensure WhatsApp compatible size & format (JPEG < 300KB)
-    const imageUrl = `${baseUrl}/public/collections/${shareToken}/preview-image`;
-    const redirectUrl = `${frontUrl}/public/collections/${shareToken}`;
+    // A imagem do preview continua sendo gerada pela API (backend) pois o robô do WhatsApp não executa JS.
+    const imageUrl = `${baseUrl}/collection/folders/${shareToken}/preview-image`;
+    // O link de redirecionamento agora é o do seu FRONTEND usando a rota de share amigável.
+    const redirectUrl = `${frontUrl}/share/${shareToken}`;
+    
     const title = `${folder.name} - Coleção de ${folder.user.name?.trim() || "um colecionador"}`;
     const description = `Confira minha coleção de cartas Pokémon no Coleciona Card!`;
 
@@ -1507,9 +1509,7 @@ export class CollectionService {
 <head>
     <meta charset="UTF-8">
     <title>${title}</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    
-    <!-- Open Graph / Facebook -->
+    <!-- Metatags para Redes Sociais (WhatsApp, Facebook, Twitter) -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="${redirectUrl}">
     <meta property="og:title" content="${title}">
@@ -1517,25 +1517,20 @@ export class CollectionService {
     <meta property="og:image" content="${imageUrl}">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-
-    <!-- Twitter -->
-    <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="${redirectUrl}">
-    <meta property="twitter:title" content="${title}">
-    <meta property="twitter:description" content="${description}">
-    <meta property="twitter:image" content="${imageUrl}">
-
+    <meta name="twitter:card" content="summary_large_image">
+    
+    <!-- Redirecionamento instantâneo para o usuário humano -->
     <meta http-equiv="refresh" content="0;url=${redirectUrl}">
     <script>window.location.href = "${redirectUrl}";</script>
 </head>
-<body style="background: #111827; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0;">
+<body style="background: #111827; color: white; font-family: sans-serif; display: flex; align-items: center; justify-content: center; height: 100vh;">
     <div style="text-align: center;">
         <p>Redirecionando para a coleção...</p>
-        <p style="font-size: 0.8rem; color: #9ca3af;">Se não for redirecionado, <a href="${redirectUrl}" style="color: #3b82f6;">clique aqui</a>.</p>
+        <a href="${redirectUrl}" style="color: #3b82f6;">Clique aqui se não for redirecionado</a>
     </div>
 </body>
 </html>
-    `;
+`;
   }
 }
 

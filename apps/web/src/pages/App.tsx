@@ -49,7 +49,7 @@ import { RequestPasswordResetPanel } from "../components/RequestPasswordResetPan
 import { ResetPasswordPanel } from "../components/ResetPasswordPanel";
 import { ConfirmEmailPanel } from "../components/ConfirmEmailPanel";
 
-type View = "home" | "cards" | "collections" | "decks" | "buy" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email";
+type View = "home" | "cards" | "collections" | "decks" | "buy" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email" | "share";
 type ThemeMode = "light" | "dark";
 export type AppRoute = {
   view: View;
@@ -59,6 +59,7 @@ export type AppRoute = {
   collection?: string | null;
   card?: string | null;
   token?: string | null;
+  shareToken?: string | null;
 };
 
 export function App() {
@@ -259,6 +260,10 @@ export function App() {
               />
             )}
 
+            {view === "share" && route.shareToken && (
+              <SharePage shareToken={route.shareToken} onRedirect={(token) => navigate({ view: "home", publicCollection: token })} />
+            )}
+
             {route.publicProfile && (
               <PublicProfilePage
                 slug={route.publicProfile}
@@ -408,6 +413,20 @@ export function App() {
   );
 }
 
+function SharePage({ shareToken, onRedirect }: { shareToken: string; onRedirect: (token: string) => void }) {
+  useEffect(() => {
+    // Redireciona imediatamente para a coleção pública
+    onRedirect(shareToken);
+  }, [shareToken, onRedirect]);
+
+  return (
+    <div className="flex flex-col items-center justify-center py-20">
+      <div className="h-12 w-12 animate-spin rounded-full border-4 border-cyan border-t-transparent" />
+      <p className="mt-4 font-bold text-slate-400">Carregando prévia...</p>
+    </div>
+  );
+}
+
 function HeroPanel({
   session,
   onSession,
@@ -470,6 +489,11 @@ function parseRoute(): AppRoute {
     return { view: "home", auction: decodeURIComponent(auctionMatch[1]) };
   }
 
+  const shareMatch = path.match(/^\/share\/([^/]+)\/?$/);
+  if (shareMatch) {
+    return { view: "share", shareToken: decodeURIComponent(shareMatch[1]) };
+  }
+
   if (path === "/confirm-email") {
     return { view: "confirm-email", token: search.get("token") };
   }
@@ -504,6 +528,9 @@ function routeToUrl(route: AppRoute): string {
   }
   if (route.auction) {
     return `/auctions/${encodeURIComponent(route.auction)}`;
+  }
+  if (route.view === "share" && route.shareToken) {
+    return `/share/${encodeURIComponent(route.shareToken)}`;
   }
   if (route.view === "confirm-email") {
     return `/confirm-email${route.token ? `?token=${encodeURIComponent(route.token)}` : ""}`;
