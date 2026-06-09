@@ -6,6 +6,8 @@ import {
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { randomBytes } from "node:crypto";
+import { join } from "node:path";
+import { promises as fs } from "node:fs";
 import sharp from "sharp";
 import { StorageService } from "../storage/storage.service";
 import {
@@ -280,6 +282,12 @@ export class CollectionService {
     }
 
     const shouldEnsureToken = dto.ensureToken || dto.isPublic === true;
+    
+    // Se estiver removendo o banner, deletar do storage
+    if (dto.bannerUrl === null && folder.bannerUrl) {
+      await this.storage.deleteBanner(folder.bannerUrl);
+    }
+
     await this.prisma.collectionFolder.update({
       where: { id },
       data: {
@@ -314,10 +322,23 @@ export class CollectionService {
     id: string,
     file: any, // MultipartFile
   ): Promise<CollectionFolderDetail> {
-    await this.assertOwnsFolder(userId, id);
+    const folder = await this.assertOwnsFolder(userId, id);
 
-    const buffer = await file.toBuffer();
-    const bannerUrl = await this.storage.uploadBanner(id, buffer, file.mimetype);
+    let buffer = await file.toBuffer();
+
+    // Redimensionar para evitar imagens gigantes e problemas de preview
+    // Limite de 1200px de largura, mantendo proporção, qualidade 80
+    buffer = await sharp(buffer)
+      .resize({ width: 1200, withoutEnlargement: true })
+      .jpeg({ quality: 80 })
+      .toBuffer();
+
+    // Deletar banner antigo se existir
+    if (folder.bannerUrl) {
+      await this.storage.deleteBanner(folder.bannerUrl);
+    }
+
+    const bannerUrl = await this.storage.uploadBanner(id, buffer, "image/jpeg");
 
     await this.prisma.collectionFolder.update({
       where: { id },
@@ -792,7 +813,12 @@ export class CollectionService {
   }
 
   async removeFolder(userId: string, id: string) {
-    await this.assertOwnsFolder(userId, id);
+    const folder = await this.assertOwnsFolder(userId, id);
+
+    if (folder.bannerUrl) {
+      await this.storage.deleteBanner(folder.bannerUrl);
+    }
+
     await this.prisma.collectionFolder.delete({ where: { id } });
     return { ok: true };
   }
@@ -1315,6 +1341,7 @@ export class CollectionService {
       include: {
         items: {
           take: 4,
+          orderBy: { createdAt: "desc" },
           include: { collectionItem: { include: { card: true } } },
         },
       },
@@ -1328,7 +1355,7 @@ export class CollectionService {
 
     if (folder.bannerUrl && !folder.bannerUrl.includes("preview-image")) {
       try {
-        const response = await fetch(folder.bannerUrl);
+        const response = await fetch(folder.bannerUrl, { signal: AbortSignal.timeout(5000) });
         if (response.ok) {
           const arrayBuffer = await response.arrayBuffer();
           // Resize and compress to JPEG for WhatsApp compatibility (< 300KB)
@@ -1343,23 +1370,51 @@ export class CollectionService {
       .map((item) => item.collectionItem.card.imageSmall)
       .filter(Boolean) as string[];
 
+    const fallbackLogo = async () => {
+      const logoPath = join(process.cwd(), "public", "images", "logo-preview.png");
+      try {
+        const logoBuffer = await fs.readFile(logoPath);
+        return sharp({
+          create: {
+            width,
+            height,
+            channels: 4,
+            background: { r: 17, g: 24, b: 39, alpha: 1 }, // slate-900
+          },
+        })
+          .composite([
+            {
+              input: await sharp(logoBuffer)
+                .resize({ width: 600, height: 400, fit: "inside", withoutEnlargement: true })
+                .toBuffer(),
+              gravity: "center",
+            },
+          ])
+          .jpeg({ quality: 80 })
+          .toBuffer();
+      } catch (e) {
+        // Ultimate fallback if logo also fails
+        return sharp({
+          create: {
+            width,
+            height,
+            channels: 4,
+            background: { r: 31, g: 41, b: 55, alpha: 1 }, // slate-800
+          },
+        })
+          .jpeg({ quality: 80 })
+          .toBuffer();
+      }
+    };
+
     if (cardImages.length === 0) {
-      return sharp({
-        create: {
-          width,
-          height,
-          channels: 4,
-          background: { r: 31, g: 41, b: 55, alpha: 1 }, // slate-800
-        },
-      })
-        .jpeg({ quality: 80 })
-        .toBuffer();
+      return fallbackLogo();
     }
 
     const images = await Promise.all(
       cardImages.map(async (url) => {
         try {
-          const res = await fetch(url);
+          const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
           if (!res.ok) return null;
           return Buffer.from(await res.arrayBuffer());
         } catch {
@@ -1369,6 +1424,10 @@ export class CollectionService {
     );
 
     const validImages = images.filter((img): img is NonNullable<typeof img> => img !== null);
+
+    if (validImages.length === 0) {
+      return fallbackLogo();
+    }
 
     const canvas = sharp({
       create: {

@@ -14,6 +14,12 @@ export abstract class StorageService {
    * @returns A URL pública do arquivo enviado
    */
   abstract uploadBanner(path: string, file: Buffer, mimeType: string): Promise<string>;
+
+  /**
+   * Remove um arquivo do storage baseado na sua URL.
+   * @param url A URL pública do arquivo
+   */
+  abstract deleteBanner(url: string): Promise<void>;
 }
 
 @Injectable()
@@ -35,6 +41,18 @@ export class LocalStorageService implements StorageService {
 
     const baseUrl = this.config.get<string>('API_BASE_URL') ?? 'http://localhost:3333';
     return `${baseUrl}/public/banners/${filename}`;
+  }
+
+  async deleteBanner(url: string): Promise<void> {
+    try {
+      const filename = url.split('/').pop();
+      if (!filename) return;
+
+      const filePath = join(process.cwd(), 'public', 'banners', filename);
+      await fs.unlink(filePath);
+    } catch (error) {
+      this.logger.error(`Falha ao excluir arquivo local: ${error.message}`);
+    }
   }
 }
 
@@ -80,5 +98,24 @@ export class SupabaseStorageService implements StorageService {
       .getPublicUrl(data.path);
 
     return publicUrlData.publicUrl;
+  }
+
+  async deleteBanner(url: string): Promise<void> {
+    if (!this.supabase) return;
+
+    try {
+      const filename = url.split('/').pop();
+      if (!filename) return;
+
+      const { error } = await this.supabase.storage
+        .from(this.bucket)
+        .remove([filename]);
+
+      if (error) {
+        this.logger.error(`Falha ao excluir arquivo do Supabase: ${error.message}`);
+      }
+    } catch (error) {
+      this.logger.error(`Erro ao processar exclusão no Supabase: ${error.message}`);
+    }
   }
 }
