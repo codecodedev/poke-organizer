@@ -2247,7 +2247,7 @@ function CollectionDetailScreen({
               {isStore && (
                 <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-aqua/20 bg-aqua/5 p-4">
                   <div>
-                    <h4 className="font-black text-ink">Propostas e Negociações</h4>
+                    <h4 className="font-black text-ink dark:text-slate-400">Propostas e Negociações</h4>
                   <p className="text-sm font-semibold text-slate-500">
                     Gerencie as ofertas e negociações desta coleção.
                   </p>
@@ -2412,7 +2412,7 @@ function CollectionDetailScreen({
                 removeLabel="Remover da colecao"
               >
                 {isStore && item.folderItemId && (
-                  <div className="grid gap-2 p-1">
+                  <div className="flex items-center justify-center">
                     {!item.store?.isSold && (
                       <Button
                         type="button"
@@ -2420,7 +2420,7 @@ function CollectionDetailScreen({
                         className="h-9 w-full text-[11px] text-white dark: bg-emerald-600/70 dark:bg-emerald-900/60 hover:bg-emerald-600"
                         onClick={() => setSellingItem(item)}
                       >
-                        Marcar como vendida
+                        Vender
                       </Button>
                     )}
                     {(item.store?.isSold || (item.store?.soldQuantity ?? 0) > 0) && (

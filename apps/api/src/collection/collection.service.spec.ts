@@ -22,6 +22,12 @@ describe("CollectionService", () => {
         update: vi.fn(),
         delete: vi.fn(),
       },
+      collectionFolderItem: {
+        findMany: vi.fn(),
+        findUnique: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      },
     };
 
     service = new CollectionService(
@@ -96,6 +102,63 @@ describe("CollectionService", () => {
         where: { id: "folder-1" },
         data: { name: "same-name" },
       });
+    });
+  });
+
+  describe("updateItem", () => {
+    it("should merge items if update causes a unique constraint collision", async () => {
+      const card = { id: "card-1", variants: ["normal", "foil"] };
+      const currentItem = {
+        id: "item-normal",
+        userId: "user-1",
+        cardId: "card-1",
+        quantity: 1,
+        condition: "NM",
+        variant: "normal",
+        foil: false,
+        language: "PT_BR",
+        card,
+      };
+      const existingFoilItem = {
+        id: "item-foil",
+        userId: "user-1",
+        cardId: "card-1",
+        quantity: 2,
+        condition: "NM",
+        variant: "foil",
+        foil: true,
+        language: "PT_BR",
+        card,
+      };
+
+      prisma.collectionItem.findUnique
+        .mockResolvedValueOnce(currentItem) // First call: find current item
+        .mockResolvedValueOnce(existingFoilItem); // Second call: find existing matching item
+
+      prisma.$transaction = vi.fn().mockImplementation(async (cb) => cb(prisma));
+      prisma.collectionItem.update.mockResolvedValue({
+        ...existingFoilItem,
+        quantity: 3,
+        price: null,
+        history: [],
+        lastCheckedAt: new Date(),
+        updatedAt: new Date(),
+        createdAt: new Date(),
+        card,
+      });
+      prisma.collectionFolderItem.findMany.mockResolvedValue([]);
+      prisma.collectionItem.delete.mockResolvedValue({});
+
+      const result = await service.update("user-1", "item-normal", { foil: true, variant: "foil" });
+
+      expect(result.quantity).toBe(3);
+      expect(prisma.collectionItem.delete).toHaveBeenCalledWith({ where: { id: "item-normal" } });
+      expect(prisma.collectionItem.update).toHaveBeenCalledWith(expect.objectContaining({
+        where: { id: "item-foil" },
+        data: expect.objectContaining({
+          quantity: { increment: 1 }
+        })
+      }));
     });
   });
 });

@@ -496,8 +496,16 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
     }
   }
 
+  const handleModalClose = () => {
+    if (showHelp) {
+      setShowHelp(false);
+    } else {
+      onClose();
+    }
+  };
+
   return (
-    <Modal title="Cadastro por voz" icon={<Mic size={20} />} onClose={onClose}>
+    <Modal title="Cadastro por voz" icon={<Mic size={20} />} onClose={handleModalClose}>
       <div className="relative">
         <div className="grid gap-4 p-5 md:grid-cols-[260px_1fr]">
           <div className="voice-mic-panel border border-slate-300 dark:border-slate-700 rounded-[22px] dark:bg-slate-200/5 p-4">

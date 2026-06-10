@@ -963,13 +963,86 @@ export class CollectionService {
     id: string,
     dto: UpdateCollectionItemDto,
   ): Promise<CollectionItem> {
-    await this.assertOwnsItem(userId, id);
+    const current = await this.prisma.collectionItem.findUnique({
+      where: { id, userId },
+      include: { card: true },
+    });
+    if (!current) {
+      throw new NotFoundException("Collection item not found");
+    }
+
     if (dto.variant) {
-      const current = await this.prisma.collectionItem.findUnique({
-        where: { id },
-        include: { card: true },
+      this.assertValidVariant(current.card.variants, dto.variant);
+    }
+
+    const condition = dto.condition
+      ? toPrismaCondition(dto.condition)
+      : current.condition;
+    const variant = dto.variant ?? current.variant;
+    const foil = dto.foil ?? current.foil;
+    const language = dto.language
+      ? toPrismaLanguage(dto.language)
+      : current.language;
+
+    // Check if another item already exists with these attributes
+    const existing = await this.prisma.collectionItem.findUnique({
+      where: {
+        userId_cardId_condition_variant_foil_language: {
+          userId,
+          cardId: current.cardId,
+          condition,
+          variant,
+          foil,
+          language,
+        },
+      },
+    });
+
+    if (existing && existing.id !== id) {
+      const updatedExisting = await this.prisma.$transaction(async (tx) => {
+        const item = await tx.collectionItem.update({
+          where: { id: existing.id },
+          data: {
+            quantity: { increment: dto.quantity ?? current.quantity },
+            notes: dto.notes ?? undefined,
+            customPrice: dto.customPrice ?? undefined,
+          },
+          include: collectionItemInclude,
+        });
+
+        const currentFolderItems = await tx.collectionFolderItem.findMany({
+          where: { collectionItemId: id },
+        });
+
+        for (const fi of currentFolderItems) {
+          const alreadyInFolder = await tx.collectionFolderItem.findUnique({
+            where: {
+              folderId_collectionItemId: {
+                folderId: fi.folderId,
+                collectionItemId: existing.id,
+              },
+            },
+          });
+
+          if (!alreadyInFolder) {
+            await tx.collectionFolderItem.update({
+              where: { id: fi.id },
+              data: { collectionItemId: existing.id },
+            });
+          } else {
+            await tx.collectionFolderItem.delete({ where: { id: fi.id } });
+          }
+        }
+
+        await tx.collectionItem.delete({ where: { id } });
+        return item;
       });
-      this.assertValidVariant(current?.card.variants ?? [], dto.variant);
+
+      await this.syncFolderItemsReplenishment(
+        updatedExisting.id,
+        updatedExisting.quantity,
+      );
+      return this.mapItem(updatedExisting);
     }
 
     const item = await this.prisma.collectionItem.update({
@@ -986,7 +1059,13 @@ export class CollectionService {
       include: collectionItemInclude,
     });
 
-    if (dto.quantity !== undefined) {
+    if (
+      dto.quantity !== undefined ||
+      dto.variant !== undefined ||
+      dto.condition !== undefined ||
+      dto.foil !== undefined ||
+      dto.language !== undefined
+    ) {
       await this.syncFolderItemsReplenishment(item.id, item.quantity);
     }
 
@@ -1397,7 +1476,7 @@ export class CollectionService {
       where: { shareToken },
       include: {
         items: {
-          take: 4,
+          take: 8,
           orderBy: { createdAt: "desc" },
           include: {
             collectionItem: {
@@ -1506,14 +1585,13 @@ export class CollectionService {
       return this.toOgJpeg(generated);
     };
 
-    const cardImages = folder.items
-      .map((item) => item.collectionItem?.card?.imageSmall)
-      .filter(Boolean) as string[];
-
-    if (cardImages.length === 0) return fallbackLogo();
+    const cardCount = folder.items.length;
+    if (cardCount === 0) return fallbackLogo();
 
     const images = await Promise.all(
-      cardImages.map(async (url) => {
+      folder.items.map(async (item) => {
+        const url = item.collectionItem?.card?.imageSmall;
+        if (!url) return null;
         try {
           const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
           if (!response.ok) return null;
@@ -1522,54 +1600,90 @@ export class CollectionService {
       }),
     );
 
-    const validImages = images.filter((img) => img !== null) as Buffer[];
-    if (validImages.length === 0) return fallbackLogo();
-
+    const hasMore = cardCount > 4;
     const composites: sharp.OverlayOptions[] = [];
     const cardWidth = 240;
     const cardHeight = 335;
     const gap = 40;
-    const totalWidth = validImages.length * cardWidth + (validImages.length - 1) * gap;
-    const startX = Math.max(gap, (width - totalWidth) / 2);
-    const startY = (height - cardHeight) / 2;
 
-    for (let i = 0; i < validImages.length; i++) {
-      const item = folder.items[i];
-      const cardNumber = item?.collectionItem?.card?.number ?? "";
-      const printedTotal = item?.collectionItem?.card?.printedTotal;
-      const displayId = printedTotal ? `${cardNumber}/${printedTotal}` : cardNumber;
+    const row1Top = hasMore ? 60 : (height - cardHeight) / 2;
+    const row2Top = row1Top + cardHeight + gap;
 
-      const cardBuffer = await sharp(validImages[i] as Buffer)
-        .rotate()
-        .resize(cardWidth, cardHeight, { fit: "cover", position: "center" })
-        .jpeg({ quality: 90 })
-        .toBuffer();
-
-      const left = Math.round(startX + i * (cardWidth + gap));
-      const top = Math.round(startY);
-
-      composites.push({
-        input: cardBuffer,
-        top,
-        left,
-      });
-
-      if (displayId) {
-        // Badge: White background with black text, centered at the bottom of the card
-        const badgeWidth = 210;
-        const badgeHeight = 66;
-        const svgBadge = `
-          <svg width="${badgeWidth}" height="${badgeHeight}">
-            <rect x="2" y="2" width="${badgeWidth - 4}" height="${badgeHeight - 4}" rx="18" fill="white" stroke="#e2e8f0" stroke-width="2" />
-            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="30" fill="black">${displayId}</text>
+    const placeholder = await sharp({
+      create: {
+        width: cardWidth,
+        height: cardHeight,
+        channels: 4,
+        background: { r: 31, g: 41, b: 55, alpha: 0.5 },
+      },
+    })
+      .composite([{
+        input: Buffer.from(`
+          <svg width="${cardWidth}" height="${cardHeight}">
+            <rect x="2" y="2" width="${cardWidth - 4}" height="${cardHeight - 4}" rx="18" fill="none" stroke="#374151" stroke-width="4" stroke-dasharray="12,12" />
           </svg>
-        `;
-        
+        `),
+        top: 0,
+        left: 0,
+      }])
+      .png()
+      .toBuffer();
+
+    const rowCount = hasMore ? 2 : 1;
+    const cardsPerRow = 4;
+
+    for (let r = 0; r < rowCount; r++) {
+      const cardsInThisRow = hasMore ? cardsPerRow : cardCount;
+      const totalWidth = cardsInThisRow * cardWidth + (cardsInThisRow - 1) * gap;
+      const startX = (width - totalWidth) / 2;
+      const top = r === 0 ? row1Top : row2Top;
+
+      for (let c = 0; c < cardsInThisRow; c++) {
+        const index = r * cardsPerRow + c;
+        const left = Math.round(startX + c * (cardWidth + gap));
+
+        let cardBuffer: Buffer | null = null;
+        let displayId: string | null = null;
+
+        if (index < cardCount) {
+          const item = folder.items[index];
+          const cardNumber = item?.collectionItem?.card?.number ?? "";
+          const printedTotal = item?.collectionItem?.card?.printedTotal;
+          displayId = printedTotal ? `${cardNumber}/${printedTotal}` : cardNumber;
+
+          if (images[index]) {
+            cardBuffer = await sharp(images[index] as Buffer)
+              .rotate()
+              .resize(cardWidth, cardHeight, { fit: "cover", position: "center" })
+              .jpeg({ quality: 90 })
+              .toBuffer();
+          }
+        }
+
+        // Draw card or placeholder
         composites.push({
-          input: Buffer.from(svgBadge),
-          top: top + cardHeight - (badgeHeight / 2) - 10,
-          left: left + (cardWidth / 2) - (badgeWidth / 2),
+          input: cardBuffer || placeholder,
+          top,
+          left,
         });
+
+        // Badge only for first row
+        if (displayId && r === 0) {
+          const badgeWidth = 210;
+          const badgeHeight = 66;
+          const svgBadge = `
+            <svg width="${badgeWidth}" height="${badgeHeight}">
+              <rect x="2" y="2" width="${badgeWidth - 4}" height="${badgeHeight - 4}" rx="18" fill="white" stroke="#e2e8f0" stroke-width="2" />
+              <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="30" fill="black">${displayId}</text>
+            </svg>
+          `;
+
+          composites.push({
+            input: Buffer.from(svgBadge),
+            top: top + cardHeight - (badgeHeight / 2) - 10,
+            left: left + (cardWidth / 2) - (badgeWidth / 2),
+          });
+        }
       }
     }
 

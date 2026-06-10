@@ -91,7 +91,10 @@ export function CardDetailModal({
 
     return "normal";
   });
-  const [language, setLanguage] = useState<CardLanguage>(collectionItem?.language ?? "pt-BR");
+  const [language, setLanguage] = useState<CardLanguage>(() => {
+    if (collectionItem) return collectionItem.language;
+    return CARD_LANGUAGES.includes("pt-BR") ? "pt-BR" : CARD_LANGUAGES[0];
+  });
   const [notes, setNotes] = useState(collectionItem?.notes ?? "");
   const [customPrice, setCustomPrice] = useState<number | null>(collectionItem?.customPrice ?? null);
   
@@ -129,6 +132,7 @@ export function CardDetailModal({
       const defaultVariant = validInitial || (variants.includes("normal") ? "normal" : variants[0]);
       
       setVariant(defaultVariant);
+      setLanguage(CARD_LANGUAGES.includes("pt-BR") ? "pt-BR" : CARD_LANGUAGES[0]);
     }
   }, [collectionItem, card, initialVariant, variants]);
 

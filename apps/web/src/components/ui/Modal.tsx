@@ -13,6 +13,8 @@ type ModalProps = {
   zIndexClass?: string;
 };
 
+const modalStack: (() => void)[] = [];
+
 export function Modal({ 
   title, 
   subtitle, 
@@ -26,10 +28,28 @@ export function Modal({
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        // Only trigger the onClose for the top-most modal in the stack
+        if (modalStack[modalStack.length - 1] === onClose) {
+          onClose();
+        }
+      }
+    };
+
+    modalStack.push(onClose);
+    window.addEventListener("keydown", handleKeyDown);
+
     return () => {
       document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKeyDown);
+      const index = modalStack.indexOf(onClose);
+      if (index > -1) {
+        modalStack.splice(index, 1);
+      }
     };
-  }, []);
+  }, [onClose]);
 
   return createPortal(
     <div
