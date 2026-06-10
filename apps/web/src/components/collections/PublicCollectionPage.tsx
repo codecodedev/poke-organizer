@@ -461,10 +461,10 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                       >
                         {collection.isStore && !item.store?.isSold && (
                           <Button
-                            variant="primary"
+                            variant="ghost"
                             className={`w-full h-10 gap-2 text-xs font-black uppercase transition-all ${
                                 cart[item.id] 
-                                    ? "bg-emerald-500 text-white border-emerald-500 shadow-glow shadow-emerald-500/20" 
+                                    ? "!bg-emerald-500 !text-white !border-emerald-500 shadow-glow shadow-emerald-500/20" 
                                     : "bg-accent/40 border-card-border text-muted-foreground hover:text-foreground hover:border-brand/40 hover:bg-brand/10"
                             }`}
                             icon={cart[item.id] ? <CheckSquare size={16} /> : <Plus size={16} />}
