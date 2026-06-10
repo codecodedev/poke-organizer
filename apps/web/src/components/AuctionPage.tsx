@@ -18,6 +18,7 @@ import type { AuctionDetail } from "@poke-organizer/shared";
 import { Panel } from "./ui/Panel";
 import { Button } from "./ui/Button";
 import { SEO } from "./SEO";
+import { LoadingScreen } from "./ui/LoadingScreen";
 
 type Props = {
   shareToken: string;
@@ -149,7 +150,7 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
     }
   }
 
-  if (loading) return <div className="p-10 text-center font-bold text-muted-foreground">Carregando leilão...</div>;
+  if (loading) return <LoadingScreen message="Carregando leilão..." />;
   if (error || !auction) return <div className="p-10 text-center font-bold text-magenta">{error || "Leilão não encontrado"}</div>;
 
   const isOwner = session?.user.id === auction.sellerId;

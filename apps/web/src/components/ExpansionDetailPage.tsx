@@ -4,6 +4,7 @@ import type { CardSetSummary, CardSummary } from "@poke-organizer/shared";
 import { api, type Session } from "../lib/api";
 import { Panel } from "./ui/Panel";
 import { Button } from "./ui/Button";
+import { LoadingScreen } from "./ui/LoadingScreen";
 import { formatCardNumber } from "@poke-organizer/shared";
 
 type Props = {
@@ -74,7 +75,7 @@ export function ExpansionDetailPage({ setId, session, onBack }: Props) {
     }).map(i => i.card);
   }, [data, activeTab, sortBy]);
 
-  if (loading) return <div className="py-20 text-center font-bold text-muted-foreground">Carregando detalhes da expansão...</div>;
+  if (loading) return <LoadingScreen message="Carregando detalhes da expansão..." />;
   if (!data) return <div className="py-20 text-center font-bold text-magenta">Expansão não encontrada.</div>;
 
   return (

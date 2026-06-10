@@ -28,6 +28,7 @@ import { Modal } from "./ui/Modal";
 import { Panel } from "./ui/Panel";
 import { StatCard } from "./ui/StatCard";
 import { CollectionItemCard } from "./collection/CollectionItemCard";
+import { LoadingScreen } from "./ui/LoadingScreen";
 import { PaginationControls } from "./ui/PaginationControls";
 import { ConfirmationModal } from "./ui/ConfirmationModal";
 
@@ -562,9 +563,7 @@ export function CollectionList({
       )}
 
       {loading ? (
-        <p className="rounded-2xl border border-card-border bg-card/60 p-4 text-sm font-semibold text-muted-foreground">
-          Carregando colecao
-        </p>
+        <LoadingScreen message="Carregando coleção..." fullScreen={false} />
       ) : items.length === 0 ? (
         <p className="rounded-2xl border border-card-border bg-card/60 p-4 text-sm font-semibold text-muted-foreground">
           Nenhuma carta cadastrada.

@@ -7,6 +7,7 @@ import { withAuthRetry } from "../lib/authRetry";
 import { AuctionCreationModal } from "./AuctionCreationModal";
 import { Modal } from "./ui/Modal";
 import { MarketAuctionCard } from "./collection/MarketAuctionCard";
+import { LoadingScreen } from "./ui/LoadingScreen";
 
 type Props = {
   session: Session;
@@ -92,7 +93,7 @@ export function AuctionWizardModal({ session, onSession, onUnauthorized, onClose
 
         <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
           {loading ? (
-            <div className="py-12 text-center font-bold text-muted-foreground">Carregando sua coleção...</div>
+            <LoadingScreen message="Carregando sua coleção..." fullScreen={false} />
           ) : filteredItems.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground font-bold border-2 border-dashed border-card-border rounded-2xl">
               Nenhuma carta encontrada.

@@ -60,7 +60,7 @@ export function Modal({
       onMouseDown={onClose}
     >
       <div
-        className={`animate-soft-pop flex max-h-[85vh] w-full flex-col overflow-hidden rounded-[32px] border border-card-border bg-card shadow-card ${maxWidthClass}`}
+        className={`animate-soft-pop flex max-h-[80vh] w-full flex-col overflow-hidden rounded-[32px] border border-card-border bg-card shadow-card ${maxWidthClass}`}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="holo-strip animate-shimmer h-2 shrink-0" />

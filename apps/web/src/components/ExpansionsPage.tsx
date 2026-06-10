@@ -4,6 +4,7 @@ import type { CardSetSummary } from "@poke-organizer/shared";
 import { api, type Session } from "../lib/api";
 import { Panel } from "./ui/Panel";
 import { Button } from "./ui/Button";
+import { LoadingScreen } from "./ui/LoadingScreen";
 
 type Props = {
   session: Session | null;
@@ -130,7 +131,7 @@ export function ExpansionsPage({ session, onSelectSet }: Props) {
       </div>
 
       {loading ? (
-        <div className="py-20 text-center font-bold text-muted-foreground">Carregando expansões...</div>
+        <LoadingScreen message="Carregando expansões..." fullScreen={false} />
       ) : Object.keys(setsBySeries).length === 0 ? (
         <div className="py-20 text-center text-muted-foreground font-bold border-2 border-dashed border-card-border rounded-3xl">
           Nenhuma expansão encontrada.

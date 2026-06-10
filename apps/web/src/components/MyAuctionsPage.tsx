@@ -8,6 +8,7 @@ import { formatBrl } from "../lib/format";
 import { Panel } from "./ui/Panel";
 import { Button } from "./ui/Button";
 import { AuctionWizardModal } from "./AuctionWizardModal";
+import { LoadingScreen } from "./ui/LoadingScreen";
 
 type Props = {
   session: Session;
@@ -78,7 +79,7 @@ export function MyAuctionsPage({ session, onSession, onUnauthorized, onSelectAuc
       </Panel>
 
       {loading ? (
-        <div className="py-20 text-center font-bold text-muted-foreground">Carregando seus leilões...</div>
+        <LoadingScreen message="Carregando seus leilões..." fullScreen={false} />
       ) : filteredAuctions.length === 0 ? (
         <div className="py-20 text-center rounded-[32px] border-2 border-dashed border-slate-400/40 bg-card/20">
           <Gavel size={40} className="mx-auto text-muted-foreground/40 mb-4" />
