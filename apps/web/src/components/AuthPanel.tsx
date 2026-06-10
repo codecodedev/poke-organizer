@@ -44,7 +44,7 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
   }
 
   return (
-    <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col lg:flex-row items-center justify-center gap-12 px-5 py-12">
+    <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col lg:flex-row items-center justify-start lg:justify-center gap-12 px-5 py-12">
       <div className="flex flex-col items-center text-center">
         <img 
           src={dark ? "/images/logo-light-bg.png" : "/images/logo-dark-bg.png"} 
@@ -56,7 +56,7 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
         </p>
       </div>
 
-      <form onSubmit={submit} className="glass-panel w-full max-w-[420px] p-4 shadow-[0_0_50px_rgba(0,242,255,0.1)]">
+      <form onSubmit={submit} className="glass-panel w-full max-w-[420px] p-4">
         <div className="mb-8 flex rounded-2xl bg-muted/50 p-1">
           <button
             type="button"
@@ -146,9 +146,9 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
           )}
         </button>
         
-        <p className="mt-6 text-center text-xs text-muted-foreground/60">
+        {/* <p className="mt-6 text-center text-xs text-muted-foreground/60">
           Ao continuar, você concorda com nossos Termos de Uso.
-        </p>
+        </p> */}
       </form>
     </section>
   );
