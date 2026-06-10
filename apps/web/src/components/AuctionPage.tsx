@@ -17,6 +17,7 @@ import { formatBrl } from "../lib/format";
 import type { AuctionDetail } from "@poke-organizer/shared";
 import { Panel } from "./ui/Panel";
 import { Button } from "./ui/Button";
+import { SEO } from "./SEO";
 
 type Props = {
   shareToken: string;
@@ -157,6 +158,14 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
+      {auction && (
+        <SEO 
+          title={`Leilão: ${auction.card.name}`} 
+          description={`Participe do leilão de ${auction.card.name} (${auction.card.rarity}) de ${auction.sellerName} no Coleciona cards. Lance atual: ${formatBrl(auction.currentBid ?? auction.minBid)}.`}
+          image={auction.card.imageLarge || undefined}
+          url={`/auctions/${shareToken}`}
+        />
+      )}
       <div className="space-y-6 min-w-0">
         <Panel>
           <div className="flex flex-col sm:flex-row gap-6">

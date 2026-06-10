@@ -18,6 +18,7 @@ import { Panel } from "../ui/Panel";
 import { Button } from "../ui/Button";
 import { ThemeToggle } from "../ui/ThemeToggle";
 import { FilterContainer, FilterSelect } from "../ui/Filters";
+import { SEO } from "../SEO";
 
 const PUBLIC_COLLECTION_PAGE_SIZE = 24;
 
@@ -253,6 +254,14 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
 
   return (
     <main className={hideHeader ? "" : "app-shell"}>
+      {collection && (
+        <SEO 
+          title={collection.name} 
+          description={collection.description || `Confira a coleção "${collection.name}" de ${collection.ownerName} no Coleciona cards. Veja cartas, valores e envie propostas.`}
+          image={collection.bannerUrl || undefined}
+          url={`/p/${shareToken}`}
+        />
+      )}
       {!hideHeader && (
         <header className="sticky top-0 z-30 border-b border-card-border bg-card/75 backdrop-blur-xl">
           <div className="mx-auto flex h-20 max-w-7xl items-center px-5 py-4">

@@ -52,6 +52,7 @@ export function PublicProfilePage({ slug, session, onSelectCollection, onSelectA
       <SEO 
         title={`Perfil de ${profile.name}`} 
         description={profile.bio || `Confira as coleções e leilões de Pokémon TCG de ${profile.name} no Coleciona cards.`}
+        url={`/public/profile/${profile.slug}`}
       />
       <aside className="space-y-6">
         <div className="overflow-hidden rounded-[32px] border border-card-border/40 bg-card/60 p-6 shadow-card">
