@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { createPortal } from "react-dom";
-import { Gavel, X } from "lucide-react";
+import { Gavel } from "lucide-react";
 import type { CollectionItem } from "@poke-organizer/shared";
 import { api, type Session } from "../lib/api";
 import { type AppRoute } from "../pages/App";
 import { withAuthRetry } from "../lib/authRetry";
 import { Button } from "./ui/Button";
+import { Modal } from "./ui/Modal";
 
 type Props = {
   item: CollectionItem;
@@ -57,88 +57,37 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
     }
   }
 
-  return createPortal(
-    <div className="fixed inset-0 z-[100] grid place-items-center bg-night/60 px-4 py-6 backdrop-blur-md" onMouseDown={onClose}>
-      <div
-        className="animate-soft-pop w-full max-w-lg overflow-hidden rounded-[32px] border border-white/20 bg-white shadow-card"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-line/70 px-6 py-5">
-          <div className="flex items-center gap-3">
-             <div className="grid h-10 w-10 place-items-center rounded-xl bg-amber-400 text-white">
-                <Gavel size={20} />
-             </div>
-             <div>
-                <h2 className="text-xl font-black text-ink">Criar Leilão</h2>
-                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{item.card.name}</p>
-             </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+  return (
+    <Modal 
+      title="Novo Leilão" 
+      subtitle="Configure os detalhes do seu anúncio"
+      icon={<Gavel size={20} />}
+      onClose={onClose}
+      maxWidthClass="max-w-xl"
+      footer={(
+        <div className="flex flex-col gap-4">
+          <Button
+            form="auction-form"
+            type="submit"
+            variant="brand"
+            className="w-full h-14 bg-amber-400 text-amber-950 hover:bg-amber-300 shadow-glow shadow-amber-500/20"
+            disabled={submitting}
           >
-            <X size={18} />
-          </button>
+            {submitting ? "Iniciando..." : "Iniciar Leilão Agora"}
+          </Button>
+          <p className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-wider">
+             Ao iniciar, você receberá um link público para compartilhar.
+          </p>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label className="grid gap-2">
-               <span className="text-xs font-black uppercase tracking-widest text-slate-500 px-1">Lance Mínimo</span>
-               <div className="relative">
-                 <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-slate-400">R$</span>
-                 <input
-                   className="premium-input pl-10"
-                   type="number"
-                   step="0.01"
-                   required
-                   value={minBid}
-                   onChange={(e) => setMinBid(e.target.value)}
-                 />
-               </div>
-            </label>
-
-            <label className="grid gap-2">
-               <span className="text-xs font-black uppercase tracking-widest text-slate-500 px-1">Duração (Dias)</span>
-               <select 
-                 className="premium-select"
-                 value={durationDays}
-                 onChange={(e) => setDurationDays(e.target.value)}
-               >
-                 <option value="1">1 Dia</option>
-                 <option value="3">3 Dias</option>
-                 <option value="5">5 Dias</option>
-                 <option value="7">7 Dias</option>
-                 <option value="15">15 Dias</option>
-               </select>
-            </label>
-          </div>
-
-          <label className="grid gap-2">
-             <span className="text-xs font-black uppercase tracking-widest text-slate-500 px-1">Título do Leilão (Opcional)</span>
-             <input
-               className="premium-input"
-               value={title}
-               onChange={(e) => setTitle(e.target.value)}
-               placeholder="Ex: Charizard Base Set NM - Oportunidade!"
-             />
-          </label>
-
-          <label className="grid gap-2">
-             <span className="text-xs font-black uppercase tracking-widest text-slate-500 px-1">Descrição Adicional</span>
-             <textarea
-               className="premium-input min-h-[100px] py-4"
-               value={description}
-               onChange={(e) => setDescription(e.target.value)}
-               placeholder="Detalhes sobre o estado da carta, envio, etc..."
-             />
-          </label>
-
+      )}
+    >
+      <div className="p-6">
           {error && (
-            <div className="danger-note p-4 flex flex-col gap-3">
-              <p>{error}</p>
+            <div className="p-4 mb-4 rounded-2xl bg-red-50 border border-red-100 flex flex-col gap-3">
+              <p className="text-red-600 text-sm font-bold">{error}</p>
               {error.includes("WhatsApp") && (
                 <Button
+                  type="button"
                   variant="outline"
                   className="h-10 border-red-200 text-red-600 hover:bg-red-50"
                   onClick={() => {
@@ -151,23 +100,70 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
               )}
             </div>
           )}
-
-          <div className="pt-2">
-            <Button
-              type="submit"
-              variant="brand"
-              className="w-full h-14 bg-amber-400 text-amber-950 hover:bg-amber-300 shadow-glow shadow-amber-500/20"
-              disabled={submitting}
-            >
-              {submitting ? "Iniciando..." : "Iniciar Leilão Agora"}
-            </Button>
-            <p className="mt-4 text-[10px] font-bold text-center text-slate-400 uppercase tracking-wider">
-               Ao iniciar, você receberá um link público para compartilhar.
-            </p>
+        <form id="auction-form" onSubmit={handleSubmit} className="space-y-6">
+          <div className="flex items-start gap-6 p-5 rounded-3xl bg-slate-50 border border-line shadow-sm">
+            <div className="aspect-[3/4] w-24 overflow-hidden rounded-xl bg-white shadow-sm">
+              <img src={item.card.imageSmall || undefined} alt={item.card.name} className="h-full w-full object-contain" />
+            </div>
+            <div className="flex-1">
+              <h3 className="text-lg font-black text-ink">{item.card.name}</h3>
+              <div className="flex flex-wrap gap-2 mt-2">
+                <span className="px-2 py-1 rounded-lg bg-white border border-line text-[10px] font-black text-slate-500 uppercase">{item.condition}</span>
+                <span className="px-2 py-1 rounded-lg bg-amber-50 border border-amber-100 text-[10px] font-black text-amber-600 uppercase">{item.variant}</span>
+              </div>
+            </div>
           </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-2">
+              <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Lance Mínimo (R$)</span>
+              <input
+                type="number"
+                step="0.01"
+                className="premium-input"
+                value={minBid}
+                onChange={(e) => setMinBid(e.target.value)}
+                required
+              />
+            </label>
+            <label className="grid gap-2">
+              <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Duração (Dias)</span>
+              <select
+                className="premium-select"
+                value={durationDays}
+                onChange={(e) => setDurationDays(e.target.value)}
+              >
+                <option value="1">1 dia</option>
+                <option value="3">3 dias</option>
+                <option value="5">5 dias</option>
+                <option value="7">7 dias</option>
+                <option value="15">15 dias</option>
+              </select>
+            </label>
+          </div>
+
+          <label className="grid gap-2">
+            <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Título (Opcional)</span>
+            <input
+              type="text"
+              className="premium-input"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Ex: Charizard Base Set NM"
+            />
+          </label>
+
+          <label className="grid gap-2">
+            <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Descrição (Opcional)</span>
+            <textarea
+              className="premium-input min-h-24 resize-none py-4"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Detalhes adicionais sobre o estado da carta..."
+            />
+          </label>
         </form>
       </div>
-    </div>,
-    document.body
+    </Modal>
   );
 }

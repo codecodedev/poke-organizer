@@ -220,7 +220,7 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">WhatsApp (Obrigatório para lances/propostas)</label>
+                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">WhatsApp</label>
                     <input
                       className="premium-input w-full"
                       value={whatsapp}

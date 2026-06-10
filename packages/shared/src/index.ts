@@ -142,6 +142,7 @@ export type CollectionFolderSummary = {
   viewCount: number;
   itemCount: number;
   totalValue: number;
+  previewItems?: CollectionItem[];
   createdAt: string;
   updatedAt: string;
 };

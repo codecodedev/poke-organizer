@@ -19,20 +19,23 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import type {
-  CollectionCartOffer,
-  CollectionFolderDetail,
-  CollectionFolderSort,
-  CollectionFolderSummary,
-  CollectionItem,
+import {
+  formatCardVariant,
+  formatCardNumber,
+  type CollectionCartOffer,
+  type CollectionFolderDetail,
+  type CollectionFolderSort,
+  type CollectionFolderSummary,
+  type CollectionItem,
 } from "@poke-organizer/shared";
-import { formatCardVariant } from "@poke-organizer/shared";
 import { api, apiFeedback, type Session } from "../../lib/api";
 import { withAuthRetry } from "../../lib/authRetry";
 import { formatBrl } from "../../lib/format";
 import { Button } from "../ui/Button";
 import { Panel } from "../ui/Panel";
 import { CollectionItemCard } from "../collection/CollectionItemCard";
+import { SimpleCardPickerItem } from "../collection/SimpleCardPickerItem";
+import { SEO } from "../SEO";
 import { CardDetailModal, type UpdateCardDetails } from "../CardDetailModal";
 import { PaginationControls } from "../ui/PaginationControls";
 import { Modal } from "../ui/Modal";
@@ -69,6 +72,7 @@ export function CollectionsPage({
   const [selectedItemIds, setSelectedItemIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [tempSelectedItemIds, setTempSelectedItemIds] = useState<Set<string>>(new Set());
   const [selectedItem, setSelectedItem] = useState<CollectionItem | null>(null);
   const [newName, setNewName] = useState("");
   const [newIsStore, setNewIsStore] = useState(false);
@@ -205,6 +209,13 @@ export function CollectionsPage({
     resetPicker();
   }
 
+  function handleTogglePicker(open: boolean) {
+    if (open) {
+      setTempSelectedItemIds(new Set(selectedItemIds));
+    }
+    setShowPickerModal(open);
+  }
+
   async function undoFolderItemSale(folderItemId: string, quantity?: number) {
     if (!activeFolder) return;
     const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
@@ -250,6 +261,26 @@ export function CollectionsPage({
       }
     } else {
       await addFolderItemInstant(itemId);
+    }
+  }
+
+  async function addSelectedCardsToFolder() {
+    if (!activeFolder) return;
+    try {
+      const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.updateCollectionFolder(token, activeFolder.id, {
+          itemIds: Array.from(tempSelectedItemIds)
+        }),
+      );
+      setActiveFolder(detail);
+      setActiveName(detail.name);
+      const nextIds = new Set(detail.items.map((item) => item.id));
+      setSelectedItemIds(nextIds);
+      setTempSelectedItemIds(new Set(nextIds));
+      setShowPickerModal(false);
+      setMessage("Cartas adicionadas a colecao.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao adicionar cartas");
     }
   }
 
@@ -566,6 +597,23 @@ export function CollectionsPage({
     });
   }
 
+  function toggleTempItem(itemId: string) {
+    setTempSelectedItemIds((current) => {
+      const next = new Set(current);
+      if (next.has(itemId)) {
+        next.delete(itemId);
+      } else {
+        next.add(itemId);
+      }
+      return next;
+    });
+  }
+
+  function confirmSelection() {
+    setSelectedItemIds(new Set(tempSelectedItemIds));
+    setShowPickerModal(false);
+  }
+
   const selectedItems = useMemo(
     () =>
       screen === "detail" && activeFolder
@@ -781,6 +829,7 @@ export function CollectionsPage({
           pickerItems={pickerItems}
           pickerPage={pickerPage}
           selectedItemIds={selectedItemIds}
+          tempSelectedItemIds={tempSelectedItemIds}
           selectedItems={selectedItems}
           isStore={newIsStore}
           onBack={backToList}
@@ -794,10 +843,12 @@ export function CollectionsPage({
           onShowAllChange={setShowAllPickerItems}
           onPickerPageChange={setPickerPage}
           onToggleItem={toggleItem}
+          onToggleTempItem={toggleTempItem}
+          onConfirmPicker={confirmSelection}
           onOpenCard={setSelectedItem}
           onSubmit={createFolder}
           showPickerModal={showPickerModal}
-          onTogglePickerModal={setShowPickerModal}
+          onTogglePickerModal={handleTogglePicker}
         />
       )}
 
@@ -873,10 +924,13 @@ export function CollectionsPage({
             const item = activeFolder.items.find((i) => i.id === itemId);
             if (item) setItemToRemove(item);
           }}
-          onToggleItem={(itemId) => void toggleFolderItemInstant(itemId)}
+          onToggleItem={toggleItem}
+          onToggleTempItem={toggleTempItem}
+          onConfirmPicker={() => void addSelectedCardsToFolder()}
           onOpenCard={setSelectedItem}
           showPickerModal={showPickerModal}
-          onTogglePickerModal={setShowPickerModal}
+          onTogglePickerModal={handleTogglePicker}
+          tempSelectedItemIds={tempSelectedItemIds}
           setSellingItem={setSellingItem}
           onManagePermissions={() => setShowPermissionsModal(true)}
         />
@@ -1389,6 +1443,7 @@ function CollectionsListScreen({
 
   return (
     <>
+      <SEO title="Minhas Coleções" />
       <Panel>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -1426,19 +1481,46 @@ function CollectionsListScreen({
                   onClick={() => onOpen(folder.id)}
                   className="group rounded-[26px] border border-line/80 bg-white/76 p-5 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/40 hover:shadow-soft"
                 >
-                  <span className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br transition ${
-                    folder.isStore 
-                      ? "from-aqua/50 to-cyan/10 text-sky-700" 
-                      : "from-lilac/20 to-aqua/20 text-violet-800"
-                  }`}>
-                    {folder.isStore ? <ShoppingBag size={20} /> : <Layers3 size={20} />}
-                  </span>
-                  <span className="mt-5 block truncate text-xl font-black text-ink">
-                    {folder.name}
-                  </span>
-                  <span className="mt-1 block text-sm font-semibold text-slate-500">
-                    {folder.itemCount} cartas - {formatBrl(folder.totalValue)}
-                  </span>
+                  <div className="flex flex-1 items-center gap-4">
+                    {folder.previewItems && folder.previewItems.length > 0 ? (
+                      <div className="grid grid-cols-2 grid-rows-2 h-16 w-14 shrink-0 gap-0.5 overflow-hidden rounded-xl border border-line/30 bg-field">
+                        {folder.previewItems.slice(0, 4).map((item) => (
+                          <div key={item.id} className="relative overflow-hidden bg-slate-100">
+                            <img
+                              src={item.card.imageSmall || undefined}
+                              alt=""
+                              className="h-full w-full object-cover"
+                            />
+                            <div className="absolute bottom-0.5 right-0.5 rounded-md bg-white px-1 py-0.5 text-[7px] font-black text-ink shadow-[0_2px_4px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+                              {formatCardNumber(item.card.number, item.card.printedTotal)}
+                            </div>
+                          </div>
+                        ))}
+                        {folder.previewItems.length < 4 && 
+                          Array.from({ length: 4 - folder.previewItems.length }).map((_, i) => (
+                            <div key={`empty-${i}`} className="bg-slate-50 border border-dashed border-line/20" />
+                          ))
+                        }
+                      </div>
+                    ) : (
+                      <span className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br transition ${
+                        folder.isStore 
+                          ? "from-aqua/50 to-cyan/10 text-sky-700" 
+                          : "from-lilac/20 to-aqua/20 text-violet-800"
+                      }`}>
+                        {folder.isStore ? <ShoppingBag size={20} /> : <Layers3 size={20} />}
+                      </span>
+                    )}
+
+                    <div className="min-w-0 flex-1">
+                      <span className="block truncate text-xl font-black text-ink">
+                        {folder.name}
+                      </span>
+                      <span className="block text-sm font-semibold text-slate-500">
+                        {folder.itemCount} cartas - {formatBrl(folder.totalValue)}
+                      </span>
+                    </div>
+                  </div>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span
                       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
@@ -1501,6 +1583,7 @@ function CollectionCreateScreen({
   pickerItems,
   pickerPage,
   selectedItemIds,
+  tempSelectedItemIds,
   selectedItems,
   isStore,
   onBack,
@@ -1514,6 +1597,8 @@ function CollectionCreateScreen({
   onShowAllChange,
   onPickerPageChange,
   onToggleItem,
+  onToggleTempItem,
+  onConfirmPicker,
   onOpenCard,
   onSubmit,
   showPickerModal,
@@ -1534,6 +1619,7 @@ function CollectionCreateScreen({
   pickerItems: CollectionItem[];
   pickerPage: number;
   selectedItemIds: Set<string>;
+  tempSelectedItemIds: Set<string>;
   selectedItems: CollectionItem[];
   isStore: boolean;
   onBack: () => void;
@@ -1547,14 +1633,19 @@ function CollectionCreateScreen({
   onShowAllChange: (value: boolean) => void;
   onPickerPageChange: (page: number) => void;
   onToggleItem: (itemId: string) => void;
+  onToggleTempItem: (itemId: string) => void;
+  onConfirmPicker: () => void;
   onOpenCard: (item: CollectionItem) => void;
   onSubmit: (event: FormEvent) => void;
   showPickerModal: boolean;
   onTogglePickerModal: (open: boolean) => void;
 }) {
+  const canCreate = name.trim().length > 0 && selectedCount > 0;
+
   return (
     <>
-      <Panel>
+      <SEO title="Criar Nova Coleção" />
+      <Panel className="pb-32">
         <form onSubmit={onSubmit} className="grid gap-5">
           <ScreenHeader
             eyebrow={isStore ? "Nova Venda" : "Nova Pasta"}
@@ -1567,16 +1658,17 @@ function CollectionCreateScreen({
             action={
               <Button
                 type="submit"
-                variant="primary"
+                variant={canCreate ? "brand" : "primary"}
+                className={canCreate ? "shadow-glow" : ""}
                 icon={<Save size={16} />}
-                disabled={!name.trim()}
+                disabled={!canCreate}
               >
                 Criar colecao
               </Button>
             }
           />
 
-          <div className="grid gap-4 rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm lg:grid-cols-[1fr_auto_260px] lg:items-end">
+          <div className="grid gap-6 rounded-[26px] border border-line/80 bg-white/72 p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-end">
             <label className="grid gap-2">
               <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
                 Nome da pasta
@@ -1590,92 +1682,101 @@ function CollectionCreateScreen({
             </label>
             <div className="grid gap-2">
               <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
-                Objetivo
+                Modo
               </span>
-              <div className="flex h-[46px] items-center gap-2 rounded-2xl border border-line bg-white px-2">
+              <div className="flex h-auto sm:h-[46px] sm:flex-row items-stretch sm:items-center gap-2 rounded-2xl border border-line bg-white p-2">
                 <button
                   type="button"
                   onClick={() => onIsStoreChange(false)}
-                  className={`flex h-8 items-center gap-2 rounded-xl px-3 text-xs font-black transition ${
+                  className={`flex h-9 sm:h-8 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-xs font-black transition ${
                     !isStore
                       ? "bg-brand text-white shadow-sm"
                       : "text-slate-500 hover:bg-field"
                   }`}
                 >
                   <Eye size={14} />
-                  Visualizar
+                  Exposição
                 </button>
                 <button
                   type="button"
                   onClick={() => onIsStoreChange(true)}
-                  className={`flex h-8 items-center gap-2 rounded-xl px-3 text-xs font-black transition ${
+                  className={`flex h-9 sm:h-8 flex-1 items-center justify-center gap-2 rounded-xl px-4 text-xs font-black transition ${
                     isStore
                       ? "bg-aqua text-white shadow-sm"
                       : "text-slate-500 hover:bg-field"
                   }`}
                 >
                   <ShoppingBag size={14} />
-                  Vender
+                  Venda
                 </button>
               </div>
             </div>
-            <Button
-              type="button"
-              variant="primary"
-              className="px-8 w-full"
-              icon={<Plus size={20} />}
-              onClick={() => onTogglePickerModal(true)}
-            >
-              Selecionar cartas
-            </Button>
-            </div>
+          </div>
 
-            <div className="mt-4 flex flex-col items-center gap-8">
-
-            <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900 text-center">
-              {selectedCount} cartas - {formatBrl(selectedTotalValue)}
-            </div>
-              <div className="w-full">
-                <div className="mb-4 flex items-center justify-between border-b border-line/50 pb-2">
-                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
-                    Preview da seleção
-                  </h3>
-                  <span className="text-[10px] font-bold text-slate-400">
-                    {selectedItems.length} selecionadas
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
-                  {selectedItems.length > 0 ? (
-                    selectedItems.map((item) => (
-                      <CollectionItemCard
-                        key={item.id}
-                        item={item}
-                        price={item.price ?? undefined}
-                        onOpen={onOpenCard}
-                        onRemove={(it) => onToggleItem(it.id)}
-                        removeLabel="Desmarcar"
-                      />
-                    ))
-                  ) : (
-                    Array.from({ length: 7 }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="aspect-[5/7] animate-pulse rounded-[24px] border border-dashed border-line/60 bg-white/20"
-                      />
-                    ))
-                  )}
+          <div className="mt-8 w-full">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-line/50 pb-3">
+              <div className="flex items-center gap-4">
+                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
+                  Preview da seleção
+                </h3>
+                <div className="flex items-center gap-2 rounded-full border border-lilac/25 bg-lilac/10 px-3 py-1 text-[11px] font-black text-violet-900">
+                  <span className="opacity-60">{selectedCount} cartas</span>
+                  <span className="h-1 w-1 rounded-full bg-violet-300" />
+                  <span>{formatBrl(selectedTotalValue)}</span>
                 </div>
               </div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                {selectedItems.length} selecionadas
+              </span>
             </div>
-            </form>
-            </Panel>
 
-            {showPickerModal && (
-            <Modal title="Selecionar cartas" onClose={() => onTogglePickerModal(false)} maxWidthClass="max-w-6xl">
-            <CardPickerPanel
-            title="Selecionar cartas"
-            description="As cartas marcadas são incluídas na nova coleção instantaneamente. Use a busca ou mostre todo o inventário."
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
+              <button
+                type="button"
+                onClick={() => onTogglePickerModal(true)}
+                className="h-full min-h-60 flex flex-col items-center justify-center gap-3 rounded-[24px] border-2 border-dashed border-line/60 bg-white/10 text-slate-400 transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group"
+              >
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/50 group-hover:bg-brand/10 transition-colors shadow-sm">
+                  <Plus size={24} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest">Adicionar</span>
+              </button>
+
+              {selectedItems.map((item) => (
+                <CollectionItemCard
+                  key={item.id}
+                  item={item}
+                  price={item.price ?? undefined}
+                  onOpen={onOpenCard}
+                  onRemove={(it) => onToggleItem(it.id)}
+                  removeLabel="Desmarcar"
+                />
+              ))}
+            </div>
+          </div>
+        </form>
+      </Panel>
+
+      {showPickerModal && (
+        <Modal 
+          title="Selecionar cartas" 
+          onClose={() => onTogglePickerModal(false)} 
+          maxWidthClass="max-w-6xl"
+          footer={tempSelectedItemIds.size > 0 && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="brand"
+                className="px-12 py-3 shadow-glow"
+                icon={<Plus size={20} />}
+                onClick={onConfirmPicker}
+              >
+                Adicionar
+              </Button>
+            </div>
+          )}
+        >
+          <CardPickerPanel
             pickerQuery={pickerQuery}
             pickerTypeOptions={pickerTypeOptions}
             pickerRarityOptions={pickerRarityOptions}
@@ -1687,7 +1788,7 @@ function CollectionCreateScreen({
             showAllPickerItems={showAllPickerItems}
             pickerItems={pickerItems}
             pickerPage={pickerPage}
-            selectedItemIds={selectedItemIds}
+            selectedItemIds={tempSelectedItemIds}
             onQueryChange={onQueryChange}
             onPickerTypeFilter={onPickerTypeFilter}
             onPickerRarityFilter={onPickerRarityFilter}
@@ -1695,15 +1796,13 @@ function CollectionCreateScreen({
             onPickerSort={onPickerSort}
             onShowAllChange={onShowAllChange}
             onPickerPageChange={onPickerPageChange}
-            onToggleItem={onToggleItem}
-            onOpenCard={onOpenCard}
-            onTogglePickerModal={onTogglePickerModal}
-            />
-            </Modal>
-            )}
-            </>
-            );
-            }
+            onToggleItem={onToggleTempItem}
+          />
+        </Modal>
+      )}
+    </>
+  );
+}
 
 function CollectionDetailScreen({
   activeName,
@@ -1736,6 +1835,7 @@ function CollectionDetailScreen({
   pickerItems,
   pickerPage,
   selectedItemIds,
+  tempSelectedItemIds,
   isPublic,
   isStore,
   shareUrl,
@@ -1765,6 +1865,8 @@ function CollectionDetailScreen({
   onPickerPageChange,
   onRemoveCollectionItem,
   onToggleItem,
+  onToggleTempItem,
+  onConfirmPicker,
   onOpenCard,
   showPickerModal,
   onTogglePickerModal,
@@ -1802,6 +1904,7 @@ function CollectionDetailScreen({
   pickerItems: CollectionItem[];
   pickerPage: number;
   selectedItemIds: Set<string>;
+  tempSelectedItemIds: Set<string>;
   isPublic: boolean;
   isStore: boolean;
   shareUrl: string | null;
@@ -1832,6 +1935,8 @@ function CollectionDetailScreen({
   onPickerPageChange: (page: number) => void;
   onRemoveCollectionItem: (itemId: string) => void;
   onToggleItem: (itemId: string) => void;
+  onToggleTempItem: (itemId: string) => void;
+  onConfirmPicker: () => void;
   onOpenCard: (item: CollectionItem) => void;
   showPickerModal: boolean;
   onTogglePickerModal: (open: boolean) => void;
@@ -1871,8 +1976,13 @@ function CollectionDetailScreen({
 
   return (
     <>
+      <SEO 
+        title={activeName} 
+        description={`${unsoldCount} cartas - Valor total: ${formatBrl(selectedTotalValue)}`}
+        image={bannerUrl || undefined}
+      />
         <div className="mb-6 overflow-hidden rounded-[32px] border border-line/80 bg-white/70 shadow-sm w-full">
-          <div className={`relative w-full overflow-hidden bg-slate-900 ${bannerUrl ? "aspect-[21/9] sm:aspect-[4/1]": "min-h-32"}`}>
+          <div className={`relative w-full overflow-hidden bg-field dark:bg-slate-900 ${bannerUrl ? "aspect-[21/9] sm:aspect-[4/1]": "min-h-32"}`}>
             {bannerUrl && (
                <img 
                 src={bannerUrl} 
@@ -1881,53 +1991,9 @@ function CollectionDetailScreen({
                 onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')}
               /> 
             )}
-
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
-
-            <div className="absolute top-6 left-6 right-6 flex items-end justify-between gap-4">
-               <div className="flex flex-col gap-2">
-                 {isEditingName ? (
-                   <div className="flex items-center gap-2 max-w-2xl">
-                     <input
-                       autoFocus
-                       className="bg-white/20 p-1.5 pl-4 rounded-xl font-black text-white outline-none placeholder:text-white/50 backdrop-blur-md border border-white/30 sm:text-4xl"
-                       value={activeName}
-                       onChange={(e) => onNameChange(e.target.value)}
-                       onKeyDown={(e) => {
-                         if (e.key === 'Enter') setIsEditingName(false);
-                         if (e.key === 'Escape') setIsEditingName(false);
-                       }}
-                       onBlur={() => setIsEditingName(false)}
-                     />
-                     <button 
-                       onClick={() => setIsEditingName(false)}
-                       className="p-2 z-10 bg-leaf rounded-xl text-white shadow-lg shrink-0"
-                     >
-                       <Check size={24} />
-                     </button>
-                   </div>
-                 ) : (
-                   <div className="flex items-center gap-3 group">
-                     <h1 
-                       className="text-2xl font-black text-white drop-shadow-md sm:text-4xl cursor-pointer hover:text-white/90"
-                       onClick={() => setIsEditingName(true)}
-                     >
-                       {activeName}
-                     </h1>
-                     <button 
-                        onClick={() => setIsEditingName(true)}
-                        className=""
-                     >
-                        <Pencil className="text-white dark:text-white" size={18} />
-                     </button>
-                   </div>
-                 )}
-                 <p className="mt-1 text-sm font-bold text-slate-200 drop-shadow-sm">{unsoldCount} cartas - {formatBrl(selectedTotalValue)}</p>
-               </div>
-            </div>
             
-            <label className="absolute flex flex-row items-center gap-1 right-auto left-6 sm:left-auto sm:right-8 bottom-4 sm:bottom-6 cursor-pointer text-[10px] font-black text-white hover:text-brand-light hover:underline uppercase tracking-wider">
-              {bannerUploading ? "Enviando..." : (bannerUrl ? <>Alterar Banner<Pencil size={12} /></> : <>Adicionar Banner<Plus className="text-brand" size={16} /></>)} 
+            <label className="absolute right-6 bottom-6 cursor-pointer text-[10px] font-black text-white bg-black/40 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 hover:bg-black/60 transition uppercase tracking-wider">
+              {bannerUploading ? "Enviando..." : (bannerUrl ? <>Alterar Banner<Pencil size={12} className="ml-1 inline" /></> : <>Adicionar Banner<Plus className="text-brand ml-1 inline" size={16} /></>)} 
               <input
                 type="file"
                 className="hidden"
@@ -1942,50 +2008,108 @@ function CollectionDetailScreen({
             </label>
             
             {bannerUrl && (
-              <div className="flex absolute right-6 top-6 items-center gap-3 bg-slate-100 p-2 rounded-full">
-                
-                  <button
-                    type="button"
-                    className="text-[10px] uppercase tracking-wider"
-                    onClick={() => onRemoveBanner()}
-                  >
-                    <Trash2 className="text-red-700 " size={22} />
-                  </button>
+              <div className="absolute left-6 top-6">
+                <button
+                  type="button"
+                  className="grid h-10 w-10 place-items-center rounded-xl border border-white/20 bg-black/40 text-white backdrop-blur-md transition hover:bg-red-500 hover:border-red-500 shadow-lg"
+                  onClick={() => onRemoveBanner()}
+                  title="Remover Banner"
+                >
+                  <Trash2 size={20} />
+                </button>
               </div>
             )}
           </div>
         </div>
 
       <Panel>
-        <div className="grid gap-5">
-          <ScreenHeader
-            eyebrow="Detalhes"
-            title={""}
-            description={bannerUrl ? "Gerencie sua coleção e links" : `${unsoldCount} cartas - ${formatBrl(selectedTotalValue)}`}
-            onBack={onBack}
-            notification={pendingOffersCount > 0}
-            action={
-              <div className="flex flex-wrap gap-2">
+        <div className="grid gap-8">
+          <div className="flex flex-col gap-4">
+            <button 
+              type="button"
+              onClick={onBack}
+              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-brand transition w-fit"
+            >
+              <ArrowLeft size={14} />
+              Voltar para coleções
+            </button>
+
+            <div className="flex flex-wrap items-center justify-between gap-6">
+               <div className="flex-1 min-w-0">
+                 {isEditingName ? (
+                   <div className="flex items-center gap-2 max-w-2xl">
+                     <input
+                       autoFocus
+                       className="premium-input text-2xl sm:text-4xl font-black py-2"
+                       value={activeName}
+                       onChange={(e) => onNameChange(e.target.value)}
+                       onKeyDown={(e) => {
+                         if (e.key === 'Enter') setIsEditingName(false);
+                         if (e.key === 'Escape') setIsEditingName(false);
+                       }}
+                       onBlur={() => setIsEditingName(false)}
+                     />
+                     <button 
+                       onClick={() => setIsEditingName(false)}
+                       className="p-3 bg-leaf rounded-2xl text-white shadow-lg shrink-0 transition hover:scale-105"
+                     >
+                       <Check size={24} />
+                     </button>
+                   </div>
+                 ) : (
+                   <div className="flex items-center gap-4 group">
+                     <h1 
+                       className="text-2xl font-black text-ink dark:text-white sm:text-5xl cursor-pointer hover:text-brand transition"
+                       onClick={() => setIsEditingName(true)}
+                     >
+                       {activeName}
+                     </h1>
+                     <button 
+                        onClick={() => setIsEditingName(true)}
+                        className="grid h-10 w-10 place-items-center rounded-xl bg-field text-slate-400 opacity-0 group-hover:opacity-100 transition"
+                     >
+                        <Pencil size={18} />
+                     </button>
+                   </div>
+                 )}
+                 <div className="mt-4 flex flex-wrap items-center gap-4">
+                    <div className="flex items-center gap-2 rounded-full border border-lilac/25 bg-lilac/10 px-4 py-1.5 text-xs font-black text-violet-900">
+                      <span>{unsoldCount} cartas</span>
+                      <span className="h-1.5 w-1.5 rounded-full bg-violet-300" />
+                      <span>{formatBrl(selectedTotalValue)}</span>
+                    </div>
+                    {pendingOffersCount > 0 && (
+                      <div className="flex items-center gap-2 rounded-full border border-aqua/25 bg-aqua/10 px-4 py-1.5 text-xs font-black text-sky-700">
+                        <ShoppingBag size={14} />
+                        {pendingOffersCount} propostas pendentes
+                      </div>
+                    )}
+                 </div>
+               </div>
+
+               <div className="flex flex-wrap gap-2">
                 <Button
                   type="button"
-                  variant="primary"
-                  className={hasChanges ? "bg-brand text-white border-brand shadow-[0_0_15px_rgba(var(--brand-rgb),0.5)]" : "opacity-50 pointer-events-none"}
-                  icon={<Save size={16} />}
+                  variant="brand"
+                  className={hasChanges ? "px-8 shadow-glow" : "opacity-50 pointer-events-none"}
+                  icon={<Save size={18} />}
                   onClick={onSave}
                   disabled={!hasChanges}
                 >
-                  Salvar alteracoes
+                  Salvar alterações
                 </Button>
                 <Button
                   type="button"
-                  icon={<Trash2 size={16} />}
+                  variant="ghost"
+                  className="px-4 text-slate-400 hover:text-red-500 hover:bg-red-50"
+                  icon={<Trash2 size={18} />}
                   onClick={onRemoveFolder}
                 >
                   Excluir
                 </Button>
               </div>
-            }
-          />
+            </div>
+          </div>
 
 
 
@@ -2140,18 +2264,6 @@ function CollectionDetailScreen({
                 Filtros e Ordenação
               </Button>
             </div>
-
-            <div className="flex flex-wrap items-center gap-3 w-full">
-              <Button
-                type="button"
-                variant="primary"
-                className="px-8 dark:bg-slate-500 w-full"
-                icon={<Plus size={20} />}
-                onClick={() => onTogglePickerModal(true)}
-              >
-                Adicionar carta
-              </Button>
-            </div>
           </div >
 
           {showFiltersModal && (
@@ -2255,62 +2367,76 @@ function CollectionDetailScreen({
             {visibleItems.length} de {unsoldCount} cartas visiveis
           </div>
 
-          {visibleItems.length ? (
-            <>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6">
-                {paginatedVisibleItems.map((item) => (
-                  <CollectionItemCard
-                    key={item.id}
-                    item={item}
-                    price={item.price ?? undefined}
-                    onOpen={onOpenCard}
-                    onPriceChange={
-                      isStore && item.folderItemId
-                        ? (amount) => debouncedUpdates(item.folderItemId!, amount)
-                        : undefined
-                    }
-                    onRemove={(nextItem) => onRemoveCollectionItem(nextItem.id)}
-                    removeLabel="Remover da colecao"
-                  >
-                    {isStore && item.folderItemId && (
-                      <div className="grid gap-2 p-1">
-                        {!item.store?.isSold && (
-                          <Button
-                            type="button"
-                            variant="primary"
-                            className="h-9 w-full text-[11px] bg-leaf hover:bg-emerald-600"
-                            onClick={() => setSellingItem(item)}
-                          >
-                            Marcar vendido
-                          </Button>
-                        )}
-                        {(item.store?.isSold || (item.store?.soldQuantity ?? 0) > 0) && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="h-8 w-full text-[10px] text-slate-500 hover:text-red-500"
-                            onClick={() => onUndoSale(item)}
-                          >
-                            Desfazer venda
-                          </Button>
-                        )}
-                      </div>
-                    )}
-                  </CollectionItemCard>
-                ))}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 mt-6">
+            <button
+              type="button"
+              onClick={() => onTogglePickerModal(true)}
+              className="h-full flex flex-col items-center justify-center gap-3 rounded-[24px] border-2 border-dashed border-line/60 bg-white/10 text-slate-400 transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group"
+            >
+              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/50 group-hover:bg-brand/10 transition-colors shadow-sm">
+                <Plus size={24} />
               </div>
-              <PaginationControls
-                page={detailPage}
-                pageSize={COLLECTION_DETAIL_PAGE_SIZE}
-                totalItems={visibleItems.length}
-                onPageChange={onDetailPageChange}
-                itemLabel="cartas"
-              />
-            </>
-          ) : (
-            <EmptyState>
-              Nenhuma carta aparece com os filtros atuais.
-            </EmptyState>
+              <span className="text-[10px] font-black uppercase tracking-widest">Adicionar</span>
+            </button>
+
+            {paginatedVisibleItems.map((item) => (
+              <CollectionItemCard
+                key={item.id}
+                item={item}
+                price={item.price ?? undefined}
+                onOpen={onOpenCard}
+                onPriceChange={
+                  isStore && item.folderItemId
+                    ? (amount) => debouncedUpdates(item.folderItemId!, amount)
+                    : undefined
+                }
+                onRemove={(nextItem) => onRemoveCollectionItem(nextItem.id)}
+                removeLabel="Remover da colecao"
+              >
+                {isStore && item.folderItemId && (
+                  <div className="grid gap-2 p-1">
+                    {!item.store?.isSold && (
+                      <Button
+                        type="button"
+                        variant="primary"
+                        className="h-9 w-full text-[11px] bg-leaf hover:bg-emerald-600"
+                        onClick={() => setSellingItem(item)}
+                      >
+                        Marcar vendido
+                      </Button>
+                    )}
+                    {(item.store?.isSold || (item.store?.soldQuantity ?? 0) > 0) && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="h-8 w-full text-[10px] text-slate-500 hover:text-red-500"
+                        onClick={() => onUndoSale(item)}
+                      >
+                        Desfazer venda
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </CollectionItemCard>
+            ))}
+          </div>
+
+          {visibleItems.length === 0 && (
+            <div className="mt-8">
+              <EmptyState>
+                Nenhuma carta aparece com os filtros atuais.
+              </EmptyState>
+            </div>
+          )}
+
+          {visibleItems.length > 0 && (
+            <PaginationControls
+              page={detailPage}
+              pageSize={COLLECTION_DETAIL_PAGE_SIZE}
+              totalItems={visibleItems.length}
+              onPageChange={onDetailPageChange}
+              itemLabel="cartas"
+            />
           )}
 
           {/* <div className="mt-8 flex justify-center">
@@ -2328,10 +2454,25 @@ function CollectionDetailScreen({
       </Panel>
 
       {showPickerModal && (
-        <Modal title="Adicionar cartas" onClose={() => onTogglePickerModal(false)} maxWidthClass="max-w-6xl">
+        <Modal 
+          title="Adicionar cartas" 
+          onClose={() => onTogglePickerModal(false)} 
+          maxWidthClass="max-w-6xl"
+          footer={tempSelectedItemIds.size > 0 && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="brand"
+                className="px-12 py-3 shadow-glow"
+                icon={<Plus size={20} />}
+                onClick={onConfirmPicker}
+              >
+                Adicionar
+              </Button>
+            </div>
+          )}
+        >
           <CardPickerPanel
-            title="Adicionar cartas"
-            description="Busque cartas do inventario e marque as entradas. As cartas sao adicionadas instantaneamente."
             pickerQuery={pickerQuery}
             pickerTypeOptions={pickerTypeOptions}
             pickerRarityOptions={pickerRarityOptions}
@@ -2343,7 +2484,7 @@ function CollectionDetailScreen({
             showAllPickerItems={showAllPickerItems}
             pickerItems={pickerItems}
             pickerPage={pickerPage}
-            selectedItemIds={selectedItemIds}
+            selectedItemIds={tempSelectedItemIds}
             onQueryChange={onQueryChange}
             onPickerTypeFilter={onPickerTypeFilter}
             onPickerRarityFilter={onPickerRarityFilter}
@@ -2351,9 +2492,7 @@ function CollectionDetailScreen({
             onPickerSort={onPickerSort}
             onShowAllChange={onShowAllChange}
             onPickerPageChange={onPickerPageChange}
-            onToggleItem={onToggleItem}
-            onOpenCard={onOpenCard}
-            onTogglePickerModal={onTogglePickerModal}
+            onToggleItem={onToggleTempItem}
           />
         </Modal>
       )}
@@ -2362,8 +2501,6 @@ function CollectionDetailScreen({
 }
 
 function CardPickerPanel({
-  title,
-  description,
   pickerQuery,
   pickerTypeOptions,
   pickerRarityOptions,
@@ -2380,16 +2517,11 @@ function CardPickerPanel({
   onShowAllChange,
   onPickerPageChange,
   onToggleItem,
-  onOpenCard,
-  action,
   onPickerTypeFilter,
   onPickerRarityFilter,
   onPickerVariantFilter,
   onPickerSort,
-  onTogglePickerModal,
 }: {
-  title: string;
-  description: string;
   pickerQuery: string;
   pickerTypeOptions: string[];
   pickerRarityOptions: string[];
@@ -2410,9 +2542,6 @@ function CardPickerPanel({
   onShowAllChange: (value: boolean) => void;
   onPickerPageChange: (page: number) => void;
   onToggleItem: (itemId: string) => void;
-  onOpenCard: (item: CollectionItem) => void;
-  action?: ReactNode;
-  onTogglePickerModal: (open: boolean) => void;
 }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const paginatedPickerItems = useMemo(
@@ -2425,60 +2554,52 @@ function CardPickerPanel({
   );
 
   return (
-    <Panel>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h3 className="section-title">{title}</h3>
-          <p className="section-copy mt-1">{description}</p>
+    <div className="relative p-5">
+      <div className="flex items-center justify-between mb-4 px-1">
+        <div className="text-[10px] font-black uppercase tracking-widest text-slate-500">
+          {selectedItemIds.size} selecionadas
         </div>
-        {action}
       </div>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto_auto_auto] lg:items-center">
-        <label className="relative block">
+      <div className="relative flex gap-2 flex-col md:flex-row">
+        <label className="relative block w-full">
           <Search
             className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
             size={18}
           />
           <input
-            className="premium-input w-full pl-11"
+            className="premium-input w-full pl-11 pr-12"
             value={pickerQuery}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Buscar por nome, numero, colecao..."
           />
+          <button
+            type="button"
+            onClick={() => setShowFiltersModal(true)}
+            className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-colors ${
+              (pickerTypeFilter || pickerRarityFilter || pickerVariantFilter) 
+                ? "text-brand bg-brand/10" 
+                : "text-slate-400 hover:text-white hover:bg-white/5"
+            }`}
+            title="Filtros e Ordenação"
+          >
+            <Filter size={20} />
+          </button>
         </label>
+
         <Button
           type="button"
           variant="ghost"
-          onClick={() => setShowFiltersModal(true)}
-          icon={<Filter size={18} />}
-          className={(pickerTypeFilter || pickerRarityFilter || pickerVariantFilter) ? "border-brand/40 bg-brand/5 text-brand" : ""}
-        >
-          Filtros e Ordenação
-        </Button>
-        <Button
-          type="button"
-          variant="primary"
-          className="px-8 shadow-glow"
-          icon={<Plus size={20} />}
-          onClick={() => onTogglePickerModal(true)}
-        >
-          Adicionar carta
-        </Button>
-        <Button
-          type="button"
-          icon={showAllPickerItems ? <X size={16} /> : <Plus size={16} />}
+          className="text-slate-500 hover:text-slate-700 text-sm justify-start "
+          icon={showAllPickerItems ? <X size={14} /> : <Plus size={14} />}
           onClick={() => onShowAllChange(!showAllPickerItems)}
         >
-          {showAllPickerItems ? "Ocultar lista" : "Mostrar todas"}
+          {showAllPickerItems ? "Ocultar lista" : "Mostrar todas as cartas"}
         </Button>
-        <div className="rounded-2xl border border-line/70 bg-white/70 px-4 py-3 text-sm font-black text-slate-600">
-          {selectedItemIds.size} selecionadas
-        </div>
       </div>
 
       {showFiltersModal && (
-        <Modal title="Filtros e Ordenação" onClose={() => setShowFiltersModal(false)} maxWidthClass="max-w-xl" zIndexClass="z-[70]">
+        <Modal title="Filtros e Ordenação" onClose={() => setShowFiltersModal(false)} maxWidthClass="max-w-xl" zIndexClass="z-[110]">
           <div className="grid gap-5 p-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <FilterField label="Tipo">
@@ -2566,12 +2687,10 @@ function CardPickerPanel({
         <>
           <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-7">
             {paginatedPickerItems.map((item) => (
-              <CollectionItemCard
+              <SimpleCardPickerItem
                 key={item.id}
                 item={item}
-                price={item.price ?? undefined}
                 selected={selectedItemIds.has(item.id)}
-                onOpen={onOpenCard}
                 onToggleSelection={onToggleItem}
               />
             ))}
@@ -2589,7 +2708,7 @@ function CardPickerPanel({
           Digite na busca ou use Mostrar todas para ver o inventario.
         </EmptyState>
       )}
-    </Panel>
+    </div>
   );
 }
 

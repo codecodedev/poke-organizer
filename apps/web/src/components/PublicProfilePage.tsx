@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { FolderOpen, Gavel, Mail, MapPin, Search, ShoppingBag, User } from "lucide-react";
 import type { UserPublicProfile } from "@poke-organizer/shared";
+import { formatCardNumber } from "@poke-organizer/shared";
 import { api, type Session } from "../lib/api";
 import { formatBrl } from "../lib/format";
 import { Panel } from "./ui/Panel";
 import { Button } from "./ui/Button";
+import { SEO } from "./SEO";
 
 type Props = {
   slug: string;
@@ -47,6 +49,10 @@ export function PublicProfilePage({ slug, session, onSelectCollection, onSelectA
 
   return (
     <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
+      <SEO 
+        title={`Perfil de ${profile.name}`} 
+        description={profile.bio || `Confira as coleções e leilões de Pokémon TCG de ${profile.name} no Coleciona cards.`}
+      />
       <aside className="space-y-6">
         <div className="overflow-hidden rounded-[32px] border border-line bg-white p-6 shadow-card dark:bg-black/20 dark:border-white/10">
           <div className="flex flex-col items-center text-center">
@@ -157,15 +163,35 @@ function TabButton({ active, onClick, label, count, icon }: { active: boolean, o
 }
 
 function CollectionFolderCard({ folder, onClick }: { folder: any, onClick: () => void }) {
+  const previewItems = (folder.previewItems || []) as any[];
+
   return (
     <button
       onClick={onClick}
       className="group flex flex-col text-left overflow-hidden rounded-[26px] border border-line/70 bg-white transition-all hover:border-brand hover:shadow-xl dark:bg-black/20 dark:border-white/10 dark:hover:border-brand"
     >
       <div className="flex flex-1 items-center gap-4 p-5">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-field text-slate-400 group-hover:bg-brand/10 group-hover:text-brand transition-colors dark:bg-white/5">
-          <FolderOpen size={24} />
-        </div>
+        {previewItems.length > 0 ? (
+          <div className="grid grid-cols-2 grid-rows-2 h-16 w-14 shrink-0 gap-0.5 overflow-hidden rounded-xl border border-line/30 bg-field dark:bg-white/5">
+            {previewItems.slice(0, 4).map((item: any) => (
+              <div key={item.id} className="relative overflow-hidden bg-slate-100 dark:bg-white/5">
+                <img src={item.card.imageSmall} className="h-full w-full object-cover" alt="" />
+                <div className="absolute bottom-0.5 right-0.5 rounded-md bg-white px-1 py-0.5 text-[7px] font-black text-ink shadow-[0_2px_4px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+                  {formatCardNumber(item.card.number, item.card.printedTotal)}
+                </div>
+              </div>
+            ))}
+            {previewItems.length < 4 && 
+              Array.from({ length: 4 - previewItems.length }).map((_, i) => (
+                <div key={`empty-${i}`} className="bg-slate-50 dark:bg-white/5" />
+              ))
+            }
+          </div>
+        ) : (
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-field text-slate-400 group-hover:bg-brand/10 group-hover:text-brand transition-colors dark:bg-white/5">
+            <FolderOpen size={24} />
+          </div>
+        )}
         <div className="min-w-0 flex-1">
           <h3 className="truncate font-black text-ink dark:text-white">{folder.name}</h3>
           <p className="text-xs font-bold text-slate-500 mt-0.5">

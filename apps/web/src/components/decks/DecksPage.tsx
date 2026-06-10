@@ -552,6 +552,7 @@ function DeckGeneratorModal({
     <Modal
       title="Gerar melhor deck"
       subtitle="O algoritmo compara seu inventario com arquetipos curados e retorna ate 3 sugestoes."
+      icon={<Bot size={20} />}
       onClose={onClose}
       maxWidthClass="max-w-5xl"
     >

@@ -1183,6 +1183,10 @@ export class CollectionService {
       0,
     );
 
+    const previewItems = folder.items
+      .slice(0, 4)
+      .map((entry) => this.mapItem(entry.collectionItem, entry));
+
     return {
       id: folder.id,
       name: folder.name,
@@ -1194,6 +1198,7 @@ export class CollectionService {
       viewCount: folder.viewCount,
       itemCount: folder.items.length,
       totalValue,
+      previewItems,
       createdAt: folder.createdAt.toISOString(),
       updatedAt: folder.updatedAt.toISOString(),
     } as CollectionFolderSummary;
