@@ -27,8 +27,13 @@ export function CardVariantImage({
   onError,
 }: Props) {
   const kind = variantKind(variant);
+  
+  const isHeavyHoloEnabled = import.meta.env.VITE_ENABLE_HEAVY_HOLO_EFFECT !== "false";
+  
   const effectClass =
-    kind !== "normal" && effect === "frame" ? "variant-card-image--effect-frame" : "";
+    kind !== "normal" && effect === "frame" && isHeavyHoloEnabled 
+      ? "variant-card-image--effect-frame" 
+      : "";
 
   return (
     <div
