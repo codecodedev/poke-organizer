@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState, type ReactNode } from "react";
+import { FormEvent, useEffect, useState, useMemo, type ReactNode } from "react";
 import {
   CalendarDays,
   DollarSign,
@@ -23,10 +23,12 @@ import {
   type CollectionItem,
   type PriceEstimate,
 } from "@poke-organizer/shared";
+import { api } from "../lib/api";
 import { formatBrl } from "../lib/format";
 import { CardVariantImage } from "./collection/CardVariantImage";
 import { Button } from "./ui/Button";
 import { Modal } from "./ui/Modal";
+import { Skeleton } from "./ui/Skeleton";
 
 export type AddCardDetails = {
   cardId: string;
@@ -67,19 +69,52 @@ export function CardDetailModal({
   onClose,
 }: Props) {
   const card = detailCard || collectionItem?.card;
-  const price = detailPrice || collectionPrice || collectionItem?.price;
   const mode = initialMode || (collectionItem ? "edit" : "add");
+
+  const variants = useMemo(() => {
+    if (!card) return ["normal"];
+    return card.variants && card.variants.length > 0 ? card.variants : ["normal"];
+  }, [card]);
 
   const [quantity, setQuantity] = useState(collectionItem?.quantity ?? 1);
   const [condition, setCondition] = useState<CardCondition>(collectionItem?.condition ?? "NM");
-  const [variant, setVariant] = useState(collectionItem?.variant ?? initialVariant ?? "normal");
+  const [variant, setVariant] = useState(() => {
+    if (collectionItem) return collectionItem.variant;
+    
+    // For new cards, wait for useEffect to sync based on variants and initialVariant
+    // But if we already have card and variants, we can try to guess
+    if (card) {
+       const initial = initialVariant && card.variants.includes(initialVariant) ? initialVariant : null;
+       const v = card.variants && card.variants.length > 0 ? card.variants : ["normal"];
+       return initial || (v.includes("normal") ? "normal" : v[0]);
+    }
+
+    return "normal";
+  });
   const [language, setLanguage] = useState<CardLanguage>(collectionItem?.language ?? "pt-BR");
   const [notes, setNotes] = useState(collectionItem?.notes ?? "");
   const [customPrice, setCustomPrice] = useState<number | null>(collectionItem?.customPrice ?? null);
+  
+  const [fetchedPrice, setFetchedPrice] = useState<PriceEstimate | null>(null);
+  const [isFetchingPrice, setIsFetchingPrice] = useState(false);
+  const [imageLoading, setImageLoading] = useState(true);
+
+  const imageSrc = card?.imageLarge ?? card?.imageSmall;
+
+  // Reset loading state when card or image changes
+  useEffect(() => {
+    if (!imageSrc) {
+      setImageLoading(false);
+    } else {
+      setImageLoading(true);
+    }
+  }, [card?.id, imageSrc]);
+
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
+  // Sync initial state and handle variant defaults
   useEffect(() => {
     if (collectionItem) {
       setQuantity(collectionItem.quantity);
@@ -88,17 +123,55 @@ export function CardDetailModal({
       setLanguage(collectionItem.language);
       setNotes(collectionItem.notes ?? "");
       setCustomPrice(collectionItem.customPrice ?? null);
+    } else if (card) {
+      // If adding, pick normal if available, else first variant
+      // But if initialVariant is provided and valid, use it
+      const validInitial = initialVariant && variants.includes(initialVariant) ? initialVariant : null;
+      const defaultVariant = validInitial || (variants.includes("normal") ? "normal" : variants[0]);
+      
+      setVariant(defaultVariant);
     }
-  }, [collectionItem]);
+  }, [collectionItem, card, initialVariant, variants]);
+
+  // Fetch price when critical attributes change
+  useEffect(() => {
+    if (!card?.id || mode !== "add") {
+      setFetchedPrice(null);
+      return;
+    }
+
+    // Skip if variant is "normal" but "normal" is not in variants (wait for sync)
+    if (variant === "normal" && !variants.includes("normal") && variants.length > 0 && variants[0] !== "normal") {
+      return;
+    }
+
+    let cancelled = false;
+    async function fetchPrice() {
+      setIsFetchingPrice(true);
+      try {
+        const p = await api.getPrice(card!.id, { variant, language, condition });
+        if (!cancelled) setFetchedPrice(p);
+      } catch (err) {
+        if (!cancelled) setFetchedPrice(null);
+      } finally {
+        if (!cancelled) setIsFetchingPrice(false);
+      }
+    }
+
+    void fetchPrice();
+    return () => { cancelled = true; };
+  }, [card?.id, variant, language, condition, mode, variants]);
+
+  const activePrice = detailPrice || collectionPrice || collectionItem?.price || fetchedPrice;
 
   if (!card) return null;
 
   const fullNumber = formatCardNumber(card.number, card.printedTotal);
-  const variants = card.variants.length > 0 ? card.variants : ["normal"];
 
-  const priceDisplay = price?.amount !== null && price?.amount !== undefined
-    ? formatBrl(price.amount)
-    : "Valor não encontrado";
+  const hasAmount = activePrice?.amount !== null && activePrice?.amount !== undefined;
+  const priceDisplay = hasAmount
+    ? formatBrl(activePrice!.amount!)
+    : isFetchingPrice ? "Carregando..." : "Valor não disponível";
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -109,11 +182,20 @@ export function CardDetailModal({
     setSubmitMessage(null);
 
     try {
+      // Ensure the variant is valid before sending
+      let finalVariant = variant;
+      if (!variants.includes(variant)) {
+        finalVariant = variants.includes("normal") ? "normal" : variants[0];
+      }
+
+      const v = finalVariant.toLowerCase();
+      const isFoil = v.includes("foil") || v.includes("holo");
+      
       const details = {
         quantity,
         condition,
-        variant,
-        foil: variant !== "normal",
+        variant: finalVariant,
+        foil: isFoil,
         language,
         notes: notes.trim() || undefined,
         customPrice,
@@ -155,8 +237,12 @@ export function CardDetailModal({
                 <Sparkles size={24} />
              </div>
              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Estimativa atual</p>
-                <p className="text-xl font-black text-ink">{priceDisplay}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Estimativa atual</p>
+                {isFetchingPrice ? (
+                  <Skeleton className="h-6 w-32 mt-1" />
+                ) : (
+                  <p className="text-xl font-black text-foreground">{priceDisplay}</p>
+                )}
              </div>
           </div>
           <div className="flex gap-3">
@@ -164,7 +250,7 @@ export function CardDetailModal({
               <Button
                 type="button"
                 variant="ghost"
-                className="px-6 text-slate-600 border border-line"
+                className="px-6 text-muted-foreground border border-card-border"
                 icon={<Gavel size={18} />}
                 onClick={() => {
                   onClose();
@@ -190,18 +276,25 @@ export function CardDetailModal({
     >
       <div className={`grid gap-8 p-6 ${showRightColumn ? 'lg:grid-cols-[1fr_400px]' : ''}`}>
         <div className="min-w-0">
-          <div className={`mx-auto w-full mb-8 ${showRightColumn ? 'max-w-[390px]' : 'max-w-[320px]'} relative`}>
+          <div className={`mx-auto w-full mb-8 ${showRightColumn ? 'max-w-[390px]' : 'max-w-[320px]'} relative group aspect-[5/7]`}>
+              {imageLoading && (
+                <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-card rounded-[24px] border border-card-border/40">
+                   <Skeleton className="h-full w-full rounded-[24px]" />
+                </div>
+              )}
               <CardVariantImage
-                src={card.imageLarge ?? card.imageSmall}
+                src={imageSrc}
                 alt={card.name}
                 variant={variant}
                 effect="frame"
-                className=" rounded-[24px] border border-line/80 bg-gradient-to-br from-aqua/15 to-lilac/15 shadow-card"
-                imageClassName="rounded-[18px] object-contain"
+                className={`rounded-[24px] border border-card-border/40 bg-card shadow-card transition-opacity duration-300 h-full w-full ${imageLoading ? 'opacity-0' : 'opacity-100'}`}
+                imageClassName="rounded-[18px] object-contain h-full w-full"
+                onLoad={() => setImageLoading(false)}
+                onError={() => setImageLoading(false)}
               />
           </div>
 
-          <h3 className="mb-3 text-xl font-black text-ink uppercase tracking-widest text-[14px]">Atributos</h3>
+          <h3 className="mb-3 text-xl font-black text-foreground uppercase tracking-widest text-[14px]">Atributos</h3>
           <dl className={`grid gap-3 ${showRightColumn ? 'sm:grid-cols-2 lg:grid-cols-3' : 'grid-cols-2'}`}>
             <Detail
               icon={<Pencil size={18} />}
@@ -233,15 +326,15 @@ export function CardDetailModal({
 
         {showRightColumn && (
           <aside className="lg:sticky lg:top-0">
-            <div className="rounded-[32px] border border-line/80 bg-white/70 p-6 shadow-sm">
+            <div className="rounded-[32px] border border-card-border/50 bg-card/70 p-6 shadow-sm">
               <form id="card-detail-form" onSubmit={submit}>
-                <h3 className="text-xl font-black text-ink uppercase tracking-widest text-[14px] mb-6">
+                <h3 className="text-xl font-black text-foreground uppercase tracking-widest text-[14px] mb-6">
                   {mode === "add" ? "Configurar Adição" : "Editar Entrada"}
                 </h3>
 
                 <div className="grid gap-5">
                   <label className="grid gap-2">
-                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Quantidade</span>
+                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quantidade</span>
                     <input
                       type="number"
                       min="1"
@@ -252,7 +345,7 @@ export function CardDetailModal({
                   </label>
 
                   <label className="grid gap-2">
-                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Condição</span>
+                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Condição</span>
                     <select
                       className="premium-select"
                       value={condition}
@@ -265,7 +358,7 @@ export function CardDetailModal({
                   </label>
 
                   <label className="grid gap-2">
-                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Variante</span>
+                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Variante</span>
                     <select
                       className="premium-select"
                       value={variant}
@@ -278,7 +371,7 @@ export function CardDetailModal({
                   </label>
 
                   <label className="grid gap-2">
-                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Idioma</span>
+                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Idioma</span>
                     <select
                       className="premium-select"
                       value={language}
@@ -291,9 +384,9 @@ export function CardDetailModal({
                   </label>
 
                   <label className="grid gap-2">
-                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Preço Manual (Opcional)</span>
+                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Preço Manual (Opcional)</span>
                     <div className="relative">
-                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                      <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                       <input
                         type="number"
                         step="0.01"
@@ -307,7 +400,7 @@ export function CardDetailModal({
                 </div>
 
                 {(error || submitMessage) && (
-                  <div className={`mt-6 p-4 rounded-2xl text-[11px] font-black uppercase tracking-wider text-center ${error ? 'bg-red-50 border border-red-100 text-red-600' : 'bg-green-50 border border-green-100 text-green-600'}`}>
+                  <div className={`mt-6 p-4 rounded-2xl text-[11px] font-black uppercase tracking-wider text-center ${error ? 'bg-magenta/10 border border-magenta/20 text-magenta' : 'bg-leaf/10 border border-leaf/20 text-leaf'}`}>
                     {error || submitMessage}
                   </div>
                 )}
@@ -330,14 +423,14 @@ function Detail({
   value: string;
 }) {
   return (
-    <div className="rounded-2xl border border-line/60 bg-white/50 p-4 shadow-sm">
-      <div className="mb-2 flex items-center gap-2 text-slate-400">
+    <div className="rounded-2xl border border-card-border/40 bg-card/50 p-4 shadow-sm">
+      <div className="mb-2 flex items-center gap-2 text-muted-foreground">
         {icon}
         <span className="text-[10px] font-black uppercase tracking-widest">
           {label}
         </span>
       </div>
-      <p className="truncate text-xs font-bold text-ink">{value}</p>
+      <p className="truncate text-xs font-bold text-foreground">{value}</p>
     </div>
   );
 }

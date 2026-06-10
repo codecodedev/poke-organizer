@@ -40,30 +40,30 @@ export function Modal({
       onMouseDown={onClose}
     >
       <div
-        className={`animate-soft-pop flex max-h-[90vh] w-full flex-col overflow-hidden rounded-[32px] border border-white/20 bg-white shadow-card ${maxWidthClass}`}
+        className={`animate-soft-pop flex max-h-[90vh] w-full flex-col overflow-hidden rounded-[32px] border border-card-border bg-card shadow-card ${maxWidthClass}`}
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="holo-strip animate-shimmer h-2 shrink-0" />
         
         {/* Fixed Header */}
-        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-line/70 px-6 py-5">
+        <div className="flex shrink-0 items-center justify-between gap-4 border-b border-card-border/50 px-6 py-5">
           <div className="flex items-center gap-3">
             {icon && (
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary text-white">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand text-white">
                 {icon}
               </div>
             )}
             <div>
-              <h2 id="modal-title" className="text-xl font-black text-ink">
+              <h2 id="modal-title" className="text-xl font-black text-foreground">
                 {title}
               </h2>
-              {subtitle && <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mt-0.5">{subtitle}</p>}
+              {subtitle && <p className="text-xs font-bold text-muted-foreground uppercase tracking-wider mt-0.5">{subtitle}</p>}
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-white text-slate-700 shadow-sm transition hover:bg-field"
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-card-border bg-card text-muted-foreground shadow-sm transition hover:bg-accent hover:text-foreground"
             aria-label="Fechar"
           >
             <X size={18} />
@@ -77,7 +77,7 @@ export function Modal({
 
         {/* Fixed Footer */}
         {footer && (
-          <div className="shrink-0 border-t border-line/70 bg-field/30 px-6 py-5">
+          <div className="shrink-0 border-t border-card-border/50 bg-muted/30 px-6 py-5">
             {footer}
           </div>
         )}

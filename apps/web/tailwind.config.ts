@@ -6,26 +6,45 @@ export default {
   theme: {
     extend: {
       colors: {
-        background: "#020617",
+        // Theme-able colors
+        background: "rgb(var(--color-background) / <alpha-value>)",
+        foreground: "rgb(var(--color-foreground) / <alpha-value>)",
+        card: {
+          DEFAULT: "rgb(var(--color-card) / <alpha-value>)",
+          foreground: "rgb(var(--color-card-foreground) / <alpha-value>)",
+          border: "rgb(var(--color-card-border) / <alpha-value>)",
+        },
+        muted: {
+          DEFAULT: "rgb(var(--color-muted) / <alpha-value>)",
+          foreground: "rgb(var(--color-muted-foreground) / <alpha-value>)",
+        },
+        accent: {
+          DEFAULT: "rgb(var(--color-accent) / <alpha-value>)",
+          foreground: "rgb(var(--color-accent-foreground) / <alpha-value>)",
+        },
+        border: "rgb(var(--color-border) / <alpha-value>)",
+        input: "rgb(var(--color-input) / <alpha-value>)",
+        
+        // Brand & Palette
         primary: "#243665",
-        cyan: "#00f2ff",
-        magenta: "#FF5790",
+        cyan: "rgb(var(--color-cyan) / <alpha-value>)",
+        magenta: "rgb(var(--color-magenta) / <alpha-value>)",
         teal: "#053b50",
         customGray: {
-          light: "#a62830", // Keeping hex as requested even if name is odd
+          light: "#a62830",
           medium: "#838987",
         },
-        ink: "#18212f",
-        field: "#f7f5ff",
-        line: "#e4dff2",
-        brand: "#ef5d75",
-        leaf: "#55c7a9",
-        amber: "#f4b35f",
-        aqua: "#69cde7",
-        lilac: "#a891f5",
+        ink: "rgb(var(--color-ink) / <alpha-value>)",
+        field: "rgb(var(--color-field) / <alpha-value>)",
+        line: "rgb(var(--color-line) / <alpha-value>)",
+        brand: "rgb(var(--color-brand) / <alpha-value>)",
+        leaf: "rgb(var(--color-leaf) / <alpha-value>)",
+        amber: "rgb(var(--color-amber) / <alpha-value>)",
+        aqua: "rgb(var(--color-aqua) / <alpha-value>)",
+        lilac: "rgb(var(--color-lilac) / <alpha-value>)",
         butter: "#ffe08a",
         coral: "#ff8d7a",
-        night: "#293347"
+        night: "rgb(var(--color-night) / <alpha-value>)"
       },
       boxShadow: {
         card: "0 18px 50px rgba(67, 56, 120, 0.12)",

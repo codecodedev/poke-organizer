@@ -24,10 +24,22 @@ type Props = {
   onUnauthorized: () => Promise<Session | null>;
   onBack: () => void;
   initialTab?: string | null;
+  onUnsavedChanges?: (hasChanges: boolean) => void;
+  blockedNavigationAt?: number;
 };
 
-export function ProfilePage({ session, onSession, onUnauthorized, onBack, initialTab }: Props) {
+export function ProfilePage({ session, onSession, onUnauthorized, onBack, initialTab, onUnsavedChanges, blockedNavigationAt }: Props) {
   const [tab, setTab] = useState<"proposals" | "settings">(initialTab === "settings" ? "settings" : "proposals");
+  
+  const [shouldShake, setShouldShake] = useState(false);
+
+  useEffect(() => {
+    if (blockedNavigationAt && blockedNavigationAt > 0) {
+      setShouldShake(true);
+      const timer = setTimeout(() => setShouldShake(false), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [blockedNavigationAt]);
 
   useEffect(() => {
     if (initialTab) {
@@ -48,6 +60,17 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
 
   const [slugStatus, setSlugStatus] = useState<"idle" | "checking" | "available" | "taken" | "invalid">("idle");
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    const changed = 
+      name !== (session.user.name || "") ||
+      whatsapp !== (session.user.whatsapp || "") ||
+      profileSlug !== (session.user.profileSlug || "") ||
+      profileBio !== (session.user.profileBio || "") ||
+      isPublicProfile !== (session.user.isPublicProfile || false);
+    
+    onUnsavedChanges?.(changed);
+  }, [name, whatsapp, profileSlug, profileBio, isPublicProfile, session.user, onUnsavedChanges]);
 
   useEffect(() => {
     if (!profileSlug || profileSlug === session.user.profileSlug) {
@@ -134,15 +157,15 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
         <div className="flex items-center gap-4">
           <button
             onClick={onBack}
-            className="grid h-12 w-12 place-items-center rounded-2xl border border-line bg-white text-slate-700 transition hover:bg-field shadow-sm dark:bg-black/20 dark:text-white dark:border-white/10"
+            className="grid h-12 w-12 place-items-center rounded-2xl border border-card-border bg-card text-muted-foreground transition hover:bg-accent hover:text-foreground shadow-sm"
           >
             <ArrowLeft size={22} />
           </button>
           <div>
-            <h1 className="text-3xl font-black text-ink dark:text-white">
+            <h1 className="text-3xl font-black text-foreground">
               {tab === "proposals" ? "Suas Propostas" : "Configurações de Perfil"}
             </h1>
-            <p className="text-sm font-semibold text-slate-500">
+            <p className="text-sm font-semibold text-muted-foreground">
               {tab === "proposals" 
                 ? "Gerencie as propostas que você enviou para outros colecionadores." 
                 : "Gerencie suas informações e visibilidade do seu perfil público."}
@@ -151,28 +174,28 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
         </div>
       </div>
 
-      <Panel className="p-0 overflow-hidden border-line/60 dark:bg-black/20 dark:border-white/5">
+      <Panel className="p-0 overflow-hidden border-card-border/40">
         {loading ? (
-          <div className="py-24 text-center font-black text-slate-400 animate-pulse">Carregando dados...</div>
+          <div className="py-24 text-center font-black text-muted-foreground animate-pulse">Carregando dados...</div>
         ) : (
-          <div className="divide-y divide-line/40">
+          <div className="divide-y divide-card-border/20">
             {tab === "proposals" ? (
               <>
                 {proposals.length === 0 ? (
                   <div className="py-24 text-center">
-                    <p className="text-sm font-bold text-slate-400">Você ainda não fez nenhuma proposta em coleções.</p>
+                    <p className="text-sm font-bold text-muted-foreground">Você ainda não fez nenhuma proposta em coleções.</p>
                   </div>
                 ) : (
                   proposals.map((offer) => (
-                    <div key={offer.id} className="p-6 transition hover:bg-field/30">
+                    <div key={offer.id} className="p-6 transition hover:bg-accent/30">
                       <div className="flex flex-wrap items-start justify-between gap-6">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-3">
-                            <span className="text-xs font-black uppercase tracking-widest text-slate-400">Proposta</span>
+                            <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Proposta</span>
                             <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ${
                               offer.status === "accepted" ? "bg-leaf text-white" :
-                              offer.status === "rejected" ? "bg-red-500 text-white" :
-                              "bg-amber-100 text-amber-800"
+                              offer.status === "rejected" ? "bg-magenta text-white" :
+                              "bg-amber/20 text-amber"
                             }`}>
                               {offer.status === "accepted" ? "Aceita" : offer.status === "rejected" ? "Recusada" : "Pendente"}
                             </span>
@@ -182,12 +205,12 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                                 </span>
                             )}
                           </div>
-                          <h3 className="mt-2 text-xl font-black text-ink">Valor sugerido: {formatBrl(offer.totalOffer)}</h3>
-                          <p className="mt-1 text-sm font-semibold text-slate-500">Enviada em: {new Date(offer.createdAt).toLocaleDateString()}</p>
+                          <h3 className="mt-2 text-xl font-black text-foreground">Valor sugerido: {formatBrl(offer.totalOffer)}</h3>
+                          <p className="mt-1 text-sm font-semibold text-muted-foreground">Enviada em: {new Date(offer.createdAt).toLocaleDateString()}</p>
                           
                           <div className="mt-4 flex flex-wrap gap-2">
                             {offer.items.map((item) => (
-                              <div key={item.id} className="rounded-xl bg-white px-3 py-1.5 text-xs font-bold text-slate-600 border border-line/60 shadow-sm">
+                              <div key={item.id} className="rounded-xl bg-card px-3 py-1.5 text-xs font-bold text-muted-foreground border border-card-border/40 shadow-sm">
                                 {item.quantity}x {item.item.card.name}
                               </div>
                             ))}
@@ -210,7 +233,7 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
               <div className="p-8 space-y-8">
                 <div className="grid gap-8 md:grid-cols-2">
                   <div className="space-y-2">
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">Nome de Exibição</label>
+                    <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Nome de Exibição</label>
                     <input
                       className="premium-input w-full"
                       value={name}
@@ -220,7 +243,7 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">WhatsApp</label>
+                    <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">WhatsApp</label>
                     <input
                       className="premium-input w-full"
                       value={whatsapp}
@@ -230,29 +253,29 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                   </div>
 
                   <div className="space-y-2">
-                    <label className="text-xs font-black uppercase tracking-widest text-slate-500">Link do Perfil (Slug)</label>
+                    <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Link do Perfil (Slug)</label>
                     <div className="relative">
-                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">@</span>
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-bold text-sm">@</span>
                       <input
                         className={`premium-input w-full pl-10 pr-10 ${
-                          slugStatus === "available" ? "border-emerald-500/50 focus:border-emerald-500" :
-                          slugStatus === "taken" || slugStatus === "invalid" ? "border-rose-500/50 focus:border-rose-500" : ""
+                          slugStatus === "available" ? "border-leaf/50 focus:border-leaf" :
+                          slugStatus === "taken" || slugStatus === "invalid" ? "border-magenta/50 focus:border-magenta" : ""
                         }`}
                         value={profileSlug}
                         onChange={(e) => setProfileSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
                         placeholder="seu-apelido"
                       />
                       <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                        {slugStatus === "checking" && <Loader2 size={18} className="animate-spin text-slate-400" />}
-                        {slugStatus === "available" && <Check size={18} className="text-emerald-500" />}
-                        {(slugStatus === "taken" || slugStatus === "invalid") && <AlertCircle size={18} className="text-rose-500" />}
+                        {slugStatus === "checking" && <Loader2 size={18} className="animate-spin text-muted-foreground" />}
+                        {slugStatus === "available" && <Check size={18} className="text-leaf" />}
+                        {(slugStatus === "taken" || slugStatus === "invalid") && <AlertCircle size={18} className="text-magenta" />}
                       </div>
                     </div>
                     <div className="flex items-center justify-between px-1">
                       <p className={`text-[10px] font-bold ${
-                        slugStatus === "taken" ? "text-rose-500" :
-                        slugStatus === "available" ? "text-emerald-500" :
-                        slugStatus === "invalid" ? "text-rose-500" : "text-slate-400"
+                        slugStatus === "taken" ? "text-magenta" :
+                        slugStatus === "available" ? "text-leaf" :
+                        slugStatus === "invalid" ? "text-magenta" : "text-muted-foreground"
                       }`}>
                         {slugStatus === "taken" ? "Este link já está em uso" :
                          slugStatus === "available" ? "Link disponível!" :
@@ -274,7 +297,7 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-xs font-black uppercase tracking-widest text-slate-500">Biografia</label>
+                  <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Biografia</label>
                   <textarea
                     className="premium-input w-full min-h-[120px] py-4"
                     value={profileBio}
@@ -283,38 +306,39 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                   />
                 </div>
 
-                <div className="flex items-center justify-between rounded-[24px] border border-line bg-field/30 p-6 dark:bg-white/5 dark:border-white/5">
+                <div className="flex items-center justify-between rounded-[24px] border border-card-border/40 bg-muted/20 p-6">
                   <div className="flex items-center gap-4">
-                    <div className={`grid h-12 w-12 place-items-center rounded-2xl ${isPublicProfile ? "bg-leaf text-white" : "bg-slate-100 text-slate-400 dark:bg-white/5"}`}>
+                    <div className={`grid h-12 w-12 place-items-center rounded-2xl ${isPublicProfile ? "bg-leaf text-white" : "bg-muted text-muted-foreground"}`}>
                       <Globe size={24} />
                     </div>
                     <div>
-                      <h4 className="font-black text-ink dark:text-white">Perfil Público</h4>
-                      <p className="text-xs font-semibold text-slate-500">Permitir que qualquer pessoa veja seu perfil e coleções públicas.</p>
+                      <h4 className="font-black text-foreground">Perfil Público</h4>
+                      <p className="text-xs font-semibold text-muted-foreground">Permitir que qualquer pessoa veja seu perfil e coleções públicas.</p>
                     </div>
                   </div>
                   <input
                     type="checkbox"
                     checked={isPublicProfile}
                     onChange={(e) => setIsPublicProfile(e.target.checked)}
-                    className="h-7 w-7 rounded-lg border-line text-brand focus:ring-brand/30 dark:bg-black/20"
+                    className="h-7 w-7 rounded-lg border-card-border text-brand focus:ring-brand/30"
                   />
                 </div>
 
                 {message && (
                   <div className={`rounded-2xl p-4 text-sm font-bold animate-in fade-in slide-in-from-top-2 ${
-                    message.type === "success" ? "bg-leaf/10 text-leaf dark:bg-leaf/20" : "bg-red-50 text-red-600 dark:bg-red-500/20 dark:text-red-400"
+                    message.type === "success" ? "bg-leaf/10 text-leaf" : "bg-magenta/10 text-magenta"
                   }`}>
                     {message.text}
                   </div>
                 )}
 
-                <div className="flex justify-end border-t border-line/40 dark:border-white/5 pt-8">
+                <div className="flex justify-end border-t border-card-border/30 pt-8">
                   <Button
                     variant="brand"
                     className="h-12 px-10 shadow-glow"
                     disabled={updating || slugStatus === "taken" || slugStatus === "checking" || slugStatus === "invalid"}
                     onClick={handleUpdateProfile}
+                    shake={shouldShake}
                   >
                     {updating ? "Salvando..." : "Salvar Alterações"}
                   </Button>

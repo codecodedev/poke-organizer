@@ -37,8 +37,8 @@ export function ConfirmEmailPanel({ token, onComplete }: Props) {
             <div className="flex justify-center mb-6">
               <Loader2 size={48} className="animate-spin text-brand" />
             </div>
-            <h2 className="mb-2 text-2xl font-black text-white">Confirmando e-mail</h2>
-            <p className="text-sm text-slate-400">Aguarde um momento enquanto validamos seu cadastro...</p>
+            <h2 className="mb-2 text-2xl font-black text-foreground">Confirmando e-mail</h2>
+            <p className="text-sm text-muted-foreground/60">Aguarde um momento enquanto validamos seu cadastro...</p>
           </>
         )}
 
@@ -47,8 +47,8 @@ export function ConfirmEmailPanel({ token, onComplete }: Props) {
             <div className="flex justify-center mb-6">
               <CheckCircle size={48} className="text-leaf" />
             </div>
-            <h2 className="mb-2 text-2xl font-black text-white">E-mail confirmado!</h2>
-            <p className="text-sm text-slate-400 mb-6">Sua conta foi ativada com sucesso. Redirecionando para o login...</p>
+            <h2 className="mb-2 text-2xl font-black text-foreground">E-mail confirmado!</h2>
+            <p className="text-sm text-muted-foreground/60 mb-6">Sua conta foi ativada com sucesso. Redirecionando para o login...</p>
             <button
               onClick={onComplete}
               className="text-sm font-bold text-brand hover:underline"
@@ -63,8 +63,8 @@ export function ConfirmEmailPanel({ token, onComplete }: Props) {
             <div className="flex justify-center mb-6">
               <XCircle size={48} className="text-magenta" />
             </div>
-            <h2 className="mb-2 text-2xl font-black text-white">Falha na confirmação</h2>
-            <p className="text-sm text-slate-400 mb-6">{error || "O link de confirmação é inválido ou expirou."}</p>
+            <h2 className="mb-2 text-2xl font-black text-foreground">Falha na confirmação</h2>
+            <p className="text-sm text-muted-foreground/60 mb-6">{error || "O link de confirmação é inválido ou expirou."}</p>
             <button
               onClick={onComplete}
               className="btn-gradient flex h-12 w-full items-center justify-center gap-2 rounded-xl text-sm"

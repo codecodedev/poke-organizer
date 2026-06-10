@@ -66,30 +66,14 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
       maxWidthClass="max-w-xl"
       footer={(
         <div className="flex flex-col gap-4">
-          <Button
-            form="auction-form"
-            type="submit"
-            variant="brand"
-            className="w-full h-14 bg-amber-400 text-amber-950 hover:bg-amber-300 shadow-glow shadow-amber-500/20"
-            disabled={submitting}
-          >
-            {submitting ? "Iniciando..." : "Iniciar Leilão Agora"}
-          </Button>
-          <p className="text-[10px] font-bold text-center text-slate-400 uppercase tracking-wider">
-             Ao iniciar, você receberá um link público para compartilhar.
-          </p>
-        </div>
-      )}
-    >
-      <div className="p-6">
           {error && (
-            <div className="p-4 mb-4 rounded-2xl bg-red-50 border border-red-100 flex flex-col gap-3">
-              <p className="text-red-600 text-sm font-bold">{error}</p>
+            <div className="p-4 mb-4 rounded-2xl bg-magenta/10 border border-magenta/20 flex flex-col gap-3">
+              <p className="text-magenta text-sm font-bold">{error}</p>
               {error.includes("WhatsApp") && (
                 <Button
                   type="button"
                   variant="outline"
-                  className="h-10 border-red-200 text-red-600 hover:bg-red-50"
+                  className="h-10 border-magenta/20 text-magenta hover:bg-magenta/10"
                   onClick={() => {
                     onClose();
                     onNavigate({ view: "profile" });
@@ -100,23 +84,39 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
               )}
             </div>
           )}
+          <Button
+            form="auction-form"
+            type="submit"
+            variant="brand"
+            className="w-full h-14 shadow-glow shadow-cyan/20"
+            disabled={submitting}
+          >
+            {submitting ? "Iniciando..." : "Iniciar Leilão Agora"}
+          </Button>
+          <p className="text-[10px] font-bold text-center text-muted-foreground uppercase tracking-wider">
+             Ao iniciar, você receberá um link público para compartilhar.
+          </p>
+        </div>
+      )}
+    >
+      <div className="p-6">
         <form id="auction-form" onSubmit={handleSubmit} className="space-y-6">
-          <div className="flex items-start gap-6 p-5 rounded-3xl bg-slate-50 border border-line shadow-sm">
-            <div className="aspect-[3/4] w-24 overflow-hidden rounded-xl bg-white shadow-sm">
+          <div className="flex items-start gap-6 p-5 rounded-3xl bg-card border border-card-border shadow-sm">
+            <div className="aspect-[3/4] w-24 overflow-hidden rounded-xl bg-accent/20 shadow-sm">
               <img src={item.card.imageSmall || undefined} alt={item.card.name} className="h-full w-full object-contain" />
             </div>
             <div className="flex-1">
-              <h3 className="text-lg font-black text-ink">{item.card.name}</h3>
+              <h3 className="text-lg font-black text-foreground">{item.card.name}</h3>
               <div className="flex flex-wrap gap-2 mt-2">
-                <span className="px-2 py-1 rounded-lg bg-white border border-line text-[10px] font-black text-slate-500 uppercase">{item.condition}</span>
-                <span className="px-2 py-1 rounded-lg bg-amber-50 border border-amber-100 text-[10px] font-black text-amber-600 uppercase">{item.variant}</span>
+                <span className="px-2 py-1 rounded-lg bg-card border border-card-border text-[10px] font-black text-muted-foreground uppercase">{item.condition}</span>
+                <span className="px-2 py-1 rounded-lg bg-amber/10 border border-amber/20 text-[10px] font-black text-amber uppercase">{item.variant}</span>
               </div>
             </div>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-2">
-              <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Lance Mínimo (R$)</span>
+              <span className="px-1 text-xs font-black uppercase tracking-widest text-muted-foreground">Lance Mínimo (R$)</span>
               <input
                 type="number"
                 step="0.01"
@@ -127,7 +127,7 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
               />
             </label>
             <label className="grid gap-2">
-              <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Duração (Dias)</span>
+              <span className="px-1 text-xs font-black uppercase tracking-widest text-muted-foreground">Duração (Dias)</span>
               <select
                 className="premium-select"
                 value={durationDays}
@@ -143,7 +143,7 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
           </div>
 
           <label className="grid gap-2">
-            <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Título (Opcional)</span>
+            <span className="px-1 text-xs font-black uppercase tracking-widest text-muted-foreground">Título (Opcional)</span>
             <input
               type="text"
               className="premium-input"
@@ -154,7 +154,7 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
           </label>
 
           <label className="grid gap-2">
-            <span className="px-1 text-xs font-black uppercase tracking-widest text-slate-500">Descrição (Opcional)</span>
+            <span className="px-1 text-xs font-black uppercase tracking-widest text-muted-foreground">Descrição (Opcional)</span>
             <textarea
               className="premium-input min-h-24 resize-none py-4"
               value={description}

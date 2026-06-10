@@ -447,7 +447,7 @@ export const api = {
   listMyAuctions(token: string) {
     return request<AuctionSummary[]>("/auctions/me", { token });
   },
-  getAuction(idOrToken: string, token?: string) {
+  getAuctionDetail(idOrToken: string, token?: string) {
     return request<AuctionDetail>(`/auctions/${encodeURIComponent(idOrToken)}`, { token });
   },
   createAuction(token: string, payload: { collectionItemId: string; title?: string; description?: string; minBidBrl: number; endsAt: string }) {
@@ -457,7 +457,7 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
-  placeAuctionBid(token: string, auctionId: string, amountBrl: number) {
+  placeBid(token: string, auctionId: string, amountBrl: number) {
     return request<AuctionDetail>(`/auctions/${encodeURIComponent(auctionId)}/bids`, {
       method: "POST",
       token,
@@ -478,7 +478,7 @@ export const api = {
       body: JSON.stringify({}),
     });
   },
-  deleteAuctionBid(token: string, auctionId: string, bidId: string) {
+  deleteBid(token: string, auctionId: string, bidId: string) {
     return request<AuctionDetail>(`/auctions/${encodeURIComponent(auctionId)}/bids/${encodeURIComponent(bidId)}/delete`, {
       method: "POST",
       token,

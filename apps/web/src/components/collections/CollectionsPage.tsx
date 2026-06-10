@@ -4,6 +4,7 @@ import {
   Check,
   Copy,
   Eye,
+  EyeClosed,
   Filter,
   FolderPlus,
   Gavel,
@@ -16,6 +17,7 @@ import {
   Share2,
   ShoppingBag,
   Trash2,
+  Unlock,
   Upload,
   X,
 } from "lucide-react";
@@ -47,8 +49,10 @@ type Props = {
   session: Session;
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
-  collectionRoute?: string | null;
-  onCollectionRouteChange?: (route: string | null) => void;
+  collectionRoute: string | null;
+  onCollectionRouteChange: (collectionId: string | null) => void;
+  onUnsavedChanges?: (hasChanges: boolean) => void;
+  blockedNavigationAt?: number;
 };
 
 type Screen = "list" | "create" | "detail";
@@ -61,8 +65,10 @@ export function CollectionsPage({
   session,
   onSession,
   onUnauthorized,
-  collectionRoute = null,
+  collectionRoute,
   onCollectionRouteChange,
+  onUnsavedChanges,
+  blockedNavigationAt,
 }: Props) {
   const [screen, setScreen] = useState<Screen>("list");
   const [folders, setFolders] = useState<CollectionFolderSummary[]>([]);
@@ -107,6 +113,19 @@ export function CollectionsPage({
   const [bannerUploading, setBannerUploading] = useState(false);
   const [pendingBannerFile, setPendingBannerFile] = useState<File | null>(null);
   const [pendingBannerRemoval, setPendingBannerRemoval] = useState(false);
+
+  const hasChanges = useMemo(() => {
+    if (!activeFolder) return false;
+    return (
+      activeName !== activeFolder.name ||
+      pendingBannerFile !== null ||
+      pendingBannerRemoval
+    );
+  }, [activeName, activeFolder, pendingBannerFile, pendingBannerRemoval]);
+
+  useEffect(() => {
+    onUnsavedChanges?.(hasChanges);
+  }, [hasChanges, onUnsavedChanges]);
 
   useEffect(() => {
     localStorage.setItem("cp_typeFilter", typeFilter);
@@ -933,6 +952,7 @@ export function CollectionsPage({
           tempSelectedItemIds={tempSelectedItemIds}
           setSellingItem={setSellingItem}
           onManagePermissions={() => setShowPermissionsModal(true)}
+          blockedNavigationAt={blockedNavigationAt}
         />
       )}
 
@@ -1054,17 +1074,17 @@ function PermissionsModal({
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
       <div
-        className="animate-soft-pop w-full max-w-md overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        className="animate-soft-pop w-full max-w-md overflow-auto rounded-[26px] border border-card-border bg-card shadow-card"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-card-border/50 px-5 py-4">
           <div>
-            <h2 className="text-xl font-black text-ink">Acessos Privados</h2>
-            <p className="text-sm font-semibold text-slate-500">Autorize outros usuários a verem esta coleção.</p>
+            <h2 className="text-xl font-black text-foreground">Acessos Privados</h2>
+            <p className="text-sm font-semibold text-muted-foreground">Autorize outros usuários a verem esta coleção.</p>
           </div>
           <button
             onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+            className="grid h-10 w-10 place-items-center rounded-xl border border-card-border/40 bg-card text-foreground/80 transition hover:bg-muted/30"
           >
             <X size={18} />
           </button>
@@ -1073,7 +1093,7 @@ function PermissionsModal({
         <div className="p-5">
           <form onSubmit={submit} className="grid gap-4">
             <label className="grid gap-2">
-              <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">E-mail do usuário</span>
+              <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">E-mail do usuário</span>
               <div className="flex gap-2">
                 <input
                   className="premium-input flex-1"
@@ -1092,20 +1112,20 @@ function PermissionsModal({
           </form>
 
           <div className="mt-6 space-y-3">
-            <h3 className="text-sm font-black text-ink">Usuários com acesso</h3>
+            <h3 className="text-sm font-black text-foreground">Usuários com acesso</h3>
             {permissions.length === 0 ? (
-              <p className="py-4 text-center text-xs font-bold text-slate-400">Apenas você tem acesso a esta coleção privada.</p>
+              <p className="py-4 text-center text-xs font-bold text-muted-foreground">Apenas você tem acesso a esta coleção privada.</p>
             ) : (
               <div className="grid gap-2">
                 {permissions.map((perm) => (
-                  <div key={perm.id} className="flex items-center justify-between rounded-xl bg-field p-3">
+                  <div key={perm.id} className="flex items-center justify-between rounded-xl bg-muted/30 p-3">
                     <div className="min-w-0">
-                      <p className="truncate text-xs font-black text-ink">{perm.user.name || "Sem nome"}</p>
-                      <p className="truncate text-[10px] font-semibold text-slate-500">{perm.user.email}</p>
+                      <p className="truncate text-xs font-black text-foreground">{perm.user.name || "Sem nome"}</p>
+                      <p className="truncate text-[10px] font-semibold text-muted-foreground">{perm.user.email}</p>
                     </div>
                     <button
                       onClick={() => onRemove(perm.id)}
-                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-500 transition"
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted-foreground hover:bg-red-50 hover:text-red-500 transition"
                       title="Remover acesso"
                     >
                       <Trash2 size={14} />
@@ -1146,17 +1166,17 @@ function UndoSaleModal({
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
       <div
-        className="animate-soft-pop w-full max-w-sm overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        className="animate-soft-pop w-full max-w-sm overflow-auto rounded-[26px] border border-card-border bg-card shadow-card"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-card-border/50 px-5 py-4">
           <div>
-            <h2 className="text-lg font-black text-ink">Desfazer venda</h2>
-            <p className="text-xs font-semibold text-slate-500">{item.card.name}</p>
+            <h2 className="text-lg font-black text-foreground">Desfazer venda</h2>
+            <p className="text-xs font-semibold text-muted-foreground">{item.card.name}</p>
           </div>
           <button
             onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+            className="grid h-9 w-9 place-items-center rounded-xl border border-card-border/40 bg-card text-foreground/80 transition hover:bg-muted/30"
           >
             <X size={16} />
           </button>
@@ -1164,11 +1184,11 @@ function UndoSaleModal({
 
         <div className="p-5">
           <div className="grid gap-4">
-            <p className="text-xs font-bold text-slate-600">
+            <p className="text-xs font-bold text-muted-foreground">
               Você tem {soldQuantity} unidades marcadas como vendidas. Quantas deseja retornar ao inventário?
             </p>
             <label className="grid gap-2">
-              <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Quantidade a devolver</span>
+              <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quantidade a devolver</span>
               <input
                 className="premium-input w-full"
                 type="number"
@@ -1220,17 +1240,17 @@ function SellModal({
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
       <div
-        className="animate-soft-pop w-full max-w-sm overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        className="animate-soft-pop w-full max-w-sm overflow-auto rounded-[26px] border border-card-border bg-card shadow-card"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-card-border/50 px-5 py-4">
           <div>
-            <h2 className="text-lg font-black text-ink">Confirmar venda</h2>
-            <p className="text-xs font-semibold text-slate-500">{item.card.name}</p>
+            <h2 className="text-lg font-black text-foreground">Confirmar venda</h2>
+            <p className="text-xs font-semibold text-muted-foreground">{item.card.name}</p>
           </div>
           <button
             onClick={onClose}
-            className="grid h-9 w-9 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+            className="grid h-9 w-9 place-items-center rounded-xl border border-card-border/40 bg-card text-foreground/80 transition hover:bg-muted/30"
           >
             <X size={16} />
           </button>
@@ -1240,9 +1260,9 @@ function SellModal({
           <div className="grid gap-4">
             <div className="grid grid-cols-[1fr_80px] gap-3">
               <label className="grid gap-2">
-                <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Preço unitário</span>
+                <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Preço unitário</span>
                 <div className="relative">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">R$</span>
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-muted-foreground">R$</span>
                   <input
                     className="premium-input w-full pl-10"
                     type="number"
@@ -1256,7 +1276,7 @@ function SellModal({
               </label>
 
               <label className="grid gap-2">
-                <span className="px-1 text-[10px] font-black uppercase tracking-widest text-slate-500">Qtd</span>
+                <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Qtd</span>
                 <input
                   className="premium-input w-full text-center"
                   type="number"
@@ -1268,9 +1288,9 @@ function SellModal({
               </label>
             </div>
 
-            <div className="rounded-xl bg-field p-3 text-center">
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total da venda</p>
-              <p className="text-xl font-black text-ink">{formatBrl(Number(price || 0) * quantity)}</p>
+            <div className="rounded-xl bg-muted/30 p-3 text-center">
+              <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total da venda</p>
+              <p className="text-xl font-black text-foreground">{formatBrl(Number(price || 0) * quantity)}</p>
             </div>
 
             <div className="flex gap-3">
@@ -1313,17 +1333,17 @@ function OffersModal({
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
       <div
-        className="animate-soft-pop max-h-[80vh] w-full max-w-2xl overflow-auto rounded-[26px] border border-white/80 bg-white shadow-card"
+        className="animate-soft-pop max-h-[80vh] w-full max-w-2xl overflow-auto rounded-[26px] border border-card-border bg-card shadow-card"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+        <div className="flex items-center justify-between border-b border-card-border/50 px-5 py-4">
           <div>
-            <h2 className="text-xl font-black text-ink">Propostas de Negociação</h2>
-            <p className="text-sm font-semibold text-slate-500">Analise e decida sobre as propostas recebidas.</p>
+            <h2 className="text-xl font-black text-foreground">Propostas de Negociação</h2>
+            <p className="text-sm font-semibold text-muted-foreground">Analise e decida sobre as propostas recebidas.</p>
           </div>
           <button
             onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+            className="grid h-10 w-10 place-items-center rounded-xl border border-card-border/40 bg-card text-foreground/80 transition hover:bg-muted/30"
           >
             <X size={18} />
           </button>
@@ -1331,15 +1351,15 @@ function OffersModal({
 
         <div className="p-5">
           <div className="flex items-center justify-between gap-4">
-            <div className="flex gap-2 rounded-2xl bg-field p-1">
+            <div className="flex gap-2 rounded-2xl bg-muted/30 p-1">
               <button
-                className={`rounded-xl px-4 py-2 text-xs font-black transition ${filter === "pending" ? "bg-white text-ink shadow-sm" : "text-slate-500 hover:text-ink"}`}
+                className={`rounded-xl px-4 py-2 text-xs font-black transition ${filter === "pending" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                 onClick={() => setFilter("pending")}
               >
                 Pendentes
               </button>
               <button
-                className={`rounded-xl px-4 py-2 text-xs font-black transition ${filter === "resolved" ? "bg-white text-ink shadow-sm" : "text-slate-500 hover:text-ink"}`}
+                className={`rounded-xl px-4 py-2 text-xs font-black transition ${filter === "resolved" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
                 onClick={() => setFilter("resolved")}
               >
                 Resolvidas
@@ -1350,26 +1370,26 @@ function OffersModal({
 
           <div className="mt-5 grid gap-4">
             {filteredOffers.length === 0 && (
-              <p className="py-10 text-center text-sm font-bold text-slate-400">Nenhuma proposta encontrada.</p>
+              <p className="py-10 text-center text-sm font-bold text-muted-foreground">Nenhuma proposta encontrada.</p>
             )}
             {filteredOffers.map((offer) => (
-              <div key={offer.id} className="rounded-2xl border border-line/70 bg-field/45 p-4">
+              <div key={offer.id} className="rounded-2xl border border-card-border/50 bg-muted/30 p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <p className="font-black text-slate-500 text-xs tracking-wider uppercase mb-1">De: {offer.buyerName}</p>
+                    <p className="font-black text-muted-foreground text-xs tracking-wider uppercase mb-1">De: {offer.buyerName}</p>
                     <div className="flex items-center gap-3">
-                      <p className="text-2xl font-black text-ink dark:text-white">{formatBrl(offer.totalOffer)}</p>
+                      <p className="text-2xl font-black text-foreground">{formatBrl(offer.totalOffer)}</p>
                       {offer.isGlobalOffer && (
                         <span className="rounded-lg bg-amber-100 text-amber-800 border border-amber-200 dark:bg-amber-900/30 dark:border-amber-500/30 dark:text-amber-300 px-2 py-0.5 text-[9px] font-black uppercase tracking-widest shadow-sm">
                           Valor Fechado
                         </span>
                       )}
                     </div>
-                    <p className="mt-1 text-xs font-bold text-slate-400">
+                    <p className="mt-1 text-xs font-bold text-muted-foreground">
                       {offer.items.length} carta(s) • {formatOfferStatus(offer.status)}
                     </p>
                     {offer.message && (
-                      <p className="mt-3 rounded-xl bg-white/60 dark:bg-black/20 p-3 text-sm italic text-slate-600 dark:text-slate-300 border border-line/40 dark:border-white/5">
+                      <p className="mt-3 rounded-xl bg-card/70 p-3 text-sm italic text-muted-foreground border border-card-border/30">
                         "{offer.message}"
                       </p>
                     )}
@@ -1393,19 +1413,19 @@ function OffersModal({
                     </div>
                   )}
                 </div>
-                <div className="mt-4 space-y-2 border-t border-line/40 pt-4">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Itens da proposta</p>
+                <div className="mt-4 space-y-2 border-t border-card-border/30 pt-4">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Itens da proposta</p>
                   {offer.items.map((entry) => (
-                    <div key={entry.item.id} className="flex items-center justify-between text-xs font-bold dark:bg-white/40 p-2 rounded-lg">
+                    <div key={entry.item.id} className="flex items-center justify-between text-xs font-bold p-2 rounded-lg">
                       <div className="flex flex-col gap-1">
-                        <span className="text-slate-600 dark:text-slate-300">
+                        <span className="text-muted-foreground">
                           {entry.quantity}x {entry.item.card.name} - {entry.item.card.setCode}
                         </span>
-                        <span className="text-[10px] font-semibold text-slate-400">
+                        <span className="text-[10px] font-semibold text-muted-foreground">
                           {entry.item.condition} • {getLanguageFlag(entry.item.language)} {entry.item.language} • {formatCardVariant(entry.item.variant)}
                         </span>
                       </div>
-                      <span className="text-ink dark:text-white shrink-0">{offer.isGlobalOffer ? "-" : formatBrl(entry.amount)}</span>
+                      <span className="text-foreground shrink-0">{offer.isGlobalOffer ? "-" : formatBrl(entry.amount)}</span>
                     </div>
                   ))}
                 </div>
@@ -1462,7 +1482,7 @@ function CollectionsListScreen({
             icon={<FolderPlus size={16} />}
             onClick={onCreate}
           >
-            Nova colecao
+            Nova coleção
           </Button>
         </div>
       </Panel>
@@ -1479,44 +1499,44 @@ function CollectionsListScreen({
                   key={folder.id}
                   type="button"
                   onClick={() => onOpen(folder.id)}
-                  className="group rounded-[26px] border border-line/80 bg-white/76 p-5 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/40 hover:shadow-soft"
+                  className="group rounded-[26px] border border-card-border/40 bg-card/60 p-5 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/40 hover:shadow-soft"
                 >
                   <div className="flex flex-1 items-center gap-4">
                     {folder.previewItems && folder.previewItems.length > 0 ? (
-                      <div className="grid grid-cols-2 grid-rows-2 h-16 w-14 shrink-0 gap-0.5 overflow-hidden rounded-xl border border-line/30 bg-field">
+                      <div className="grid grid-cols-2 grid-rows-2 h-16 w-14 shrink-0 gap-0.5 overflow-hidden rounded-xl border border-card-border/20 bg-muted">
                         {folder.previewItems.slice(0, 4).map((item) => (
-                          <div key={item.id} className="relative overflow-hidden bg-slate-100">
+                          <div key={item.id} className="relative overflow-hidden bg-accent/20">
                             <img
                               src={item.card.imageSmall || undefined}
                               alt=""
                               className="h-full w-full object-cover"
                             />
-                            <div className="absolute bottom-0.5 right-0.5 rounded-md bg-white px-1 py-0.5 text-[7px] font-black text-ink shadow-[0_2px_4px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+                            <div className="absolute bottom-0.5 right-0.5 rounded-md bg-card px-1 py-0.5 text-[7px] font-black text-foreground shadow-[0_2px_4px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
                               {formatCardNumber(item.card.number, item.card.printedTotal)}
                             </div>
                           </div>
                         ))}
                         {folder.previewItems.length < 4 && 
                           Array.from({ length: 4 - folder.previewItems.length }).map((_, i) => (
-                            <div key={`empty-${i}`} className="bg-slate-50 border border-dashed border-line/20" />
+                            <div key={`empty-${i}`} className="bg-card/40 border border-dashed border-card-border/20" />
                           ))
                         }
                       </div>
                     ) : (
                       <span className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br transition ${
                         folder.isStore 
-                          ? "from-aqua/50 to-cyan/10 text-sky-700" 
-                          : "from-lilac/20 to-aqua/20 text-violet-800"
+                          ? "from-aqua/50 to-cyan/10 text-aqua" 
+                          : "from-lilac/20 to-aqua/20 text-lilac"
                       }`}>
                         {folder.isStore ? <ShoppingBag size={20} /> : <Layers3 size={20} />}
                       </span>
                     )}
 
                     <div className="min-w-0 flex-1">
-                      <span className="block truncate text-xl font-black text-ink">
+                      <span className="block truncate text-xl font-black text-foreground">
                         {folder.name}
                       </span>
-                      <span className="block text-sm font-semibold text-slate-500">
+                      <span className="block text-sm font-semibold text-muted-foreground">
                         {folder.itemCount} cartas - {formatBrl(folder.totalValue)}
                       </span>
                     </div>
@@ -1525,8 +1545,8 @@ function CollectionsListScreen({
                     <span
                       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
                         folder.isStore
-                          ? "border-aqua/25 bg-aqua/10 text-sky-700"
-                          : "border-brand/25 bg-brand/10 text-violet-800"
+                          ? "border-aqua/25 bg-aqua/10 text-aqua"
+                          : "border-brand/25 bg-brand/10 text-brand"
                       }`}
                     >
                       {folder.isStore ? <ShoppingBag size={14} /> : <Layers3 size={14} />}
@@ -1535,8 +1555,8 @@ function CollectionsListScreen({
                     <span
                       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
                         folder.isPublic
-                          ? "border-leaf/25 bg-leaf/10 text-emerald-800"
-                          : "border-line/70 bg-white/70 text-slate-500"
+                          ? "border-leaf/25 bg-leaf/10 text-leaf"
+                          : "border-card-border/40 bg-card/60 text-muted-foreground"
                       }`}
                     >
                       {folder.isPublic ? <Eye size={14} /> : <Lock size={14} />}
@@ -1668,7 +1688,7 @@ function CollectionCreateScreen({
             }
           />
 
-          <div className="grid gap-6 rounded-[26px] border border-line/80 bg-white/72 p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-end">
+          <div className="grid gap-6 rounded-[26px] border border-card-border/40 bg-card/60 p-5 shadow-sm lg:grid-cols-[1fr_auto] lg:items-end">
             <label className="grid gap-2">
               <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
                 Nome da pasta
@@ -1684,7 +1704,7 @@ function CollectionCreateScreen({
               <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
                 Modo
               </span>
-              <div className="flex h-auto sm:h-[46px] sm:flex-row items-stretch sm:items-center gap-2 rounded-2xl border border-line bg-white p-2">
+              <div className="flex h-auto sm:h-[46px] sm:flex-row items-stretch sm:items-center gap-2 rounded-2xl border border-card-border bg-card p-2">
                 <button
                   type="button"
                   onClick={() => onIsStoreChange(false)}
@@ -1716,16 +1736,16 @@ function CollectionCreateScreen({
           <div className="mt-8 w-full">
             <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-line/50 pb-3">
               <div className="flex items-center gap-4">
-                <h3 className="text-sm font-black uppercase tracking-widest text-slate-400">
+                <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">
                   Preview da seleção
                 </h3>
-                <div className="flex items-center gap-2 rounded-full border border-lilac/25 bg-lilac/10 px-3 py-1 text-[11px] font-black text-violet-900">
+                <div className="flex items-center gap-2 rounded-full border border-lilac/25 bg-lilac/10 px-3 py-1 text-[11px] font-black dark:text-slate-200">
                   <span className="opacity-60">{selectedCount} cartas</span>
                   <span className="h-1 w-1 rounded-full bg-violet-300" />
                   <span>{formatBrl(selectedTotalValue)}</span>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                 {selectedItems.length} selecionadas
               </span>
             </div>
@@ -1734,9 +1754,9 @@ function CollectionCreateScreen({
               <button
                 type="button"
                 onClick={() => onTogglePickerModal(true)}
-                className="h-full min-h-60 flex flex-col items-center justify-center gap-3 rounded-[24px] border-2 border-dashed border-line/60 bg-white/10 text-slate-400 transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group"
+                className="h-full min-h-60 flex flex-col items-center justify-center gap-3 rounded-[24px] border-2 border-dashed border-card-border/40 bg-card/20 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group"
               >
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/50 group-hover:bg-brand/10 transition-colors shadow-sm">
+                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-card/50 group-hover:bg-brand/10 transition-colors shadow-sm">
                   <Plus size={24} />
                 </div>
                 <span className="text-[10px] font-black uppercase tracking-widest">Adicionar</span>
@@ -1873,6 +1893,7 @@ function CollectionDetailScreen({
   setSellingItem,
   onUndoSale,
   onManagePermissions,
+  blockedNavigationAt,
 }: {
   activeName: string;
   hasChanges: boolean;
@@ -1942,10 +1963,20 @@ function CollectionDetailScreen({
   onTogglePickerModal: (open: boolean) => void;
   setSellingItem: (item: CollectionItem | null) => void;
   onManagePermissions: () => void;
+  blockedNavigationAt?: number;
 }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [shouldShake, setShouldShake] = useState(false);
+
+  useEffect(() => {
+    if (blockedNavigationAt && blockedNavigationAt > 0) {
+      setShouldShake(true);
+      const timer = setTimeout(() => setShouldShake(false), 800);
+      return () => clearTimeout(timer);
+    }
+  }, [blockedNavigationAt]);
 
   const handleCopy = () => {
     if (!shareUrl) return;
@@ -1981,7 +2012,7 @@ function CollectionDetailScreen({
         description={`${unsoldCount} cartas - Valor total: ${formatBrl(selectedTotalValue)}`}
         image={bannerUrl || undefined}
       />
-        <div className="mb-6 overflow-hidden rounded-[32px] border border-line/80 bg-white/70 shadow-sm w-full">
+        <div className="mb-0 overflow-hidden rounded-[32px] border border-line/80 bg-white/70 shadow-sm w-full">
           <div className={`relative w-full overflow-hidden bg-field dark:bg-slate-900 ${bannerUrl ? "aspect-[21/9] sm:aspect-[4/1]": "min-h-32"}`}>
             {bannerUrl && (
                <img 
@@ -2008,10 +2039,10 @@ function CollectionDetailScreen({
             </label>
             
             {bannerUrl && (
-              <div className="absolute left-6 top-6">
+              <div className="absolute right-6 top-6">
                 <button
                   type="button"
-                  className="grid h-10 w-10 place-items-center rounded-xl border border-white/20 bg-black/40 text-white backdrop-blur-md transition hover:bg-red-500 hover:border-red-500 shadow-lg"
+                  className="grid h-10 w-10 place-items-center rounded-xl border border-white/20 bg-red-500/40 text-white backdrop-blur-md transition hover:bg-red-500 hover:border-red-500 shadow-lg"
                   onClick={() => onRemoveBanner()}
                   title="Remover Banner"
                 >
@@ -2028,16 +2059,33 @@ function CollectionDetailScreen({
             <button 
               type="button"
               onClick={onBack}
-              className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-brand transition w-fit"
+              className="flex flex-col sm:flex-row items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-brand transition w-fit"
             >
-              <ArrowLeft size={14} />
-              Voltar para coleções
-            </button>
+              <div className="flex flex-row gap-2">
+                <ArrowLeft size={14} />
+                Voltar para coleções
+              </div>
 
-            <div className="flex flex-wrap items-center justify-between gap-6">
+              <div className="flex flex-wrap items-center justify-center gap-4">
+                <div className="flex items-center gap-2 rounded-full border border-lilac/25 bg-lilac/10 px-4 py-1.5 text-xs font-black text-violet-900 dark:text-white/60">
+                  <span>{unsoldCount} cartas</span>
+                  <span className="h-1.5 w-1.5 rounded-full bg-violet-300" />
+                  <span>{formatBrl(selectedTotalValue)}</span>
+                </div>
+                {pendingOffersCount > 0 && (
+                  <div className="flex items-center gap-2 rounded-full border border-aqua/25 bg-aqua/10 px-4 py-1.5 text-xs font-black text-sky-700">
+                    <ShoppingBag size={14} />
+                    {pendingOffersCount} propostas pendentes
+                  </div>
+                )}
+              </div>
+            </button>
+            
+
+            <div className="flex flex-wrap justify-start items-start lg:justify-between flex-col md:flex-row gap-6">
                <div className="flex-1 min-w-0">
                  {isEditingName ? (
-                   <div className="flex items-center gap-2 max-w-2xl">
+                   <div className="flex items-center gap-2 max-w-[80%] md:max-w-[70%]">
                      <input
                        autoFocus
                        className="premium-input text-2xl sm:text-4xl font-black py-2"
@@ -2051,61 +2099,50 @@ function CollectionDetailScreen({
                      />
                      <button 
                        onClick={() => setIsEditingName(false)}
-                       className="p-3 bg-leaf rounded-2xl text-white shadow-lg shrink-0 transition hover:scale-105"
+                       className="p-2 bg-leaf rounded-2xl text-white shadow-lg shrink-0 transition hover:scale-50"
                      >
-                       <Check size={24} />
+                       <Check size={20} />
                      </button>
                    </div>
                  ) : (
-                   <div className="flex items-center gap-4 group">
-                     <h1 
+                   <div className="flex items-center justify-start gap-4 group">
+                     <div 
                        className="text-2xl font-black text-ink dark:text-white sm:text-5xl cursor-pointer hover:text-brand transition"
                        onClick={() => setIsEditingName(true)}
                      >
                        {activeName}
-                     </h1>
+                     </div>
                      <button 
                         onClick={() => setIsEditingName(true)}
-                        className="grid h-10 w-10 place-items-center rounded-xl bg-field text-slate-400 opacity-0 group-hover:opacity-100 transition"
+                        className="grid border h-10 w-10 place-items-center rounded-xl text-muted-foreground group-hover:opacity-100 transition"
                      >
-                        <Pencil size={18} />
+                        <Pencil className="text-black dark:text-white" size={18} />
                      </button>
                    </div>
                  )}
-                 <div className="mt-4 flex flex-wrap items-center gap-4">
-                    <div className="flex items-center gap-2 rounded-full border border-lilac/25 bg-lilac/10 px-4 py-1.5 text-xs font-black text-violet-900">
-                      <span>{unsoldCount} cartas</span>
-                      <span className="h-1.5 w-1.5 rounded-full bg-violet-300" />
-                      <span>{formatBrl(selectedTotalValue)}</span>
-                    </div>
-                    {pendingOffersCount > 0 && (
-                      <div className="flex items-center gap-2 rounded-full border border-aqua/25 bg-aqua/10 px-4 py-1.5 text-xs font-black text-sky-700">
-                        <ShoppingBag size={14} />
-                        {pendingOffersCount} propostas pendentes
-                      </div>
-                    )}
-                 </div>
                </div>
 
-               <div className="flex flex-wrap gap-2">
+               <div className="flex flex-wrap gap-2 flex-col items-end sm:flex-row absolute top-4 right-4">
                 <Button
                   type="button"
-                  variant="brand"
-                  className={hasChanges ? "px-8 shadow-glow" : "opacity-50 pointer-events-none"}
-                  icon={<Save size={18} />}
+                  variant="light"
+                  className={`w-16 md:w-auto md:px-6 p-0 gap-0 lg:gap-2 ${hasChanges ? "shadow-glow" : " pointer-events-none"}`}
+                  icon={<Save strokeWidth={2} size={20} />}
                   onClick={onSave}
                   disabled={!hasChanges}
+                  shake={shouldShake}
                 >
-                  Salvar alterações
+                  <p className="hidden lg:flex">
+                    Salvar alterações
+                  </p>
                 </Button>
                 <Button
                   type="button"
                   variant="ghost"
-                  className="px-4 text-slate-400 hover:text-red-500 hover:bg-red-50"
-                  icon={<Trash2 size={18} />}
+                  className="w-16 p-0 gap-0 text-white hover:text-red-500 hover:bg-red-50 bg-red-500/80"
+                  icon={<Trash2 size={20} />}
                   onClick={onRemoveFolder}
                 >
-                  Excluir
                 </Button>
               </div>
             </div>
@@ -2114,11 +2151,11 @@ function CollectionDetailScreen({
 
 
           <CollapsibleSection 
-            title="Compartilhamento" 
+            title="Compartilhar" 
             defaultExpanded={false}
             action={
-              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700" onClick={(e) => e.stopPropagation()}>
-                <span className="hidden sm:inline">Privada</span>
+              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
+                {/* <span className="hidden sm:inline"> <Lock size={14} /></span> */}
                 <input
                   type="checkbox"
                   className="peer sr-only"
@@ -2126,7 +2163,7 @@ function CollectionDetailScreen({
                   onChange={(event) => onToggleSharing({ isPublic: event.target.checked })}
                 />
                 <span className="relative h-7 w-12 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition peer-checked:bg-leaf peer-checked:after:translate-x-5" />
-                <span className="hidden sm:inline">Publica</span>
+                {/* <span className="hidden sm:inline"><Unlock size={14} /></span> */}
               </label>
             }
           >
@@ -2136,8 +2173,8 @@ function CollectionDetailScreen({
                   <span
                     className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
                       isPublic
-                        ? "border-leaf/25 bg-leaf/10 text-emerald-800"
-                        : "border-line/70 bg-white/70 text-slate-500"
+                        ? "border-leaf/25 bg-leaf/10 text-emerald-800 dark:text-emerald-500"
+                        : "border-line/70 dark:border-slate-300 bg-white/70 dark:bg-slate-800 text-slate-500 dark:text-slate-300"
                     }`}
                   >
                     {isPublic ? <Eye size={14} /> : <Lock size={14} />}
@@ -2152,14 +2189,14 @@ function CollectionDetailScreen({
                         Link de compartilhamento (WhatsApp)
                       </span>
                       <div className="relative flex items-center min-w-0 w-full">
-                        <p className="flex-1 truncate rounded-xl bg-slate-50 dark:bg-slate-800 py-3 pl-3 pr-10 text-sm font-semibold text-slate-400 border border-line/40">
+                        <p className="flex-1 truncate rounded-xl bg-slate-50 dark:bg-slate-800 py-3 pl-3 pr-10 text-sm font-semibold text-muted-foreground border border-line/40">
                           {shareUrl ?? "Nenhum link gerado"}
                         </p>
                         <button
                           type="button"
                           onClick={handleCopy}
                           className={`absolute right-2 p-2 rounded-lg transition-colors ${
-                            copied ? "text-emerald-600 bg-emerald-50" : "text-slate-400 hover:text-ink hover:bg-slate-100"
+                            copied ? "text-emerald-600 bg-emerald-50" : "text-muted-foreground hover:text-ink hover:bg-slate-100"
                           }`}
                           title="Copiar link"
                         >
@@ -2201,11 +2238,12 @@ function CollectionDetailScreen({
           </CollapsibleSection>
 
           <CollapsibleSection 
-            title="Objetivo da pasta" 
-            defaultExpanded={false}
+            disable={!isStore}
+            title="Vender" 
+            defaultExpanded={isStore?false:false}
             action={
-              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700" onClick={(e) => e.stopPropagation()}>
-                <span className="hidden sm:inline">Visualizar</span>
+              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black  dark:text-slate-400" onClick={(e) => e.stopPropagation()}>
+                {/* <span className="hidden sm:inline">Visualizar</span> */}
                 <input
                   type="checkbox"
                   className="peer sr-only"
@@ -2213,7 +2251,7 @@ function CollectionDetailScreen({
                   onChange={(event) => onToggleStore(event.target.checked)}
                 />
                 <span className="relative h-7 w-12 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition peer-checked:bg-leaf peer-checked:after:translate-x-5" />
-                <span className="hidden sm:inline">Vender</span>
+                {/* <span className="hidden sm:inline">Vender</span> */}
               </label>
             }
           >
@@ -2259,7 +2297,7 @@ function CollectionDetailScreen({
                 variant="ghost"
                 onClick={() => setShowFiltersModal(true)}
                 icon={<Filter size={18} />}
-                className={(typeFilter || rarityFilter || variantFilter) ? "border-brand/40 bg-brand/5 text-brand w-full" : "w-full"}
+                className={(typeFilter || rarityFilter || variantFilter) ? "border-brand/40 text-brand w-full bg-slate-200/80 dark:bg-slate-800" : "bg-slate-200/80 dark:bg-slate-800 w-full"}
               >
                 Filtros e Ordenação
               </Button>
@@ -2363,18 +2401,18 @@ function CollectionDetailScreen({
             </Modal>
           )}
 
-          <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
+          <div className="rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-slate-600 dark:text-slate-400">
             {visibleItems.length} de {unsoldCount} cartas visiveis
           </div>
 
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 mt-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 mt-6">
             <button
               type="button"
               onClick={() => onTogglePickerModal(true)}
-              className="h-full flex flex-col items-center justify-center gap-3 rounded-[24px] border-2 border-dashed border-line/60 bg-white/10 text-slate-400 transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group"
+              className="h-full p-4 sm:p-0 flex flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-slate-500 dark:border-slate-600 border-line/60 bg-black/6 dark:bg-white/6 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group"
             >
-              <div className="grid h-12 w-12 place-items-center rounded-2xl bg-white/50 group-hover:bg-brand/10 transition-colors shadow-sm">
-                <Plus size={24} />
+              <div className="grid h-12 w-12 place-items-center rounded-2xl group-hover:bg-brand/10 transition-colors shadow-sm">
+                <Plus size={30} />
               </div>
               <span className="text-[10px] font-black uppercase tracking-widest">Adicionar</span>
             </button>
@@ -2399,10 +2437,10 @@ function CollectionDetailScreen({
                       <Button
                         type="button"
                         variant="primary"
-                        className="h-9 w-full text-[11px] bg-leaf hover:bg-emerald-600"
+                        className="h-9 w-full text-[11px] text-white dark: bg-emerald-600/70 dark:bg-emerald-900/60 hover:bg-emerald-600"
                         onClick={() => setSellingItem(item)}
                       >
-                        Marcar vendido
+                        Marcar vendida
                       </Button>
                     )}
                     {(item.store?.isSold || (item.store?.soldQuantity ?? 0) > 0) && (
@@ -2564,22 +2602,31 @@ function CardPickerPanel({
       <div className="relative flex gap-2 flex-col md:flex-row">
         <label className="relative block w-full">
           <Search
-            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+            className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
             size={18}
           />
           <input
-            className="premium-input w-full pl-11 pr-12"
+            className="premium-input w-full pl-11 pr-20"
             value={pickerQuery}
             onChange={(event) => onQueryChange(event.target.value)}
             placeholder="Buscar por nome, numero, colecao..."
           />
+          {pickerQuery && (
+            <button
+              type="button"
+              onClick={() => onQueryChange("")}
+              className="absolute right-10 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X size={18} />
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setShowFiltersModal(true)}
             className={`absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-xl transition-colors ${
               (pickerTypeFilter || pickerRarityFilter || pickerVariantFilter) 
                 ? "text-brand bg-brand/10" 
-                : "text-slate-400 hover:text-white hover:bg-white/5"
+                : "text-muted-foreground hover:text-white hover:bg-white/5"
             }`}
             title="Filtros e Ordenação"
           >
@@ -2839,8 +2886,8 @@ function publicCollectionUrl(shareToken: string): string {
 
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
-    <span className="rounded-full border border-line/70 bg-white/70 px-4 py-2 text-sm font-black text-slate-600 shadow-sm">
-      <span className="text-slate-400">{label}: </span>
+    <span className="rounded-full border border-line/70 bg-white/70 dark:bg-slate-900 px-4 py-2 text-sm font-black text-slate-500 shadow-sm">
+      <span className="text-muted-foreground">{label}: </span>
       {value}
     </span>
   );
@@ -2848,7 +2895,7 @@ function InfoPill({ label, value }: { label: string; value: string }) {
 
 function EmptyState({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-5 rounded-[24px] border border-line/80 bg-white/70 p-5 text-sm font-bold text-slate-500 shadow-sm">
+    <div className="mt-5 rounded-[24px] border border-line/80 bg-white/70 dark:bg-slate-900 p-5 text-sm font-bold text-slate-500 shadow-sm">
       {children}
     </div>
   );

@@ -1483,17 +1483,43 @@ export class CollectionService {
     const startY = (height - cardHeight) / 2;
 
     for (let i = 0; i < validImages.length; i++) {
+      const item = folder.items[i];
+      const cardNumber = item?.collectionItem?.card?.number ?? "";
+      const printedTotal = item?.collectionItem?.card?.printedTotal;
+      const displayId = printedTotal ? `${cardNumber}/${printedTotal}` : cardNumber;
+
       const cardBuffer = await sharp(validImages[i] as Buffer)
         .rotate()
         .resize(cardWidth, cardHeight, { fit: "cover", position: "center" })
         .jpeg({ quality: 90 })
         .toBuffer();
 
+      const left = Math.round(startX + i * (cardWidth + gap));
+      const top = Math.round(startY);
+
       composites.push({
         input: cardBuffer,
-        top: Math.round(startY),
-        left: Math.round(startX + i * (cardWidth + gap)),
+        top,
+        left,
       });
+
+      if (displayId) {
+        // Badge: White background with black text, centered at the bottom of the card
+        const badgeWidth = 140;
+        const badgeHeight = 44;
+        const svgBadge = `
+          <svg width="${badgeWidth}" height="${badgeHeight}">
+            <rect x="2" y="2" width="${badgeWidth - 4}" height="${badgeHeight - 4}" rx="12" fill="white" stroke="#e2e8f0" stroke-width="2" />
+            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="20" fill="black">${displayId}</text>
+          </svg>
+        `;
+        
+        composites.push({
+          input: Buffer.from(svgBadge),
+          top: top + cardHeight - (badgeHeight / 2) - 10,
+          left: left + (cardWidth / 2) - (badgeWidth / 2),
+        });
+      }
     }
 
     const generated = await sharp({

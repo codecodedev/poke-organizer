@@ -16,9 +16,11 @@ export function PaginationControls({ page, pageSize, totalItems, onPageChange, i
   const start = (currentPage - 1) * pageSize + 1;
   const end = Math.min(totalItems, currentPage * pageSize);
 
+  const btnClass = "grid h-10 w-10 place-items-center rounded-2xl border border-card-border bg-card text-muted-foreground shadow-sm transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45";
+
   return (
-    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-line/70 bg-white/70 px-4 py-3 shadow-sm">
-      <p className="text-sm font-black text-slate-600">
+    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-[22px] border border-card-border/40 bg-card/70 px-4 py-3 shadow-sm">
+      <p className="text-sm font-black text-muted-foreground">
         {start}-{end} de {totalItems} {itemLabel}
       </p>
       <div className="flex items-center gap-2">
@@ -26,19 +28,19 @@ export function PaginationControls({ page, pageSize, totalItems, onPageChange, i
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage === 1}
-          className="grid h-10 w-10 place-items-center rounded-2xl border border-line bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
+          className={btnClass}
           aria-label="Pagina anterior"
         >
           <ChevronLeft size={17} />
         </button>
-        <span className="min-w-20 text-center text-sm font-black text-ink">
+        <span className="min-w-20 text-center text-sm font-black text-foreground">
           {currentPage}/{totalPages}
         </span>
         <button
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage === totalPages}
-          className="grid h-10 w-10 place-items-center rounded-2xl border border-line bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0"
+          className={btnClass}
           aria-label="Proxima pagina"
         >
           <ChevronRight size={17} />
@@ -47,4 +49,3 @@ export function PaginationControls({ page, pageSize, totalItems, onPageChange, i
     </div>
   );
 }
-

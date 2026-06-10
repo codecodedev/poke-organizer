@@ -9,6 +9,7 @@ import {
 import { PriceSource, Prisma } from "@prisma/client";
 import { fromPrismaLanguage } from "../common/mappers";
 import { PrismaService } from "../prisma/prisma.service";
+import { CatalogService } from "../cards/catalog.service";
 
 // const BRAZILIAN_PRICE_SOURCES: PriceSource[] = [PriceSource.LIGAPOKEMON, PriceSource.MYPCARDS];
 const BRAZILIAN_PRICE_SOURCES = ["LIGAPOKEMON", "MYPCARDS"] as PriceSource[];
@@ -26,16 +27,32 @@ type RawCardPrice = {
 
 @Injectable()
 export class PricingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly catalog: CatalogService,
+  ) {}
 
   async getEstimate(
     cardId: string,
     options: { variant?: string; language?: CardLanguage; condition?: CardCondition } = {}
   ): Promise<PriceEstimate> {
-    const card = await this.prisma.card.findFirst({
+    let card = await this.prisma.card.findFirst({
       where: { OR: [{ id: cardId }, { externalId: cardId }] },
       include: { prices: { orderBy: { capturedAt: "desc" }, take: 5 } }
     });
+
+    if (!card) {
+      try {
+        const ensured = await this.catalog.ensureCardByExternalId(cardId);
+        card = await this.prisma.card.findUnique({
+          where: { id: ensured.id },
+          include: { prices: { orderBy: { capturedAt: "desc" }, take: 5 } }
+        });
+      } catch (err) {
+        throw new NotFoundException("Card not found");
+      }
+    }
+
     if (!card) {
       throw new NotFoundException("Card not found");
     }

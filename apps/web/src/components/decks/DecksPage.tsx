@@ -461,11 +461,20 @@ export function DecksPage({ session, onSession, onUnauthorized }: Props) {
               <div className="relative">
                 <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={17} />
                 <input
-                  className="premium-input w-full pl-11"
+                  className="premium-input w-full pl-11 pr-11"
                   value={query}
                   placeholder="Nome, numero ou colecao"
                   onChange={(event) => setQuery(event.target.value)}
                 />
+                {query && (
+                  <button
+                    type="button"
+                    onClick={() => setQuery("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                )}
               </div>
               <select className="premium-select" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
                 <option value="">Todos os tipos</option>

@@ -26,7 +26,7 @@ export function SimpleCardPickerItem({
       className={`group relative cursor-pointer rounded-2xl border p-2 transition-all ${
         selected
           ? "border-brand bg-brand/10 shadow-glow"
-          : "border-white/5 bg-white/5 hover:border-white/10"
+          : "border-card-border/40 bg-card/40 hover:border-card-border/60"
       }`}
     >
       <div className="relative">
@@ -47,17 +47,17 @@ export function SimpleCardPickerItem({
         )}
 
         <div className="absolute left-2 top-2 z-20">
-          <span className="grid h-7 w-7 place-items-center rounded-lg border border-white/10 bg-black/60 text-lg shadow-sm backdrop-blur" title={`Idioma: ${item.language}`}>
+          <span className="grid h-7 w-7 place-items-center rounded-lg border border-card-border/50 bg-card/80 text-lg shadow-sm backdrop-blur" title={`Idioma: ${item.language}`}>
             {getLanguageFlag(item.language)}
           </span>
         </div>
       </div>
 
       <div className="mt-2 px-1">
-        <p className="text-sm font-black text-white">
+        <p className="text-sm font-black text-foreground">
           {formatBrl(displayPrice)}
         </p>
-        <div className="flex items-center justify-between gap-1 text-[10px] font-bold text-slate-400">
+        <div className="flex items-center justify-between gap-1 text-[10px] font-bold text-muted-foreground">
           <span className="truncate uppercase">{item.card.setCode}</span>
           <span className="shrink-0">{fullNumber}</span>
         </div>

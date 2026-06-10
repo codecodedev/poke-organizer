@@ -6,32 +6,36 @@ type Props = {
   children: ReactNode;
   defaultExpanded?: boolean;
   action?: ReactNode;
+  disable?: boolean;
 };
 
-export function CollapsibleSection({ title, children, defaultExpanded = false, action }: Props) {
+export function CollapsibleSection({ title, children, defaultExpanded = false, action, disable }: Props) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
     <div className="rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm transition-all duration-200">
       <div className="flex w-full items-center justify-between gap-4">
-        <div className="flex flex-1 flex-wrap items-center gap-3 min-w-0">
+        <div className="flex flex-1 flex-wrap items-center justify-between gap-3 min-w-0">
           <button
             type="button"
             className="flex items-center outline-none text-left"
             onClick={() => setIsExpanded((prev) => !prev)}
           >
-            <h3 className="font-black text-ink truncate">{title}</h3>
+            <h3 className="font-black text-ink dark:text-white/70 truncate">{title}</h3>
           </button>
           {action && <div className="flex-shrink-0">{action}</div>}
         </div>
-        
-        <button
-          type="button"
-          className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-black dark:text-white transition-colors"
-          onClick={() => setIsExpanded((prev) => !prev)}
-        >
-          {isExpanded ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
-        </button>
+        {
+          (!disable || isExpanded) && (
+            <button
+              type="button"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-full text-black dark:text-white transition-colors"
+              onClick={() => setIsExpanded((prev) => !prev)}
+            >
+              {isExpanded ? <ChevronUp size={22} /> : <ChevronDown size={22} />}
+            </button>
+          )
+        }
       </div>
       {isExpanded && (
         <>

@@ -63,7 +63,7 @@ export function RequestFeedback() {
     <>
       {showLoading && (
         <div className="fixed bottom-6 right-6 z-[80] animate-in fade-in slide-in-from-bottom-4 duration-300">
-          <div className="flex items-center gap-3 rounded-full border border-white/60 bg-white/80 px-4 py-2.5 text-[13px] font-black text-ink shadow-soft backdrop-blur-xl">
+          <div className="flex items-center gap-3 rounded-full border border-card-border bg-card/80 px-4 py-2.5 text-[13px] font-black text-foreground shadow-soft backdrop-blur-xl">
             <span className="relative flex h-3 w-3">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75"></span>
               <span className="relative inline-flex h-3 w-3 rounded-full bg-brand"></span>
@@ -77,13 +77,13 @@ export function RequestFeedback() {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`flex items-start gap-3 rounded-2xl border bg-white/95 p-4 text-sm font-semibold shadow-card backdrop-blur ${
-              toast.type === "error" ? "border-red-200 text-slate-700" : "border-emerald-200 text-emerald-900"
+            className={`flex items-start gap-3 rounded-2xl border bg-card/95 p-4 text-sm font-semibold shadow-card backdrop-blur ${
+              toast.type === "error" ? "border-magenta/20 text-foreground" : "border-leaf/20 text-foreground"
             }`}
             role="status"
           >
             <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${
-              toast.type === "error" ? "bg-red-50 text-red-600" : "bg-emerald-50 text-emerald-600"
+              toast.type === "error" ? "bg-magenta/10 text-magenta" : "bg-leaf/10 text-leaf"
             }`}>
               {toast.type === "error" ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
             </span>
@@ -91,8 +91,8 @@ export function RequestFeedback() {
             <button
               type="button"
               onClick={() => closeToast(toast.id)}
-              className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border bg-white transition ${
-                toast.type === "error" ? "border-line text-slate-500 hover:border-red-200 hover:text-red-600" : "border-emerald-100 text-emerald-600 hover:border-emerald-300 hover:text-emerald-700 hover:bg-emerald-50"
+              className={`grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-card-border/40 bg-card transition ${
+                toast.type === "error" ? "text-muted-foreground hover:border-magenta/40 hover:text-magenta" : "text-muted-foreground hover:border-leaf/40 hover:text-leaf"
               }`}
               aria-label="Fechar aviso"
             >

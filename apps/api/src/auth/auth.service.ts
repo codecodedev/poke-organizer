@@ -194,6 +194,7 @@ export class AuthService {
         profileSlug: true,
         profileBio: true,
         isPublicProfile: true,
+        whatsapp: true,
         createdAt: true
       }
     });
@@ -209,7 +210,8 @@ export class AuthService {
         name: user.name,
         profileSlug: user.profileSlug,
         profileBio: user.profileBio,
-        isPublicProfile: user.isPublicProfile
+        isPublicProfile: user.isPublicProfile,
+        whatsapp: user.whatsapp
       },
       ...tokens
     };

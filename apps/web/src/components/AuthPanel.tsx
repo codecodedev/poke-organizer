@@ -49,20 +49,20 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
         <img 
           src={dark ? "/images/logo-light-bg.png" : "/images/logo-dark-bg.png"} 
           alt="Coleciona Cards" 
-          className="mb-6 h-36 w-auto animate-soft-pop scale-[2.5]"
+          className="mb-6 h-20 sm:h-36 w-auto animate-soft-pop scale-[2.5]"
         />
-        <p className="mt-6 max-w-md text-lg leading-relaxed text-slate-400">
+        <p className="mt-6 max-w-md text-lg leading-relaxed text-muted-foreground">
               Coleção, mercado e comunidade.
         </p>
       </div>
 
-      <form onSubmit={submit} className="glass-panel w-full max-w-[420px] p-8 shadow-[0_0_50px_rgba(0,242,255,0.1)]">
-        <div className="mb-8 flex rounded-2xl bg-white/5 p-1">
+      <form onSubmit={submit} className="glass-panel w-full max-w-[420px] p-4 shadow-[0_0_50px_rgba(0,242,255,0.1)]">
+        <div className="mb-8 flex rounded-2xl bg-muted/50 p-1">
           <button
             type="button"
             onClick={() => setMode("login")}
             className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition ${
-              mode === "login" ? "bg-white/10 text-white shadow-sm" : "text-slate-400 hover:text-white"
+              mode === "login" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <LogIn size={18} />
@@ -72,7 +72,7 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
             type="button"
             onClick={() => setMode("register")}
             className={`flex flex-1 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-sm font-bold transition ${
-              mode === "register" ? "bg-white/10 text-white shadow-sm" : "text-slate-400 hover:text-white"
+              mode === "register" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
             }`}
           >
             <UserPlus size={18} />
@@ -82,7 +82,7 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
 
         {mode === "register" && (
           <div className="mb-5">
-            <label className="mb-2 block text-sm font-bold text-slate-300">Nome</label>
+            <label className="mb-2 block text-sm font-bold text-muted-foreground">Nome</label>
             <input
               className="input-dark w-full"
               value={name}
@@ -93,7 +93,7 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
         )}
 
         <div className="mb-5">
-          <label className="mb-2 block text-sm font-bold text-slate-300">Email</label>
+          <label className="mb-2 block text-sm font-bold text-muted-foreground">Email</label>
           <input
             className="input-dark w-full"
             value={email}
@@ -106,7 +106,7 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
 
         <div className="mb-6">
           <div className="mb-2 flex items-center justify-between">
-            <label className="text-sm font-bold text-slate-300">Senha</label>
+            <label className="text-sm font-bold text-muted-foreground">Senha</label>
             {mode === "login" && onRequestPasswordReset && (
               <button
                 type="button"
@@ -146,7 +146,7 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
           )}
         </button>
         
-        <p className="mt-6 text-center text-xs text-slate-500">
+        <p className="mt-6 text-center text-xs text-muted-foreground/60">
           Ao continuar, você concorda com nossos Termos de Uso.
         </p>
       </form>

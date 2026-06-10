@@ -498,23 +498,24 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
 
   return (
     <Modal title="Cadastro por voz" icon={<Mic size={20} />} onClose={onClose}>
-<div className="relative">
-  <div className="grid gap-4 p-5 md:grid-cols-[260px_1fr]">        <div className="voice-mic-panel rounded-[22px] bg-gradient-to-br from-aqua/15 via-white to-lilac/15 p-4">
-          <div className="mb-2 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setShowHelp((current) => !current)}
-              className="grid h-9 w-9 place-items-center rounded-2xl border border-line/80 bg-white/85 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/40 hover:text-ink"
-              aria-label="Ver regras do cadastro por voz"
-              title="Regras do cadastro por voz"
-            >
-              <CircleHelp size={17} />
-            </button>
-          </div>
-          <MicVisualizer state={micState} />
-          <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="relative">
+        <div className="grid gap-4 p-5 md:grid-cols-[260px_1fr]">
+          <div className="voice-mic-panel border border-slate-300 dark:border-slate-700 rounded-[22px] dark:bg-slate-200/5 p-4">
+            <div className="mb-2 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowHelp((current) => !current)}
+                className="grid h-9 w-9 place-items-center rounded-2xl border border-card-border/60 bg-card/85 text-muted-foreground shadow-sm transition hover:-translate-y-0.5 hover:border-brand/40 hover:text-foreground"
+                aria-label="Ver regras do cadastro por voz"
+                title="Regras do cadastro por voz"
+              >
+                <CircleHelp size={17} />
+              </button>
+            </div>
+            <MicVisualizer state={micState} />
+            <div className="mt-3 grid grid-cols-2 gap-2">
             {micState === "listening" ? (
-              <Button type="button" variant="ghost" icon={<MicOff size={17} />} className="col-span-2" onClick={stopListening}>
+              <Button type="button" variant="ghost" icon={<MicOff size={17} />} className="col-span-2 text-white dark:text-slate-900 hover:text-white dark:hover:text-slate-200 bg-slate-400 hover:bg-slate-400/80" onClick={stopListening}>
                 Fechar microfone
               </Button>
             ) : (
@@ -532,7 +533,7 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
           </div>
 
           {mode === "set" && (
-            <label className="text-sm font-black text-slate-700">
+            <label className="text-sm font-black text-foreground/80">
               Colecao
               <select
                 className="premium-select mt-2 w-full"
@@ -580,7 +581,7 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
               <VoiceHelpOverlay onClose={() => setShowHelp(false)} />
             </>
           )}
-</div>
+      </div>
 
       <CardDetailModal card={selectedCard} initialVariant={selectedVariant} onClose={() => setSelectedCard(null)} onAdd={addDetailsAndContinue} />
     </Modal>
@@ -589,13 +590,13 @@ export function AudioRegistrationModal({ session, onSession, onUnauthorized, onA
 
 function VoiceHelpOverlay({ onClose }: { onClose: () => void }) {
   return (
-<div className="fixed left-1/2 top-1/2 z-[70] w-[420px] max-w-[calc(100vw-40px)] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-line/80 bg-white p-4 shadow-2xl">      <div className="mb-3 flex items-start justify-between gap-3">
+<div className="fixed left-1/2 top-1/2 z-[70] w-[420px] max-w-[calc(100vw-40px)] -translate-x-1/2 -translate-y-1/2 rounded-[24px] border border-card-border/60 bg-card p-4 shadow-2xl">      <div className="mb-3 flex items-start justify-between gap-3">
         <div>
           <div className="mb-2 grid h-10 w-10 place-items-center rounded-2xl bg-brand/10 text-brand">
             <BookOpenText size={20} />
           </div>
-          <h3 className="text-lg font-black text-ink">Comandos de voz</h3>
-          <p className="text-sm font-semibold text-slate-500">
+          <h3 className="text-lg font-black text-foreground">Comandos de voz</h3>
+          <p className="text-sm font-semibold text-muted-foreground">
             Exemplos rápidos para cadastrar cartas.
           </p>
         </div>
@@ -603,7 +604,7 @@ function VoiceHelpOverlay({ onClose }: { onClose: () => void }) {
         <button
           type="button"
           onClick={onClose}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl border border-line bg-white text-slate-500 shadow-sm transition hover:border-brand/30 hover:text-ink"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl border border-card-border/40 bg-card text-muted-foreground shadow-sm transition hover:border-brand/30 hover:text-foreground"
           aria-label="Fechar dicas"
         >
           <X size={17} />
@@ -655,19 +656,19 @@ function VoiceTip({
   example: string[];
 }) {
   return (
-    <div className="flex items-center gap-3 rounded-2xl border border-line/70 bg-field/60 p-3">
-      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-white text-slate-600 shadow-sm">
+    <div className="flex items-center gap-3 rounded-2xl border border-card-border/50 bg-muted/30 p-3">
+      <div className="grid h-9 w-9 shrink-0 place-items-center rounded-2xl bg-card text-muted-foreground shadow-sm">
         {icon}
       </div>
 
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-black leading-tight text-ink">{title}</p>
-        <p className="text-xs font-semibold text-slate-500">{description}</p>
+        <p className="text-sm font-black leading-tight text-foreground">{title}</p>
+        <p className="text-xs font-semibold text-muted-foreground">{description}</p>
       </div>
       <div className="flex flex-col items-end gap-2">
         {
           example.map((ex, index) => (
-            <span className="shrink-0 rounded-full bg-white px-3 py-1 text-xs font-black text-slate-700 shadow-sm">
+            <span className="shrink-0 rounded-full bg-card px-3 py-1 text-xs font-black text-foreground/80 shadow-sm">
               “{ex}”
             </span>
           ))
@@ -693,30 +694,30 @@ function ModeCard({
       type="button"
       onClick={onClick}
       className={`flex min-h-14 items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition duration-200 hover:-translate-y-0.5 ${
-        active ? "border-brand/40 bg-brand/10 shadow-soft" : "border-line/80 bg-white/75"
+        active ? "border-brand/40 bg-brand/10 shadow-soft" : "border-card-border/60 bg-card/75"
       }`}
     >
-      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-2xl ${active ? "bg-brand text-white" : "bg-slate-100 text-slate-500"}`}>
+      <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-2xl ${active ? "bg-brand text-white" : "bg-muted/40 text-muted-foreground"}`}>
         {icon}
       </span>
-      <span className="block text-sm font-black leading-tight text-ink">{title}</span>
+      <span className="block text-sm font-black leading-tight text-foreground">{title}</span>
     </button>
   );
 }
 
 function VoiceQueueList({ items, onCancel }: { items: VoiceQueueItem[]; onCancel: (itemId: string) => void }) {
   return (
-    <div className="rounded-2xl border border-line/80 bg-white/75 p-3">
-      <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-slate-500">
+    <div className="rounded-2xl border border-card-border/60 bg-card/75 p-3">
+      <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.12em] text-muted-foreground">
         <Clock3 size={14} />
         Fila automatica
       </div>
       <div className="grid gap-2">
         {items.map((item) => (
-          <div key={item.id} className="flex items-center gap-2 rounded-xl border border-line/70 bg-field/50 px-3 py-2">
+          <div key={item.id} className="flex items-center gap-2 rounded-xl border border-card-border/50 bg-muted/30 px-3 py-2">
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-black text-ink">{item.command.cardNumber.fullNumber}</p>
-              <p className="truncate text-xs font-semibold text-slate-500">
+              <p className="truncate text-sm font-black text-foreground">{item.command.cardNumber.fullNumber}</p>
+              <p className="truncate text-xs font-semibold text-muted-foreground">
                 {item.canceled
                   ? "Cancelando"
                   : item.status === "running"
@@ -730,7 +731,7 @@ function VoiceQueueList({ items, onCancel }: { items: VoiceQueueItem[]; onCancel
             <button
               type="button"
               onClick={() => onCancel(item.id)}
-              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-line bg-white text-slate-600 shadow-sm transition hover:border-red-200 hover:text-red-600"
+              className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-card-border/40 bg-card text-muted-foreground shadow-sm transition hover:border-red-200 hover:text-red-600"
               aria-label="Cancelar item da fila"
               title="Cancelar"
             >
@@ -754,21 +755,21 @@ function LastAddedPreviewCard({ preview }: { preview: AddedPreview }) {
           <img
             src={item.card.imageSmall}
             alt={item.card.name}
-            className="h-16 w-12 shrink-0 rounded-lg border border-white/80 object-cover shadow-sm"
+            className="h-16 w-12 shrink-0 rounded-lg border border-card/80 object-cover shadow-sm"
           />
         ) : (
-          <div className="grid h-16 w-12 shrink-0 place-items-center rounded-lg border border-white/80 bg-white/70 text-xs font-black text-slate-400">
+          <div className="grid h-16 w-12 shrink-0 place-items-center rounded-lg border border-card/80 bg-card/70 text-xs font-black text-muted-foreground/60">
             CC
           </div>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <p className="truncate text-sm font-black text-ink">{item.card.name}</p>
-            <span className="rounded-full bg-white/85 px-2 py-0.5 text-xs font-black text-emerald-800">
+            <p className="truncate text-sm font-black text-foreground">{item.card.name}</p>
+            <span className="rounded-full bg-card/85 px-2 py-0.5 text-xs font-black text-emerald-800">
               {preview.action === "incremented" ? "Quantidade +" : "Nova carta"}
             </span>
           </div>
-          <p className="mt-1 text-xs font-semibold text-slate-600">
+          <p className="mt-1 text-xs font-semibold text-muted-foreground">
             {formatCardNumber(item.card.number, item.card.printedTotal)} - {formatCardVariant(item.variant)} - {priceText}
           </p>
         </div>

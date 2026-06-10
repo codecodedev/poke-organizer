@@ -40,8 +40,8 @@ export function ResetPasswordPanel({ token, onSuccess, theme = "dark" }: Props) 
   return (
     <section className="mx-auto flex min-h-screen w-full max-w-6xl flex-col items-center justify-center gap-12 px-5 py-12">
       <form onSubmit={submit} className="glass-panel w-full max-w-[420px] p-8 shadow-[0_0_50px_rgba(0,242,255,0.1)]">
-        <h2 className="mb-2 text-2xl font-black text-white">Nova senha</h2>
-        <p className="mb-8 text-sm text-slate-400">
+        <h2 className="mb-2 text-2xl font-black text-foreground">Nova senha</h2>
+        <p className="mb-8 text-sm text-muted-foreground/60">
           Defina sua nova senha de acesso abaixo.
         </p>
 
@@ -51,14 +51,14 @@ export function ResetPasswordPanel({ token, onSuccess, theme = "dark" }: Props) 
               <CheckCircle size={48} className="text-leaf" />
             </div>
             <p className="font-semibold text-leaf mb-2">Senha alterada!</p>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-muted-foreground/60">
               Sua senha foi atualizada com sucesso. Você será redirecionado para o login.
             </p>
           </div>
         ) : (
           <>
             <div className="mb-5">
-              <label className="mb-2 block text-sm font-bold text-slate-300">Nova senha</label>
+              <label className="mb-2 block text-sm font-bold text-foreground/80">Nova senha</label>
               <input
                 className="input-dark w-full"
                 value={password}
@@ -71,7 +71,7 @@ export function ResetPasswordPanel({ token, onSuccess, theme = "dark" }: Props) 
             </div>
 
             <div className="mb-6">
-              <label className="mb-2 block text-sm font-bold text-slate-300">Confirmar nova senha</label>
+              <label className="mb-2 block text-sm font-bold text-foreground/80">Confirmar nova senha</label>
               <input
                 className="input-dark w-full"
                 value={confirmPassword}

@@ -254,21 +254,21 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
   return (
     <main className={hideHeader ? "" : "app-shell"}>
       {!hideHeader && (
-        <header className="sticky top-0 z-30 border-b border-white/70 bg-white/75 backdrop-blur-xl">
+        <header className="sticky top-0 z-30 border-b border-card-border bg-card/75 backdrop-blur-xl">
           <div className="mx-auto flex h-20 max-w-7xl items-center px-5 py-4">
             {/* Left: Spacer (to center logo) */}
             <div className="hidden sm:flex w-1/4" />
             
             {/* Center: Logo */}
             <div className="flex flex-1 items-center justify-center gap-3">
-              <div className="grid h-10 w-10 sm:h-12 sm:w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand via-coral to-amber font-black text-white shadow-glow">
+              <div className="grid h-10 w-10 sm:h-12 sm:w-12 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand via-magenta to-amber font-black text-white shadow-glow">
                 CC
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-lg sm:text-xl font-black text-ink">
+                <h1 className="truncate text-lg sm:text-xl font-black text-foreground">
                   Coleciona cards
                 </h1>
-                <p className="truncate text-[10px] sm:text-sm font-medium text-slate-600">
+                <p className="truncate text-[10px] sm:text-sm font-medium text-muted-foreground">
                   Coleção compartilhada
                 </p>
               </div>
@@ -303,7 +303,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
         {!loading && error && (
           <Panel>
             <div className="flex items-start gap-4">
-              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-slate-100 text-slate-600">
+              <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-accent text-muted-foreground">
                 <Lock size={20} />
               </span>
               <div>
@@ -330,15 +330,15 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
         {!loading && collection && (
           <>
             {collection.bannerUrl && (
-              <div className="overflow-hidden rounded-[32px] border border-line/80 bg-white/70 shadow-sm">
-                <div className="relative aspect-[21/9] w-full overflow-hidden bg-slate-900 sm:aspect-[4/1]">
+              <div className="overflow-hidden rounded-[32px] border border-card-border bg-card/70 shadow-sm">
+                <div className="relative aspect-[21/9] w-full overflow-hidden bg-slate-950 sm:aspect-[4/1]">
                   <img 
                     src={collection.bannerUrl} 
                     alt="Banner da Coleção" 
                     className="h-full w-full object-cover opacity-90 transition-opacity hover:opacity-100" 
                     onError={(e) => (e.currentTarget.parentElement!.style.display = 'none')}
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-background/60 to-transparent" />
                   <div className="absolute bottom-6 left-6 right-6 flex items-end justify-between gap-4">
                      <div>
                        <h1 className="text-2xl font-black text-white drop-shadow-md sm:text-4xl">{collection.name}</h1>
@@ -352,7 +352,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
             <Panel>
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                  <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">
                     {collection.isStore ? "Pasta para vender" : "Pasta para visualizar"}
                   </p>
                   {!collection.bannerUrl && <h2 className="section-title truncate">{collection.name}</h2>}
@@ -377,8 +377,8 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                   )}
                   <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
                     collection.isPublic 
-                      ? "border-leaf/25 bg-leaf/10 text-emerald-800" 
-                      : "border-amber-200 bg-amber-50 text-amber-800"
+                      ? "border-leaf/25 bg-leaf/10 text-leaf" 
+                      : "border-amber/20 bg-amber/10 text-amber"
                   }`}>
                     {collection.isPublic ? <FolderOpen size={14} /> : <Lock size={14} />}
                     {collection.isPublic ? "Publica" : "Privada (Acesso Autorizado)"}
@@ -387,13 +387,13 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
               </div>
               {message && (
                 <div className={`mt-4 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-                  message.includes("enviada") ? "bg-leaf/10 text-leaf" : "bg-red-50 text-red-600"
+                  message.includes("enviada") ? "bg-leaf/10 text-leaf" : "bg-magenta/10 text-magenta"
                 }`}>
                   <p className="text-sm font-bold">{message}</p>
                   {message.includes("WhatsApp") && (
                     <Button
                       variant="outline"
-                      className="h-10 px-6 border-red-200 text-red-600 hover:bg-red-50"
+                      className="h-10 px-6 border-magenta/20 text-magenta hover:bg-magenta/10"
                       onClick={() => onNavigate({ view: "profile" })}
                     >
                       Ir para o Perfil
@@ -407,15 +407,24 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                 <div className="relative flex-1">
                   <Search
-                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+                    className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
                     size={18}
                   />
                   <input
-                    className="premium-input w-full pl-11"
+                    className="premium-input w-full pl-11 pr-11"
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Nome, número, coleção..."
                   />
+                  {query && (
+                    <button
+                      type="button"
+                      onClick={() => setQuery("")}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
                 </div>
                 <Button
                   variant="primary"
@@ -427,7 +436,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                 </Button>
               </div>
 
-              <div className="mt-6 rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-violet-900">
+              <div className="mt-6 rounded-2xl border border-lilac/25 bg-lilac/10 px-4 py-3 text-sm font-black text-lilac">
                 {visibleItems.length} de {items.length} cartas visíveis
               </div>
 
@@ -446,8 +455,8 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                             variant="primary"
                             className={`w-full h-10 gap-2 text-xs font-black uppercase transition-all ${
                                 cart[item.id] 
-                                    ? "bg-emerald-500 text-white border-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.3)]" 
-                                    : "bg-white/5 border-white/10 text-slate-400 hover:text-white hover:border-brand hover:bg-brand/10 dark:bg-white/5 dark:text-slate-400"
+                                    ? "bg-emerald-500 text-white border-emerald-500 shadow-glow shadow-emerald-500/20" 
+                                    : "bg-accent/40 border-card-border text-muted-foreground hover:text-foreground hover:border-brand/40 hover:bg-brand/10"
                             }`}
                             icon={cart[item.id] ? <CheckSquare size={16} /> : <Plus size={16} />}
                             onClick={(e) => {
@@ -478,7 +487,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                   />
                 </>
               ) : (
-                <div className="mt-5 rounded-[24px] border border-line/80 bg-white/70 p-5 text-sm font-bold text-slate-500 shadow-sm">
+                <div className="mt-5 rounded-[24px] border border-card-border bg-card/70 p-5 text-sm font-bold text-muted-foreground shadow-sm">
                   Nenhuma carta aparece com os filtros atuais.
                 </div>
               )}
@@ -519,21 +528,21 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
 
       {showFiltersModal && (
         <div 
-          className="fixed inset-0 z-[60] flex items-end justify-center bg-night/55 backdrop-blur-sm sm:items-center p-0 sm:p-4"
+          className="fixed inset-0 z-[60] flex items-end justify-center bg-background/60 backdrop-blur-sm sm:items-center p-0 sm:p-4"
           onMouseDown={() => setShowFiltersModal(false)}
         >
           <div 
-            className="animate-in slide-in-from-bottom-full sm:animate-soft-pop flex w-full max-w-lg flex-col overflow-hidden rounded-t-[32px] sm:rounded-[32px] border border-white/10 bg-white dark:bg-zinc-900 shadow-2xl h-[80vh] sm:h-auto"
+            className="animate-in slide-in-from-bottom-full sm:animate-soft-pop flex w-full max-w-lg flex-col overflow-hidden rounded-t-[32px] sm:rounded-[32px] border border-card-border bg-card shadow-2xl h-[80vh] sm:h-auto"
             onMouseDown={(e) => e.stopPropagation()}
           >
-            <div className="flex items-center justify-between border-b border-line/70 dark:border-white/5 px-6 py-5 shrink-0">
+            <div className="flex items-center justify-between border-b border-card-border px-6 py-5 shrink-0">
               <div>
-                <h2 className="text-xl font-black text-ink dark:text-white">Filtros e Ordenação</h2>
-                <p className="text-sm font-semibold text-slate-500">Refine os resultados da coleção.</p>
+                <h2 className="text-xl font-black text-foreground">Filtros e Ordenação</h2>
+                <p className="text-sm font-semibold text-muted-foreground">Refine os resultados da coleção.</p>
               </div>
               <button
                 onClick={() => setShowFiltersModal(false)}
-                className="grid h-10 w-10 place-items-center rounded-xl border border-line dark:border-white/10 bg-white dark:bg-zinc-800 text-slate-700 dark:text-white transition hover:bg-field"
+                className="grid h-10 w-10 place-items-center rounded-xl border border-card-border bg-card text-foreground transition hover:bg-accent"
               >
                 <X size={18} />
               </button>
@@ -563,7 +572,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                   emptyLabel="Todas"
                 />
                 <label className="grid gap-2">
-                  <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
+                  <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">
                     Ordenação
                   </span>
                   <select
@@ -582,12 +591,12 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                   </select>
                 </label>
                 {collection?.isStore && (
-                  <label className="flex items-center justify-between gap-4 rounded-2xl border border-line/50 p-4">
+                  <label className="flex items-center justify-between gap-4 rounded-2xl border border-card-border p-4">
                     <div>
-                      <span className="block text-sm font-black text-ink dark:text-white">
+                      <span className="block text-sm font-black text-foreground">
                         Ver vendidas
                       </span>
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
                         Exibir itens já negociados
                       </span>
                     </div>
@@ -595,14 +604,14 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                       type="checkbox"
                       checked={showSold}
                       onChange={(e) => setShowSold(e.target.checked)}
-                      className="h-6 w-6 rounded-lg border-line text-brand focus:ring-brand/30"
+                      className="h-6 w-6 rounded-lg border-card-border text-brand focus:ring-brand/30"
                     />
                   </label>
                 )}
               </div>
             </div>
 
-            <div className="border-t border-line/70 dark:border-white/5 p-6 shrink-0">
+            <div className="border-t border-card-border p-6 shrink-0">
               <Button 
                 variant="brand" 
                 className="w-full h-12"
@@ -626,19 +635,19 @@ function MyProposalsModal({
   onClose: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/60 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
       <div
-        className="animate-soft-pop flex h-full max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-card"
+        className="animate-soft-pop flex h-full max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-card-border bg-card shadow-card"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-line/70 px-6 py-5">
+        <div className="flex items-center justify-between border-b border-card-border px-6 py-5">
           <div>
-            <h2 className="text-xl font-black text-ink">Minhas Propostas</h2>
-            <p className="text-sm font-semibold text-slate-500">Histórico de propostas nesta coleção.</p>
+            <h2 className="text-xl font-black text-foreground">Minhas Propostas</h2>
+            <p className="text-sm font-semibold text-muted-foreground">Histórico de propostas nesta coleção.</p>
           </div>
           <button
             onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-xl border border-line bg-white text-slate-700 transition hover:bg-field"
+            className="grid h-10 w-10 place-items-center rounded-xl border border-card-border bg-card text-foreground transition hover:bg-accent"
           >
             <X size={18} />
           </button>
@@ -649,15 +658,15 @@ function MyProposalsModal({
             {proposals.map((offer) => (
               <div
                 key={offer.id}
-                className="rounded-2xl border border-line/70 bg-field/30 p-5"
+                className="rounded-2xl border border-card-border bg-accent/30 p-5"
               >
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-1">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
                       Enviada em {new Date(offer.createdAt).toLocaleDateString()}
                     </p>
                     <div className="flex items-center gap-2">
-                      <p className="font-black text-ink">Total: {formatBrl(offer.totalOffer)}</p>
+                      <p className="font-black text-foreground">Total: {formatBrl(offer.totalOffer)}</p>
                       {offer.isGlobalOffer && (
                         <span className="rounded-lg bg-brand px-2 py-0.5 text-[10px] font-black text-white uppercase tracking-tighter">
                           Proposta Global
@@ -666,7 +675,7 @@ function MyProposalsModal({
                     </div>
                     <div className="mt-2 flex flex-wrap gap-2">
                       {offer.items.map((item) => (
-                        <span key={item.id} className="rounded-lg bg-white px-2 py-0.5 text-[10px] font-bold text-slate-600 border border-line/50">
+                        <span key={item.id} className="rounded-lg bg-card px-2 py-0.5 text-[10px] font-bold text-muted-foreground border border-card-border">
                           {item.quantity}x {item.item.card.name} {offer.isGlobalOffer ? "" : `(${formatBrl(item.amount)})`}
                         </span>
                       ))}
@@ -677,8 +686,8 @@ function MyProposalsModal({
                       offer.status === "accepted"
                         ? "bg-leaf text-white"
                         : offer.status === "rejected"
-                          ? "bg-red-500 text-white"
-                          : "bg-amber-100 text-amber-800"
+                          ? "bg-magenta text-white"
+                          : "bg-amber/20 text-amber"
                     }`}
                   >
                     {offer.status === "accepted"

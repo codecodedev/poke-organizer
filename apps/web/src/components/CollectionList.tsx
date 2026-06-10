@@ -9,6 +9,7 @@ import {
   Settings,
   Trash2,
   Upload,
+  X,
 } from "lucide-react";
 import {
   formatCardNumber,
@@ -368,14 +369,14 @@ export function CollectionList({
               </Button>
 
               {showSettings && (
-                <div className="absolute right-0 top-full z-40 mt-2 w-48 animate-soft-pop overflow-hidden rounded-2xl border border-white/10 bg-black/40 shadow-2xl backdrop-blur-xl">
+                <div className="absolute right-0 top-full z-40 mt-2 w-48 animate-soft-pop overflow-hidden rounded-2xl border border-card-border bg-card shadow-2xl backdrop-blur-xl">
                   <button
                     type="button"
                     onClick={() => {
                       exportCsv();
                       setShowSettings(false);
                     }}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-300 hover:bg-white/5"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-muted-foreground hover:bg-accent"
                   >
                     <Download size={16} />
                     Baixar CSV
@@ -386,7 +387,7 @@ export function CollectionList({
                       fileInputRef.current?.click();
                       setShowSettings(false);
                     }}
-                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-slate-300 hover:bg-white/5"
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-bold text-muted-foreground hover:bg-accent"
                   >
                     <Upload size={16} />
                     Restaurar CSV
@@ -397,7 +398,7 @@ export function CollectionList({
                       setIsClearModalOpen(true);
                       setShowSettings(false);
                     }}
-                    className="flex w-full items-center gap-3 border-t border-white/10 px-4 py-3 text-left text-sm font-bold text-rose-500 hover:bg-rose-500/10"
+                    className="flex w-full items-center gap-3 border-t border-card-border px-4 py-3 text-left text-sm font-bold text-magenta hover:bg-magenta/10"
                   >
                     <Trash2 size={16} />
                     Apagar tudo
@@ -444,15 +445,24 @@ export function CollectionList({
         <div className="mb-6 flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[240px]">
             <Search
-              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"
+              className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
               size={17}
             />
             <input
-              className="premium-input w-full pl-11"
+              className="premium-input w-full pl-11 pr-11"
               value={searchTerm}
               placeholder="Busca rapida por nome ou numero..."
               onChange={(event) => setSearchTerm(event.target.value)}
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm("")}
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X size={16} />
+              </button>
+            )}
           </div>
           <Button
             type="button"
@@ -552,15 +562,15 @@ export function CollectionList({
       )}
 
       {loading ? (
-        <p className="rounded-2xl border border-line/80 bg-white/60 p-4 text-sm font-semibold text-slate-600">
+        <p className="rounded-2xl border border-card-border bg-card/60 p-4 text-sm font-semibold text-muted-foreground">
           Carregando colecao
         </p>
       ) : items.length === 0 ? (
-        <p className="rounded-2xl border border-line/80 bg-white/60 p-4 text-sm font-semibold text-slate-600">
+        <p className="rounded-2xl border border-card-border bg-card/60 p-4 text-sm font-semibold text-muted-foreground">
           Nenhuma carta cadastrada.
         </p>
       ) : visibleItems.length === 0 ? (
-        <p className="rounded-2xl border border-line/80 bg-white/60 p-4 text-sm font-semibold text-slate-600">
+        <p className="rounded-2xl border border-card-border bg-card/60 p-4 text-sm font-semibold text-muted-foreground">
           Nenhuma carta aparece com a busca ou filtros atuais.
         </p>
       ) : (
@@ -655,11 +665,11 @@ export function CollectionList({
           maxWidthClass="max-w-md"
         >
           <div className="grid gap-4 p-5">
-            <div className="rounded-2xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">
+            <div className="rounded-2xl border border-magenta/20 bg-magenta/10 p-4 text-sm font-semibold text-magenta">
               Atenção: todas as cartas serão deletadas de forma definitiva.
             </div>
             <div className="flex flex-col gap-2">
-              <label className="text-sm font-bold text-slate-700">Confirme sua senha</label>
+              <label className="text-sm font-bold text-foreground">Confirme sua senha</label>
               <input
                 type="password"
                 className="premium-input w-full"
@@ -685,7 +695,7 @@ export function CollectionList({
               <Button
                 type="button"
                 variant="brand"
-                className="flex-1 bg-red-600 !from-red-600 !to-red-500"
+                className="flex-1 bg-magenta hover:bg-magenta/80"
                 onClick={() => void clearCollection()}
                 disabled={clearing || !clearPassword}
               >
@@ -729,12 +739,12 @@ function ImportChoice({
       onClick={onClick}
       className={`rounded-[22px] border p-4 text-left shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${
         danger
-          ? "border-red-200 bg-red-50 text-red-800"
-          : "border-line/80 bg-white/80 text-ink hover:border-brand/35"
+          ? "border-magenta/20 bg-magenta/10 text-magenta"
+          : "border-card-border bg-card text-foreground hover:border-brand/40"
       }`}
     >
       <span className="block text-base font-black">{title}</span>
-      <span className="mt-2 block text-sm font-semibold leading-6 text-slate-600">
+      <span className="mt-2 block text-sm font-semibold leading-6 text-muted-foreground">
         {description}
       </span>
     </button>

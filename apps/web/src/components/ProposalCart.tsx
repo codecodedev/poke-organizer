@@ -131,7 +131,7 @@ export function ProposalCart({
     <>
       {/* Mobile Overlay - Only when expanded */}
       <div 
-        className={`fixed inset-0 z-[25] bg-black/60 backdrop-blur-sm transition-opacity duration-300 sm:hidden ${
+        className={`fixed inset-0 z-[25] bg-background/60 backdrop-blur-sm transition-opacity duration-300 sm:hidden ${
           isExpanded ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
         }`}
         onClick={() => setIsExpanded(false)}
@@ -146,8 +146,8 @@ export function ProposalCart({
         {/* Main Container */}
         <div className={`relative flex flex-col w-full transition-all duration-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)]
           ${isExpanded
-            ? "h-[600px] max-h-[90vh] sm:max-h-[80vh] rounded-t-[32px] sm:rounded-[32px] bg-white dark:bg-zinc-950 backdrop-blur-xl border-t sm:border border-white/10 overflow-hidden"
-            : "h-16 bg-white/95 dark:bg-zinc-900/95 backdrop-blur-md border-t sm:border border-white/10 sm:rounded-full sm:w-auto overflow-visible"
+            ? "h-[600px] max-h-[90vh] sm:max-h-[80vh] rounded-t-[32px] sm:rounded-[32px] bg-card backdrop-blur-xl border-t sm:border border-card-border/40 overflow-hidden"
+            : "h-16 bg-card/95 backdrop-blur-md border-t sm:border border-card-border/40 sm:rounded-full sm:w-auto overflow-visible"
           }
           ${isGlobalMode && isExpanded ? "border-t-2 border-brand sm:border-t" : ""}
         `}>
@@ -156,7 +156,7 @@ export function ProposalCart({
           <div 
             className={`flex shrink-0 items-center justify-between transition-all duration-300 cursor-pointer ${
               isExpanded 
-                ? "border-b border-white/5 bg-gradient-to-r from-brand/10 to-coral/10 p-5" 
+                ? "border-b border-card-border/20 bg-gradient-to-r from-brand/10 to-magenta/10 p-5" 
                 : "h-full px-5 sm:px-2 sm:pr-6"
             }`}
             onClick={() => setIsExpanded(!isExpanded)}
@@ -164,13 +164,13 @@ export function ProposalCart({
             {/* Expanded Header or Mobile Minimized Header */}
             <div className={`flex relative items-center gap-3 ${!isExpanded && "hidden sm:hidden"} ${isExpanded && "flex"} w-full sm:w-auto`}>
               <div className="">
-                <div className={`grid h-10 w-10 place-items-center rounded-2xl text-white shadow-glow transition-colors ${isGlobalMode ? "bg-brand dark:bg-white" : "bg-white dark:bg-white dark:text-white"}`}>
+                <div className={`grid h-10 w-10 place-items-center rounded-2xl shadow-glow transition-colors ${isGlobalMode ? "bg-brand text-white" : "bg-card text-foreground border border-card-border/40"}`}>
                   <ShoppingBag size={20} />
                 </div>
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="text-sm font-black text-ink dark:text-white truncate">Carrinho: {folderName}</h3>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none mt-0.5">
+                <h3 className="text-sm font-black text-foreground truncate">Carrinho: {folderName}</h3>
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-0.5">
                   Finalize sua proposta
                 </p>
               </div>
@@ -188,14 +188,14 @@ export function ProposalCart({
                     <ShoppingBag size={24} className="text-white" />
                   </div>
                   {totalItems > 0 && hasNewItems && (
-                    <span className="absolute -left-1 -top-1 grid h-6 w-6 place-items-center rounded-full text-xs font-black text-white bg-rose-500 ring-4 ring-white dark:ring-zinc-900 animate-soft-pop">
+                    <span className="absolute -left-1 -top-1 grid h-6 w-6 place-items-center rounded-full text-xs font-black text-white bg-rose-500 ring-4 ring-background animate-soft-pop">
                       {totalItems}
                     </span>
                   )}
                 </div>
                 <div className="text-left">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 leading-none mb-0.5">Total Carrinho</p>
-                  <p className="text-xs font-black text-ink dark:text-white">{totalItems} itens • {formatBrl(displayTotal)}</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none mb-0.5">Total Carrinho</p>
+                  <p className="text-xs font-black text-foreground">{totalItems} itens • {formatBrl(displayTotal)}</p>
                 </div>
               </div>
             )}
@@ -217,11 +217,11 @@ export function ProposalCart({
                     )}
                   </div>
                   <div className="text-left">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 leading-none">Total Carrinho</p>
-                    <p className="text-sm font-black text-ink dark:text-white">{totalItems} itens • {formatBrl(displayTotal)}</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground leading-none">Total Carrinho</p>
+                    <p className="text-sm font-black text-foreground">{totalItems} itens • {formatBrl(displayTotal)}</p>
                   </div>
                 </div>
-                <ChevronUp className="text-slate-400 dark:text-white/60" size={20} />
+                <ChevronUp className="text-muted-foreground" size={20} />
               </div>
             )}
 
@@ -230,7 +230,7 @@ export function ProposalCart({
               <div className="flex items-center gap-2">
                 <button 
                   onClick={(e) => { e.stopPropagation(); setIsExpanded(false); }}
-                  className="p-2 text-slate-400 hover:text-rose-500 transition-colors dark:text-white/60 dark:hover:text-rose-400"
+                  className="p-2 text-muted-foreground hover:text-rose-500 transition-colors"
                 >
                   <ChevronDown className="sm:hidden" size={24} />
                   <X className="hidden sm:block" size={20} />
@@ -245,7 +245,7 @@ export function ProposalCart({
               {cartList.map((entry) => {
                 const originalPrice = entry.item.store?.effectivePrice ?? entry.item.price?.amount ?? 0;
                 return (
-                  <div key={entry.item.id} className="group relative flex flex-col gap-3 rounded-2xl border border-white/5 bg-white/50 p-3 transition hover:border-white/10 dark:bg-white/5">
+                  <div key={entry.item.id} className="group relative flex flex-col gap-3 rounded-2xl border border-card-border/40 bg-muted/30 p-3 transition hover:border-card-border/60">
                     <div className="flex items-center gap-3">
                       <img 
                         src={entry.item.card.imageSmall ?? ""} 
@@ -253,14 +253,14 @@ export function ProposalCart({
                         className="h-16 w-12 rounded-lg object-cover shadow-md"
                       />
                       <div className="min-w-0 flex-1">
-                        <h4 className="truncate text-sm font-black text-ink dark:text-white">{entry.item.card.name}</h4>
-                        <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400">
+                        <h4 className="truncate text-sm font-black text-foreground">{entry.item.card.name}</h4>
+                        <p className="text-[10px] font-bold text-muted-foreground">
                             Ref: {formatBrl(originalPrice)}
                         </p>
                       </div>
                       <button 
                         onClick={(e) => { e.stopPropagation(); removeFromCart(entry.item.id); }}
-                        className="p-2 text-slate-300 hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100 dark:text-slate-600 dark:hover:text-rose-400"
+                        className="p-2 text-muted-foreground hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
                       >
                         <X size={16} />
                       </button>
@@ -268,12 +268,12 @@ export function ProposalCart({
 
                     <div className="grid grid-cols-[1fr_auto] items-center gap-4">
                       <div className="relative">
-                        <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black transition-colors ${isGlobalMode ? "text-slate-300 dark:text-slate-600" : "text-slate-400 dark:text-slate-500"}`}>R$</span>
+                        <span className={`absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black transition-colors ${isGlobalMode ? "text-muted-foreground/40" : "text-muted-foreground"}`}>R$</span>
                         <input 
-                          className={`w-full h-10 rounded-xl border border-white/10 bg-white px-8 text-sm font-black outline-none transition-all ${
+                          className={`w-full h-10 rounded-xl border border-card-border/40 bg-input px-8 text-sm font-black outline-none transition-all ${
                             isGlobalMode 
-                              ? "bg-slate-50 text-slate-300 cursor-not-allowed border-transparent dark:bg-zinc-800/50 dark:text-zinc-600" 
-                              : "text-ink focus:ring-2 focus:ring-brand/20 dark:bg-zinc-900 dark:text-white dark:border-white/5"
+                              ? "opacity-50 cursor-not-allowed border-transparent" 
+                              : "text-foreground focus:ring-2 focus:ring-cyan/50"
                           }`}
                           type="number"
                           value={isGlobalMode ? originalPrice : entry.amount}
@@ -282,17 +282,17 @@ export function ProposalCart({
                           onClick={(e) => e.stopPropagation()}
                         />
                       </div>
-                      <div className="flex items-center gap-1 rounded-xl border border-white/10 bg-white p-1 dark:bg-zinc-900 dark:border-white/5" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex items-center gap-1 rounded-xl border border-card-border/40 bg-input p-1" onClick={(e) => e.stopPropagation()}>
                         <button 
                           onClick={() => updateQuantity(entry.item.id, -1)}
-                          className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors dark:text-slate-400 dark:hover:bg-white/10"
+                          className="p-1.5 text-muted-foreground hover:bg-accent rounded-lg transition-colors"
                         >
                           <Minus size={14} />
                         </button>
-                        <span className="w-8 text-center text-sm font-black text-ink dark:text-white">{entry.quantity}</span>
+                        <span className="w-8 text-center text-sm font-black text-foreground">{entry.quantity}</span>
                         <button 
                           onClick={() => updateQuantity(entry.item.id, 1)}
-                          className="p-1.5 text-slate-500 hover:bg-slate-100 rounded-lg transition-colors dark:text-slate-400 dark:hover:bg-white/10"
+                          className="p-1.5 text-muted-foreground hover:bg-accent rounded-lg transition-colors"
                         >
                           <Plus size={14} />
                         </button>
@@ -311,27 +311,27 @@ export function ProposalCart({
                   }}
                   className={`flex w-full items-center gap-4 rounded-2xl border p-4 transition-all text-left ${
                     isGlobalMode 
-                      ? "border-brand bg-brand/5 shadow-[0_0_20px_rgba(var(--brand-rgb),0.1)]" 
-                      : "border-white/5 bg-white/30 hover:border-white/20 dark:bg-white/5 dark:border-white/10"
+                      ? "border-brand bg-brand/5 shadow-[0_0_20px_rgba(var(--color-brand),0.1)]" 
+                      : "border-card-border/40 bg-muted/20 hover:border-card-border/60 hover:bg-muted/30"
                   }`}
                 >
                   <div className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border-2 transition-all ${
                     isGlobalMode 
                       ? "border-brand bg-brand text-white" 
-                      : "border-slate-300 bg-transparent dark:border-white/20"
+                      : "border-muted-foreground/30 bg-transparent"
                   }`}>
                     {isGlobalMode && <Check size={16} strokeWidth={4} />}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className={`text-sm font-black transition-colors ${isGlobalMode ? "text-brand" : "text-ink dark:text-white"}`}>
+                      <p className={`text-sm font-black transition-colors ${isGlobalMode ? "text-brand" : "text-foreground"}`}>
                         Definir valor final para a proposta
                       </p>
                       {isGlobalMode && (
                         <span className="rounded-full bg-brand px-1.5 py-0.5 text-[8px] font-black uppercase text-white animate-pulse">Ativo</span>
                       )}
                     </div>
-                    <p className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">Substitui a soma individual por um valor único no carrinho</p>
+                    <p className="text-[10px] font-semibold text-muted-foreground">Substitui a soma individual por um valor único no carrinho</p>
                   </div>
                 </button>
 
@@ -339,7 +339,7 @@ export function ProposalCart({
                   <div className="relative animate-in slide-in-from-top-2" onClick={(e) => e.stopPropagation()}>
                     <span className="absolute left-4 top-1/2 -translate-y-1/2 text-lg font-black text-brand/60">R$</span>
                     <input 
-                      className="w-full h-14 rounded-2xl border-2 border-brand bg-brand/5 pl-12 text-xl font-black text-brand outline-none focus:ring-4 focus:ring-brand/10 transition-all dark:bg-brand/10 dark:text-white"
+                      className="w-full h-14 rounded-2xl border-2 border-brand bg-brand/5 pl-12 text-xl font-black text-brand outline-none focus:ring-4 focus:ring-brand/10 transition-all"
                       type="number"
                       value={globalTotal}
                       onChange={(e) => setGlobalTotal(e.target.value)}
@@ -350,9 +350,9 @@ export function ProposalCart({
                 )}
 
                 <div className="relative" onClick={(e) => e.stopPropagation()}>
-                  <MessageSquare className="absolute left-4 top-4 text-slate-400 dark:text-slate-500" size={18} />
+                  <MessageSquare className="absolute left-4 top-4 text-muted-foreground" size={18} />
                   <textarea 
-                    className="w-full min-h-[100px] rounded-2xl border border-white/5 bg-white/30 p-4 pl-12 text-sm font-semibold text-ink outline-none focus:ring-2 focus:ring-brand/20 dark:bg-white/5 dark:text-white dark:border-white/10"
+                    className="w-full min-h-[100px] rounded-2xl border border-card-border/40 bg-input p-4 pl-12 text-sm font-semibold text-foreground outline-none focus:ring-2 focus:ring-brand/20"
                     placeholder="Adicione uma mensagem (opcional)..."
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
@@ -363,10 +363,10 @@ export function ProposalCart({
           </div>
 
           {/* Expanded Footer Area */}
-          <div className={`border-t border-white/5 bg-white/50 p-5 backdrop-blur-md dark:bg-black/40 transition-all duration-500 ${isExpanded ? "opacity-100" : "opacity-0 pointer-events-none h-0 p-0"}`}>
+          <div className={`border-t border-card-border/30 bg-muted/50 p-5 backdrop-blur-md transition-all duration-500 ${isExpanded ? "opacity-100" : "opacity-0 pointer-events-none h-0 p-0"}`}>
             <div className="mb-4 flex items-center justify-between px-1">
-              <span className="text-sm font-black text-slate-500 uppercase tracking-widest dark:text-slate-400">Total da Proposta</span>
-              <span className={`text-2xl font-black transition-colors ${isGlobalMode ? "text-brand" : "text-ink dark:text-white"}`}>
+              <span className="text-sm font-black text-muted-foreground uppercase tracking-widest">Total da Proposta</span>
+              <span className={`text-2xl font-black transition-colors ${isGlobalMode ? "text-brand" : "text-foreground"}`}>
                 {formatBrl(displayTotal)}
               </span>
             </div>

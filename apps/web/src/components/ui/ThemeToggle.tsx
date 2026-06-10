@@ -16,7 +16,7 @@ export function ThemeToggle({
     <button
       type="button"
       onClick={onToggle}
-      className={`btn border border-line bg-white/80 text-night shadow-sm hover:border-lilac/40 ${className}`}
+      className={`btn border border-line bg-white/80 dark:bg-night text-night dark:text-white shadow-sm hover:border-lilac/40 ${className}`}
       aria-label={dark ? "Ativar modo claro" : "Ativar modo escuro"}
       title={dark ? "Modo claro" : "Modo escuro"}
     >

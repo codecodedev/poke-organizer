@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import {
   FolderOpen,
   Home,
@@ -66,7 +66,11 @@ export function Sidebar({
   onSession,
   onUnauthorized,
 }: Props) {
+  const [isHovered, setIsHovered] = useState(false);
   const dark = theme === "dark";
+
+  // Only allow hover to expand sidebar on desktop
+  const effectiveOpen = isOpen || (isHovered && typeof window !== 'undefined' && window.innerWidth >= 768);
 
   return (
     <>
@@ -80,8 +84,10 @@ export function Sidebar({
 
       {/* Sidebar Container */}
       <aside
-        className={`fixed left-0 top-0 z-50 flex h-full flex-col border-r border-white/5 bg-white/70 backdrop-blur-2xl transition-all duration-300 ease-in-out dark:border-white/5 dark:bg-black/20 ${
-          isOpen 
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        className={`fixed left-0 top-0 z-50 flex h-full flex-col border-r border-card-border bg-card backdrop-blur-2xl transition-all duration-300 ease-in-out ${
+          effectiveOpen 
             ? "w-[280px] translate-x-0" 
             : "w-[280px] -translate-x-full md:w-20 md:translate-x-0"
         }`}
@@ -96,16 +102,16 @@ export function Sidebar({
             />
             <div
               className={`min-w-0 transition-all duration-300 ${
-                isOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4 md:hidden"
+                effectiveOpen ? "opacity-100 translate-x-0" : "opacity-0 -translate-x-4 md:hidden"
               }`}
             >
-              <h1 className="truncate text-xl font-black text-ink dark:text-white">
+              <h1 className="truncate text-xl font-black text-foreground">
                 coleciona<span className="gradient-text">.cards</span>
               </h1>
-              <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              <p className="truncate text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
                 {session?.user.name || session?.user.email || "Visitante"}
               </p>
-              {session?.user.profileSlug && isOpen && (
+              {session?.user.profileSlug && effectiveOpen && (
                  <a 
                    href={`/public/profile/${session.user.profileSlug}`}
                    target="_blank"
@@ -123,7 +129,7 @@ export function Sidebar({
             <button
               type="button"
               onClick={onToggleOpen}
-              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-line bg-white/80 text-night md:hidden"
+              className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-card-border bg-card text-foreground md:hidden"
             >
               <X size={20} />
             </button>
@@ -140,15 +146,15 @@ export function Sidebar({
                 onClick={() => onNavigate(item.id)}
                 className={`group flex w-full items-center gap-3 rounded-2xl px-3 py-3 font-bold transition-all duration-200 ${
                   activeView === item.id
-                    ? "bg-gradient-to-r from-cyan/90 to-magenta/90 text-white shadow-[0_0_20px_rgba(0,242,255,0.15)] sidebar-active-item"
-                    : "text-slate-400 hover:bg-white/10 hover:text-white"
+                    ? "bg-gradient-to-r from-cyan to-magenta text-white shadow-lg"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground bg-slate-200/80 dark:bg-slate-800/80"
                 }`}
-                title={!isOpen ? item.label : undefined}
+                title={!effectiveOpen ? item.label : undefined}
               >
-                <span className={`shrink-0 ${activeView === item.id ? 'text-black dark:text-black' : ''}`}>{item.icon}</span>
+                <span className={`shrink-0 ${activeView === item.id ? "text-white dark:text-slate-900" : "text-muted-foreground"}`}>{item.icon}</span>
                 <span
-                  className={`truncate transition-opacity duration-200 ${activeView === item.id ? 'text-black dark:text-black' : ''} ${
-                    isOpen ? "opacity-100" : "opacity-0 md:hidden"
+                  className={`truncate transition-opacity duration-200 ${activeView === item.id ? "text-white dark:text-slate-900" : "text-muted-foreground" } ${
+                    effectiveOpen ? "opacity-100" : "opacity-0 md:hidden"
                   }`}
                 >
                   {item.label}
@@ -161,15 +167,13 @@ export function Sidebar({
                 className="btn-gradient w-full py-3 rounded-2xl"
                 onClick={() => window.location.href = "/"}
               >
-                {isOpen ? "Entrar" : "In"}
+                {effectiveOpen ? "Entrar" : "In"}
               </button>
           )}
-        </nav>
-
         {/* Footer Actions */}
         <div className="space-y-4 p-4 ">
           {session && (
-            <div className={`flex items-center gap-3 ${!isOpen && 'md:justify-center'} `}>
+            <div className={`flex items-center gap-3 ${!effectiveOpen && 'md:justify-center'} `}>
                <NotificationBell
                  session={session}
                  onSession={onSession}
@@ -180,53 +184,58 @@ export function Sidebar({
                    onNavigate("proposals");
                  }}
                />
-                {isOpen && <span className="text-sm font-bold text-slate-500">Notificações</span>}
+                {effectiveOpen && <span className="text-sm font-bold text-muted-foreground">Notificações</span>}
             </div>
           )}
-
-          <button
-            type="button"
-            onClick={onToggleTheme}
-            className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 font-bold text-slate-600 transition-all duration-200 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800"
-            title={!isOpen ? (dark ? "Modo claro" : "Modo escuro") : undefined}
-          >
-            {dark ? <Sun size={20} /> : <Moon size={20} />}
-            <span
-              className={`truncate transition-opacity duration-200 ${
-                isOpen ? "opacity-100" : "opacity-0 md:hidden"
-              }`}
-            >
-              {dark ? "Modo claro" : "Modo escuro"}
-            </span>
-          </button>
 
           {session && (
             <button
               type="button"
               onClick={onLogout}
-              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 font-bold text-red-500 transition-all duration-200 hover:bg-red-50 dark:hover:bg-red-900/20"
-              title={!isOpen ? "Sair" : undefined}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 font-bold text-red-500 transition-all duration-200 hover:bg-red-500/10"
+              title={!effectiveOpen ? "Sair" : undefined}
             >
               <LogOut size={20} />
               <span
                 className={`truncate transition-opacity duration-200 ${
-                  isOpen ? "opacity-100" : "opacity-0 md:hidden"
+                  effectiveOpen ? "opacity-100" : "opacity-0 md:hidden"
                 }`}
               >
                 Sair
               </span>
             </button>
           )}
+        </div>
+        </nav>
 
+        {/* Footer Actions */}
+        <div className="space-y-4 p-4 ">
+          <button
+            type="button"
+            onClick={onToggleTheme}
+            className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 font-bold text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground"
+            title={!effectiveOpen ? (dark ? "Modo claro" : "Modo escuro") : undefined}
+          >
+            {dark ? <Sun size={20} /> : <Moon size={20} />}
+            <span
+              className={`truncate transition-opacity duration-200 ${
+                effectiveOpen ? "opacity-100" : "opacity-0 md:hidden"
+              }`}
+            >
+              {dark ? "Modo claro" : "Modo escuro"}
+            </span>
+          </button>
+          
           {/* Desktop Toggle Button */}
           <button
             type="button"
             onClick={onToggleOpen}
-            className="hidden h-10 w-full items-center justify-center rounded-xl border border-line bg-white/50 text-slate-400 transition-colors hover:text-night md:flex dark:border-slate-800 dark:bg-slate-800/50"
+            className="hidden h-10 w-full items-center justify-center rounded-xl border border-card-border bg-card/50 text-muted-foreground transition-colors hover:text-foreground md:flex"
           >
             {isOpen ? <ChevronLeft size={20} /> : <ChevronRight size={20} />}
           </button>
         </div>
+
       </aside>
     </>
   );

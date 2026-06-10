@@ -42,8 +42,8 @@ export function PublicProfilePage({ slug, session, onSelectCollection, onSelectA
     void load();
   }, [slug]);
 
-  if (loading) return <div className="p-10 text-center text-slate-500 font-bold">Carregando perfil...</div>;
-  if (error || !profile) return <div className="p-10 text-center text-red-500 font-bold">{error || "Perfil não encontrado"}</div>;
+  if (loading) return <div className="p-10 text-center text-muted-foreground font-bold">Carregando perfil...</div>;
+  if (error || !profile) return <div className="p-10 text-center text-magenta font-bold">{error || "Perfil não encontrado"}</div>;
 
   const activeCollections = tab === "selling" ? profile.collections.selling : profile.collections.viewing;
 
@@ -54,32 +54,32 @@ export function PublicProfilePage({ slug, session, onSelectCollection, onSelectA
         description={profile.bio || `Confira as coleções e leilões de Pokémon TCG de ${profile.name} no Coleciona cards.`}
       />
       <aside className="space-y-6">
-        <div className="overflow-hidden rounded-[32px] border border-line bg-white p-6 shadow-card dark:bg-black/20 dark:border-white/10">
+        <div className="overflow-hidden rounded-[32px] border border-card-border/40 bg-card/60 p-6 shadow-card">
           <div className="flex flex-col items-center text-center">
-            <div className="grid h-24 w-24 place-items-center rounded-[32px] bg-gradient-to-br from-brand to-coral font-black text-white shadow-glow text-3xl mb-4">
+            <div className="grid h-24 w-24 place-items-center rounded-[32px] bg-gradient-to-br from-brand to-magenta font-black text-white shadow-glow text-3xl mb-4">
               {profile.name.charAt(0).toUpperCase()}
             </div>
-            <h1 className="text-2xl font-black text-ink dark:text-white">{profile.name}</h1>
-            <p className="text-sm font-semibold text-slate-500 mt-1">@{profile.slug}</p>
+            <h1 className="text-2xl font-black text-foreground">{profile.name}</h1>
+            <p className="text-sm font-semibold text-muted-foreground mt-1">@{profile.slug}</p>
             
             {profile.bio && (
-              <p className="mt-4 text-sm font-medium text-slate-600 dark:text-slate-400 leading-relaxed italic">
+              <p className="mt-4 text-sm font-medium text-muted-foreground leading-relaxed italic">
                 "{profile.bio}"
               </p>
             )}
           </div>
 
-          <div className="mt-8 space-y-4 border-t border-line/50 dark:border-white/5 pt-6">
-            <div className="flex items-center gap-3 text-slate-600 dark:text-slate-400">
-              <ShoppingBag size={18} className="text-slate-400" />
+          <div className="mt-8 space-y-4 border-t border-card-border/30 pt-6">
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <ShoppingBag size={18} className="text-muted-foreground/60" />
               <span className="text-sm font-bold">{profile.collections.selling.length} Lojas</span>
             </div>
-            <div className="flex items-center gap-3 text-slate-600 dark:text-slate-400">
-              <FolderOpen size={18} className="text-slate-400" />
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <FolderOpen size={18} className="text-muted-foreground/60" />
               <span className="text-sm font-bold">{profile.collections.viewing.length} Pastas</span>
             </div>
-            <div className="flex items-center gap-3 text-slate-600 dark:text-slate-400">
-              <Gavel size={18} className="text-slate-400" />
+            <div className="flex items-center gap-3 text-muted-foreground">
+              <Gavel size={18} className="text-muted-foreground/60" />
               <span className="text-sm font-bold">{profile.auctions.length} Leilões</span>
             </div>
           </div>
@@ -149,13 +149,13 @@ function TabButton({ active, onClick, label, count, icon }: { active: boolean, o
       onClick={onClick}
       className={`flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-black transition-all whitespace-nowrap ${
         active 
-          ? "bg-ink dark:bg-slate-300 text-white dark:text-ink shadow-lg" 
-          : "bg-white text-slate-500 hover:bg-field border border-line dark:bg-black/20 dark:text-slate-400 dark:border-white/10"
+          ? "bg-foreground text-background shadow-lg" 
+          : "bg-card text-muted-foreground hover:bg-accent border border-card-border/40"
       }`}
     >
       {icon}
       {label}
-      <span className={`ml-1 rounded-lg px-1.5 py-0.5 text-[10px] ${active ? "bg-white/90 dark:bg-black/20 text-black dark:text-white " : "bg-slate-400 dark:bg-white/10"}`}>
+      <span className={`ml-1 rounded-lg px-1.5 py-0.5 text-[10px] ${active ? "bg-background/90 text-foreground" : "bg-muted text-muted-foreground"}`}>
         {count}
       </span>
     </button>
@@ -168,33 +168,33 @@ function CollectionFolderCard({ folder, onClick }: { folder: any, onClick: () =>
   return (
     <button
       onClick={onClick}
-      className="group flex flex-col text-left overflow-hidden rounded-[26px] border border-line/70 bg-white transition-all hover:border-brand hover:shadow-xl dark:bg-black/20 dark:border-white/10 dark:hover:border-brand"
+      className="group flex flex-col text-left overflow-hidden rounded-[26px] border border-card-border/40 bg-card transition-all hover:border-brand hover:shadow-xl"
     >
       <div className="flex flex-1 items-center gap-4 p-5">
         {previewItems.length > 0 ? (
-          <div className="grid grid-cols-2 grid-rows-2 h-16 w-14 shrink-0 gap-0.5 overflow-hidden rounded-xl border border-line/30 bg-field dark:bg-white/5">
+          <div className="grid grid-cols-2 grid-rows-2 h-16 w-14 shrink-0 gap-0.5 overflow-hidden rounded-xl border border-card-border/20 bg-muted">
             {previewItems.slice(0, 4).map((item: any) => (
-              <div key={item.id} className="relative overflow-hidden bg-slate-100 dark:bg-white/5">
+              <div key={item.id} className="relative overflow-hidden bg-accent/20">
                 <img src={item.card.imageSmall} className="h-full w-full object-cover" alt="" />
-                <div className="absolute bottom-0.5 right-0.5 rounded-md bg-white px-1 py-0.5 text-[7px] font-black text-ink shadow-[0_2px_4px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
+                <div className="absolute bottom-0.5 right-0.5 rounded-md bg-card px-1 py-0.5 text-[7px] font-black text-foreground shadow-[0_2px_4px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
                   {formatCardNumber(item.card.number, item.card.printedTotal)}
                 </div>
               </div>
             ))}
             {previewItems.length < 4 && 
               Array.from({ length: 4 - previewItems.length }).map((_, i) => (
-                <div key={`empty-${i}`} className="bg-slate-50 dark:bg-white/5" />
+                <div key={`empty-${i}`} className="bg-muted" />
               ))
             }
           </div>
         ) : (
-          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-field text-slate-400 group-hover:bg-brand/10 group-hover:text-brand transition-colors dark:bg-white/5">
+          <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-muted text-muted-foreground group-hover:bg-brand/10 group-hover:text-brand transition-colors">
             <FolderOpen size={24} />
           </div>
         )}
         <div className="min-w-0 flex-1">
-          <h3 className="truncate font-black text-ink dark:text-white">{folder.name}</h3>
-          <p className="text-xs font-bold text-slate-500 mt-0.5">
+          <h3 className="truncate font-black text-foreground">{folder.name}</h3>
+          <p className="text-xs font-bold text-muted-foreground mt-0.5">
             {folder.itemCount} cartas • {formatBrl(folder.totalValue)}
           </p>
         </div>
@@ -207,25 +207,25 @@ function AuctionCard({ auction, onClick }: { auction: any, onClick: () => void }
   return (
     <button
       onClick={onClick}
-      className="group flex flex-col text-left overflow-hidden rounded-[26px] border border-line/70 bg-white transition-all hover:border-amber-400 hover:shadow-xl dark:bg-black/20 dark:border-white/10 dark:hover:border-amber-400"
+      className="group flex flex-col text-left overflow-hidden rounded-[26px] border border-card-border/40 bg-card transition-all hover:border-amber hover:shadow-xl"
     >
       <div className="flex flex-1 items-center gap-4 p-5">
-        <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-lg bg-field dark:bg-white/5">
+        <div className="relative h-16 w-12 shrink-0 overflow-hidden rounded-lg bg-muted">
           {auction.card.imageSmall && (
             <img src={auction.card.imageSmall} className="h-full w-full object-cover" alt="" />
           )}
         </div>
         <div className="min-w-0 flex-1">
-          <h3 className="truncate font-black text-ink dark:text-white">{auction.card.name}</h3>
+          <h3 className="truncate font-black text-foreground">{auction.card.name}</h3>
           <div className="mt-1 flex items-center gap-2">
-            <span className="text-xs font-black text-amber-600 dark:text-amber-400">
+            <span className="text-xs font-black text-amber">
               {auction.currentBid ? formatBrl(auction.currentBid) : formatBrl(auction.minBid)}
             </span>
-            <span className="text-[10px] font-bold text-slate-400">
+            <span className="text-[10px] font-bold text-muted-foreground">
                • {auction.bidCount} lances
             </span>
           </div>
-          <p className="text-[10px] font-bold text-red-500 mt-1 uppercase tracking-wider">
+          <p className="text-[10px] font-bold text-magenta mt-1 uppercase tracking-wider">
             Encerrando {new Date(auction.endsAt).toLocaleDateString()}
           </p>
         </div>
@@ -237,10 +237,10 @@ function AuctionCard({ auction, onClick }: { auction: any, onClick: () => void }
 function EmptyState({ message }: { message: string }) {
   return (
     <div className="col-span-full py-20 text-center">
-      <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-field text-slate-300 mb-4">
+      <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-muted text-muted-foreground mb-4">
         <Search size={32} />
       </div>
-      <p className="text-sm font-bold text-slate-400">{message}</p>
+      <p className="text-sm font-bold text-muted-foreground">{message}</p>
     </div>
   );
 }

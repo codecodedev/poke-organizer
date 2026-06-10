@@ -68,8 +68,22 @@ export function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [theme, setTheme] = useState<ThemeMode>(() => loadTheme());
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [blockedNavigationAt, setBlockedNavigationAt] = useState(0);
 
   const view = route.view;
+
+  // Navigation Guard for Browser navigation (tab close, external link)
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = "";
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
 
   const handleSession = useCallback((nextSession: Session) => {
     saveSession(nextSession);
@@ -136,6 +150,18 @@ export function App() {
   }
 
   function navigate(nextRoute: AppRoute) {
+    if (hasUnsavedChanges && !window.confirm("Você tem alterações não salvas. Deseja mesmo sair sem salvar?")) {
+      setBlockedNavigationAt(Date.now());
+      return;
+    }
+    
+    // Safety check for undefined routes
+    if (nextRoute.auction === "undefined" || nextRoute.publicCollection === "undefined") {
+       console.error("Navigation error: route parameter is undefined", nextRoute);
+       return;
+    }
+
+    setHasUnsavedChanges(false);
     setRoute(nextRoute);
     setSidebarOpen(false);
     window.history.pushState(null, "", routeToUrl(nextRoute));
@@ -175,18 +201,19 @@ export function App() {
 
         <div className={`flex flex-1 flex-col transition-all duration-300 ${session ? (sidebarOpen ? "md:ml-[280px]" : "md:ml-20") : ""}`}>
           {(session || isPublicView) && (
-            <header className={`sticky top-0 z-20 flex h-20 items-center border-b border-white/5 bg-white/5 px-5 backdrop-blur-xl dark:bg-black/20 ${session ? 'md:hidden' : ''}`}>
+            <header className={`sticky top-0 z-20 flex h-20 items-center justify-between jus border-b border-white/5 bg-white/5 px-5 backdrop-blur-xl dark:bg-black/20 ${session ? 'md:hidden' : ''}`}>
               {/* Left: Sidebar Toggle (Mobile only) */}
-              <div className="flex w-1/4 items-center justify-start md:hidden">
-                {session && (
-                  <button
-                    type="button"
-                    onClick={() => setSidebarOpen(true)}
-                    className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 text-night shadow-sm"
-                  >
-                    <Menu size={22} />
-                  </button>
-                )}
+              <div className={`flex items-center justify-start md:hidden ${session ? '' : 'hidden'}`}>
+                <button
+                  type="button"
+                  onClick={() => setSidebarOpen(true)}
+                  className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 dark:bg-night text-night dark:text-white shadow-sm"
+                >
+                  <Menu size={22} />
+                </button>
+              </div>
+              <div className={`flex items-center justify-end ${session ? 'hidden' : ''}`}>
+                <ThemeToggle theme={theme} onToggle={toggleTheme} />
               </div>
 
               {/* Center: Logo */}
@@ -196,16 +223,19 @@ export function App() {
                   alt="Logo" 
                   className="h-8 w-8 sm:h-10 sm:w-10 object-contain scale-[2.5]"
                 />
-                <span className="text-lg sm:text-xl font-black text-ink dark:text-white">coleciona<span className="gradient-text">.cards</span></span>
+                <span className="text-lg hidden sm:flex sm:text-xl font-black text-ink dark:text-white">coleciona<span className="gradient-text">.cards</span></span>
+              </div>
+
+              <div className={`flex items-center justify-end ${session ? '' : 'hidden'}`}>
+                <ThemeToggle theme={theme} onToggle={toggleTheme} />
               </div>
 
               {/* Right: Actions */}
-              <div className="flex w-1/4 items-center justify-end gap-2 sm:gap-3">
-                <ThemeToggle theme={theme} onToggle={toggleTheme} />
+              <div className="flex items-center justify-end">
                 {!session && (
                   <Button
                     variant="brand"
-                    className="hidden sm:flex"
+                    className="h-9 px-4 text-xs sm:h-11 sm:px-5 sm:text-sm"
                     onClick={() => navigate({ view: "home" })}
                   >
                     Entrar
@@ -270,7 +300,7 @@ export function App() {
 
             {route.auction && (
               <AuctionPage
-                idOrToken={route.auction}
+                shareToken={route.auction}
                 session={session}
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
@@ -332,6 +362,8 @@ export function App() {
                 onCollectionRouteChange={(collection) =>
                   navigate({ view: "collections", collection })
                 }
+                onUnsavedChanges={setHasUnsavedChanges}
+                blockedNavigationAt={blockedNavigationAt}
               />
             )}
 
@@ -369,6 +401,8 @@ export function App() {
                 onUnauthorized={handleUnauthorized}
                 onBack={() => navigate({ view: "home" })}
                 initialTab="proposals"
+                onUnsavedChanges={setHasUnsavedChanges}
+                blockedNavigationAt={blockedNavigationAt}
               />
             )}
 
@@ -379,6 +413,8 @@ export function App() {
                 onUnauthorized={handleUnauthorized}
                 onBack={() => navigate({ view: "home" })}
                 initialTab="settings"
+                onUnsavedChanges={setHasUnsavedChanges}
+                blockedNavigationAt={blockedNavigationAt}
               />
             )}
 
@@ -431,7 +467,7 @@ function HeroPanel({
             type="button"
             variant="brand"
             icon={<Sparkles size={18} />}
-            className="w-full"
+            className="w-full text-white dark:text-slate-900"
             onClick={() => navigate({ view: "cards" })}
           >
             Cadastrar cartas
@@ -602,7 +638,7 @@ function HomeView({
         onAdded={onAdded}
       />
 
-      <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid pb-16 gap-6 lg:grid-cols-[1fr_320px]">
         <div className="flex flex-col gap-6">
           <div className="glass-panel p-5">
             <div className="mb-5 flex items-center justify-between">
@@ -611,7 +647,7 @@ function HomeView({
                   <Flame size={18} />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-lg">Leilões em destaque</h3>
+                  <h3 className="font-bold text-ink dark:text-white text-lg">Leilões em destaque</h3>
                   <p className="text-xs text-slate-400">Participe dos leilões ativos da comunidade.</p>
                 </div>
               </div>
@@ -666,7 +702,7 @@ function HomeView({
                 <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
                   <ShoppingBag size={18} />
                 </div>
-                <h3 className="font-bold text-white">Suas propostas</h3>
+                <h3 className="font-bold text-ink dark:text-white">Suas propostas</h3>
               </div>
               {!summary?.recentProposals?.length && !loading ? (
                 <p className="py-4 text-center text-slate-400 text-sm italic">Nenhuma proposta enviada ainda.</p>

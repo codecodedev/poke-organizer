@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, X } from "lucide-react";
 import { formatCardNumber, type CardSummary } from "@poke-organizer/shared";
 import { api, type Session } from "../lib/api";
 import { withAuthRetry } from "../lib/authRetry";
@@ -100,18 +100,40 @@ export function CardSearch({ session, onSession, onUnauthorized, onAdded, title 
   return (
     <Panel title={title ?? "Buscar cartas"} description="Digite nome, numero ou combine os dois para encontrar sua carta.">
       <form onSubmit={search} className="grid gap-3 sm:grid-cols-[1fr_140px_auto]">
-        <input
-          className="premium-input"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Nome da carta, opcional"
-        />
-        <input
-          className="premium-input"
-          value={number}
-          onChange={(event) => setNumber(event.target.value)}
-          placeholder="150/217"
-        />
+        <div className="relative">
+          <input
+            className="premium-input w-full pr-10"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Nome da carta, opcional"
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
+        <div className="relative">
+          <input
+            className="premium-input w-full pr-10"
+            value={number}
+            onChange={(event) => setNumber(event.target.value)}
+            placeholder="150/217"
+          />
+          {number && (
+            <button
+              type="button"
+              onClick={() => setNumber("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X size={16} />
+            </button>
+          )}
+        </div>
         <Button type="submit" variant="primary" icon={<Search size={18} />}>
           {loading ? "Buscando" : "Buscar"}
         </Button>
@@ -121,7 +143,7 @@ export function CardSearch({ session, onSession, onUnauthorized, onAdded, title 
       {addFeedback && <p className="success-note mt-3">{addFeedback}</p>}
 
       {hasSearchInput && !error && (
-        <div className="mt-3 rounded-2xl border border-line/80 bg-white/60 px-4 py-3 text-sm font-semibold text-slate-600">
+        <div className="mt-3 rounded-2xl border border-card-border/40 bg-card/60 px-4 py-3 text-sm font-semibold text-muted-foreground">
           {loading
             ? "Buscando sugestoes..."
             : cards.length > 0
@@ -149,8 +171,8 @@ export function CardSearch({ session, onSession, onUnauthorized, onAdded, title 
               {card.imageSmall && <img className="h-full w-full object-cover transition duration-300 hover:scale-105" src={card.imageSmall} alt={card.name} />}
             </div>
             <div className="min-w-0">
-              <h3 className="truncate text-base font-black text-ink">{card.name}</h3>
-              <p className="mt-1 text-sm font-semibold text-slate-600">
+              <h3 className="truncate text-base font-black text-foreground">{card.name}</h3>
+              <p className="mt-1 text-sm font-semibold text-muted-foreground">
                 {formatCardNumber(card.number, card.printedTotal)}
                 {card.setName ? ` - ${card.setName}` : ""}
               </p>
@@ -160,7 +182,7 @@ export function CardSearch({ session, onSession, onUnauthorized, onAdded, title 
                   event.stopPropagation();
                   setSelectedCard(card);
                 }}
-                className="mt-3 inline-flex items-center gap-2 rounded-full border border-line bg-white/80 px-3 py-1.5 text-sm font-black text-ink transition hover:-translate-y-0.5 hover:border-brand/40"
+                className="mt-3 inline-flex items-center gap-2 rounded-full border border-card-border bg-card/80 px-3 py-1.5 text-sm font-black text-foreground transition hover:-translate-y-0.5 hover:border-brand/40"
               >
                 <Plus size={16} />
                 Adicionar

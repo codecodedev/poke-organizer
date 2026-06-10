@@ -69,8 +69,8 @@ export function CollectionItemCard({
       title={`${item.card.name} - ${formatBrl(displayPrice)}`}
       className={`collection-item-card collection-item-card--${kind} group relative cursor-pointer rounded-[24px] border p-2 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-cyan/5 ${
         selected
-          ? "border-cyan/50 bg-cyan/10 shadow-[0_0_20px_rgba(0,242,255,0.1)]"
-          : "border-white/5 bg-white/5 backdrop-blur-md"
+          ? "border-cyan/50 bg-cyan/10 shadow-[0_0_20px_rgba(var(--color-cyan)/0.1)]"
+          : "border-slate-800/20 dark:border-slate-600 bg-card/40 backdrop-blur-md"
       } ${isSold ? "opacity-90" : ""}`}
     >
       {onToggleSelection && (
@@ -80,7 +80,7 @@ export function CollectionItemCard({
             event.stopPropagation();
             onToggleSelection(item.id);
           }}
-          className="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-2xl border border-white/10 bg-black/40 text-slate-300 shadow-sm backdrop-blur transition hover:border-cyan/40 hover:text-white"
+          className="absolute right-3 top-3 z-20 grid h-9 w-9 place-items-center rounded-2xl border border-card-border bg-card/80 text-muted-foreground shadow-sm backdrop-blur transition hover:border-cyan/40 hover:text-foreground"
           aria-label={
             selected
               ? "Remover da atualizacao de valores"
@@ -93,7 +93,7 @@ export function CollectionItemCard({
 
       {item.quantity > 1 && (
         <span
-          className={`absolute right-4 z-30 rounded-full border border-white/10 bg-black/60 px-2.5 py-1 text-xs font-black text-white shadow-sm backdrop-blur ${onToggleSelection ? "top-14" : "top-4"}`}
+          className={`absolute right-4 z-30 rounded-full border border-card-border/50 bg-card/90 px-2.5 py-1 text-xs font-black text-foreground shadow-sm backdrop-blur ${onToggleSelection ? "top-14" : "top-4"}`}
         >
           x{item.quantity}
         </span>
@@ -102,7 +102,7 @@ export function CollectionItemCard({
       <div className={`absolute z-30 flex flex-col gap-2 left-5 top-5`}>
         {item.variant !== "normal" && (
           <span
-            className="grid h-7 sm:h-8 w-7 sm:w-8 place-items-center rounded-xl border border-white/10 bg-black/40 text-sm shadow-sm backdrop-blur text-butter"
+            className="grid h-7 sm:h-8 w-7 sm:w-8 place-items-center rounded-xl border border-card-border/50 bg-card/80 text-sm shadow-sm backdrop-blur text-amber"
             title={`Variante: ${item.variant}`}
           >
             <Sparkles size={16} fill="currentColor" />
@@ -112,7 +112,7 @@ export function CollectionItemCard({
 
       <div className={`absolute z-30 flex flex-col gap-2 ${item.variant === "normal"? "left-4 top-4":"left-5 top-14"}`}>
         <span
-          className="grid h-7 sm:h-8 w-7 sm:w-8 place-items-center rounded-xl border border-white/10 bg-black/40 text-lg shadow-sm backdrop-blur"
+          className="grid h-7 sm:h-8 w-7 sm:w-8 place-items-center rounded-xl border border-card-border/50 bg-card/80 text-lg shadow-sm backdrop-blur"
           title={`Idioma: ${item.language}`}
         >
           {getLanguageFlag(item.language)}
@@ -128,9 +128,17 @@ export function CollectionItemCard({
           className="aspect-[5/7] rounded-[20px] shadow-lg"
           imageClassName={`object-cover transition duration-300 group-hover:scale-[1.03] ${isSold ? "grayscale-[0.4]" : ""}`}
         />
+        <div className={`absolute z-30 flex flex-col gap-2 bottom-2 left-2`}>
+          <span
+            className="grid h-7 px-2 place-items-center rounded-xl border border-card-border/50 bg-card/80 text-xs shadow-sm backdrop-blur"
+            title={`Numero: ${item.card.number}/${item.card.printedTotal}`}
+          >
+            {item.card.number}/{item.card.printedTotal}
+          </span>
+        </div>
         {isSold && (
-          <div className="absolute inset-0 z-10 grid place-items-center rounded-[20px] bg-black/40 backdrop-blur-[1px]">
-            <span className="rounded-full bg-white/10 border border-white/20 px-4 py-2 text-xs font-black uppercase tracking-widest text-white shadow-xl">
+          <div className="absolute inset-0 z-10 grid place-items-center rounded-[20px] bg-background/60 backdrop-blur-[1px]">
+            <span className="rounded-full bg-card/90 border border-card-border/50 px-4 py-2 text-xs font-black uppercase tracking-widest text-foreground shadow-xl">
               Vendido
             </span>
           </div>
@@ -143,7 +151,7 @@ export function CollectionItemCard({
                 event.stopPropagation();
                 onRemove(item);
               }}
-              className="grid h-9 w-9 place-items-center rounded-2xl border border-rose-500/20 bg-black/60 text-rose-500 shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:bg-rose-500/20"
+              className="grid h-9 w-9 place-items-center rounded-2xl border border-magenta/20 bg-white/80 text-magenta shadow-xl backdrop-blur transition hover:-translate-y-0.5 hover:bg-magenta/20"
               aria-label={removeLabel}
             >
               <Trash2 size={16} />
@@ -156,9 +164,9 @@ export function CollectionItemCard({
         <div className="flex min-w-0 flex-wrap items-center gap-1.5">
           {onPriceChange && !isSold ? (
             <div className="flex flex-1 items-center" onClick={(e) => e.stopPropagation()}>
-              <span className="text-sm font-black text-slate-500 mr-1">R$</span>
+              <span className="text-sm font-black text-muted-foreground mr-1">R$</span>
               <input
-                className="w-full bg-white/5 border border-white/10 p-1.5 pl-3 rounded-xl text-sm font-black text-white outline-none focus:ring-1 focus:ring-cyan/50 transition"
+                className="w-full bg-input border border-card-border/50 p-1.5 pl-3 rounded-xl text-sm font-black text-foreground outline-none focus:ring-1 focus:ring-cyan/50 transition"
                 type="number"
                 min={0}
                 step="0.01"
@@ -170,13 +178,13 @@ export function CollectionItemCard({
               />
             </div>
           ) : (
-            <p className={`truncate text-sm font-black ${isSold ? "text-emerald-800" : "text-slate-500"}`}>
+            <p className={`truncate text-sm font-black ${isSold ? "text-leaf" : "text-foreground"}`}>
               {formatBrl(displayPrice)}
             </p>
           )}
 
           {isSold && typeof manualPrice === "number" && manualPrice > 0 && manualPrice !== soldPrice && (
-            <p className="text-[10px] font-bold text-slate-500 line-through">
+            <p className="text-[10px] font-bold text-muted-foreground line-through">
               {formatBrl(manualPrice)}
             </p>
           )}
@@ -185,8 +193,8 @@ export function CollectionItemCard({
             <span
               className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-black ${
                 latestChange > 0
-                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
-                  : "border-rose-500/20 bg-rose-500/10 text-rose-400"
+                  ? "border-leaf/30 bg-leaf/10 text-leaf"
+                  : "border-magenta/30 bg-magenta/10 text-magenta"
               }`}
               title={latestChange > 0 ? "Valor subiu" : "Valor caiu"}
             >
@@ -200,11 +208,17 @@ export function CollectionItemCard({
           )}
         </div>
         <div className="flex items-center justify-between gap-2 overflow-auto">
-          <p className="truncate text-xs font-semibold text-slate-400">
-            {item.card.name}
-          </p>
+          <div className="flex flex-row gap-1 truncate items-center text-muted-foreground justify-center">
+            <p className="truncate text-xs font-semibold">
+              {item.card.name}
+            </p>
+            -
+            <p title={item.card.setCode??item.card.setName??'sem codigo cadastrado'} className="truncate text-xs font-semibold">
+              {item.card.setCode??item.card.setName}
+            </p>
+          </div>
           {isSold && (
-            <span className="shrink-0 text-[10px] font-black uppercase text-slate-500">
+            <span className="shrink-0 text-[10px] font-black uppercase text-muted-foreground">
               Negociada
             </span>
           )}
@@ -212,7 +226,7 @@ export function CollectionItemCard({
       </div>
 
       {children && (
-        <div className="mt-1 border-t border-white/5 pt-2" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-1 border-t border-card-border/30 pt-2" onClick={(e) => e.stopPropagation()}>
           {children}
         </div>
       )}

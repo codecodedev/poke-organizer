@@ -35,28 +35,28 @@ export function RequestPasswordResetPanel({ onBack, theme = "dark" }: Props) {
         <button
           type="button"
           onClick={onBack}
-          className="mb-6 flex items-center gap-2 text-sm font-semibold text-slate-400 hover:text-white transition"
+          className="mb-6 flex items-center gap-2 text-sm font-semibold text-muted-foreground/60 hover:text-foreground transition"
         >
           <ArrowLeft size={16} />
           Voltar para o login
         </button>
 
-        <h2 className="mb-2 text-2xl font-black text-white">Recuperar senha</h2>
-        <p className="mb-8 text-sm text-slate-400">
+        <h2 className="mb-2 text-2xl font-black text-foreground">Recuperar senha</h2>
+        <p className="mb-8 text-sm text-muted-foreground/60">
           Informe seu e-mail e enviaremos um link para você definir uma nova senha.
         </p>
 
         {success ? (
           <div className="rounded-xl border border-leaf/20 bg-leaf/10 px-4 py-6 text-center">
             <p className="font-semibold text-leaf mb-4">E-mail enviado!</p>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-muted-foreground/60">
               Se houver uma conta associada a este e-mail, você receberá as instruções em instantes.
             </p>
           </div>
         ) : (
           <>
             <div className="mb-6">
-              <label className="mb-2 block text-sm font-bold text-slate-300">Email</label>
+              <label className="mb-2 block text-sm font-bold text-foreground/80">Email</label>
               <input
                 className="input-dark w-full"
                 value={email}
