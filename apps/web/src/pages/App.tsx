@@ -3,11 +3,13 @@ import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import {
   BarChart3,
+  ChevronRight,
   Eye,
   Flame,
   FolderOpen,
   Gavel,
   Home,
+  Layers3,
   LibraryBig,
   LogOut,
   Menu,
@@ -28,6 +30,8 @@ import { DecksPage } from "../components/decks/DecksPage";
 import { PublicCollectionPage } from "../components/collections/PublicCollectionPage";
 import { PublicProfilePage } from "../components/PublicProfilePage";
 import { AuctionPage } from "../components/AuctionPage";
+import { ExpansionsPage } from "../components/ExpansionsPage";
+import { ExpansionDetailPage } from "../components/ExpansionDetailPage";
 import { api, HttpError, type Session } from "../lib/api";
 import { clearSession, loadSession, saveSession } from "../lib/session";
 import { AuthPanel } from "../components/AuthPanel";
@@ -49,7 +53,7 @@ import { RequestPasswordResetPanel } from "../components/RequestPasswordResetPan
 import { ResetPasswordPanel } from "../components/ResetPasswordPanel";
 import { ConfirmEmailPanel } from "../components/ConfirmEmailPanel";
 
-type View = "home" | "cards" | "collections" | "decks" | "buy" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email";
+type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "expansion-detail" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email";
 type ThemeMode = "light" | "dark";
 export type AppRoute = {
   view: View;
@@ -59,6 +63,7 @@ export type AppRoute = {
   collection?: string | null;
   card?: string | null;
   token?: string | null;
+  setId?: string | null;
 };
 
 export function App() {
@@ -384,6 +389,21 @@ export function App() {
               />
             )}
 
+            {!isPublicView && view === "expansions" && session && (
+              <ExpansionsPage
+                session={session}
+                onSelectSet={(id) => navigate({ view: "expansion-detail", setId: id })}
+              />
+            )}
+
+            {!isPublicView && view === "expansion-detail" && session && route.setId && (
+              <ExpansionDetailPage
+                setId={route.setId}
+                session={session}
+                onBack={() => navigate({ view: "expansions" })}
+              />
+            )}
+
             {!isPublicView && view === "my-auctions" && session && (
               <MyAuctionsPage
                 session={session}
@@ -522,7 +542,7 @@ function parseRoute(): AppRoute {
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
   const view: View =
-    (page === "cards" || page === "collections" || page === "decks" || page === "buy" || page === "proposals" || page === "profile" || page === "my-auctions" || page === "orders" || page === "request-password-reset")
+    (page === "cards" || page === "collections" || page === "decks" || page === "buy" || page === "expansions" || page === "expansion-detail" || page === "proposals" || page === "profile" || page === "my-auctions" || page === "orders" || page === "request-password-reset")
       ? page as View
       : (path.slice(1) || "home") as View;
 
@@ -534,6 +554,7 @@ function parseRoute(): AppRoute {
     collection: (view === "collections" || view === "profile" || view === "proposals") ? params.get("collection") : null,
     card: params.get("card"),
     token: search.get("token"),
+    setId: params.get("setId"),
   };
 }
 
@@ -562,6 +583,10 @@ function routeToUrl(route: AppRoute): string {
 
   if ((route.view === "collections" || route.view === "profile" || route.view === "proposals") && route.collection) {
     params.set("collection", route.collection);
+  }
+
+  if (route.view === "expansion-detail" && route.setId) {
+    params.set("setId", route.setId);
   }
 
   if (route.card) {
@@ -629,7 +654,7 @@ function HomeView({
   }, [session.accessToken, onUnauthorized, refreshKey]);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-6 pb-20">
       <HeroPanel
         navigate={navigate}
         session={session}
@@ -639,6 +664,122 @@ function HomeView({
       />
 
       <div className="grid pb-16 gap-6 lg:grid-cols-[1fr_320px]">
+
+        <div className="flex flex-col gap-6">
+          <div className="glass-panel overflow-hidden p-5">
+            <div className="mb-5 flex items-center gap-2">
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
+                <TrendingUp size={18} />
+              </div>
+              <h3 className="font-bold text-ink dark:text-white">Coleções em alta</h3>
+            </div>
+            
+            <div className="flex flex-col gap-4">
+              {summary?.ranking?.map((folder, index) => (
+                <button
+                  key={folder.id}
+                  onClick={() => navigate({ view: "home", publicCollection: folder.shareToken })}
+                  className="group flex flex-col gap-2 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 dark:bg-white/5 text-[10px] font-black text-slate-500 group-hover:bg-cyan group-hover:text-white dark:group-hover:text-black transition-colors">
+                      #{index + 1}
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-bold text-ink dark:text-white text-sm group-hover:text-cyan transition-colors">
+                          {folder.name}
+                        </p>
+                        {folder.isStore ? (
+                          <span className="shrink-0 flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+                            <ShoppingBag size={10} />
+                          </span>
+                        ) : (
+                          <span className="shrink-0 flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                            <LibraryBig size={10} />
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                        <span className="flex items-center gap-1 font-black text-slate-400 uppercase tracking-tighter">
+                          {folder.userName || "Usuário"}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Eye size={12} /> {folder.viewCount}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <LibraryBig size={12} /> {folder.itemCount} cartas
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-1 w-full rounded-full bg-white/5 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-cyan to-magenta" 
+                      style={{ width: `${Math.min(100, (folder.viewCount / (summary?.ranking?.[0]?.viewCount || 1)) * 100)}%` }} 
+                    />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {summary?.expansionProgress && summary.expansionProgress.length > 0 && (
+            <div className="glass-panel overflow-hidden p-5">
+              <div className="mb-5 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/10 text-indigo-500">
+                    <Layers3 size={18} />
+                  </div>
+                  <h3 className="font-bold text-ink dark:text-white">Expansões</h3>
+                </div>
+                <button 
+                  onClick={() => navigate({ view: "expansions" })}
+                  className="text-[10px] font-black uppercase tracking-widest text-brand hover:underline flex items-center gap-1"
+                >
+                  Ver Todos <ChevronRight size={12} />
+                </button>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {summary.expansionProgress.map((set) => (
+                  <button
+                    key={set.id}
+                    onClick={() => navigate({ view: "expansion-detail", setId: set.id })}
+                    className="group flex flex-col gap-2 text-left"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-200 dark:bg-white/5 p-1 flex items-center justify-center">
+                        {set.logoUrl ? (
+                          <img src={set.logoUrl} className="max-h-full max-w-full object-contain" alt="" />
+                        ) : (
+                          <div className="text-[10px] font-black text-slate-400 uppercase">{set.id}</div>
+                        )}
+                      </div>
+                      <div className="flex-1 overflow-hidden">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="truncate font-bold text-ink dark:text-white text-sm group-hover:text-indigo-400 transition-colors">
+                            {set.name}
+                          </p>
+                          <span className="shrink-0 text-[10px] font-black text-slate-500">
+                            {set.owned}/{set.total}
+                          </span>
+                        </div>
+                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/5">
+                          <div 
+                            className="h-full bg-indigo-500 transition-all duration-1000" 
+                            style={{ width: `${set.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
         <div className="flex flex-col gap-6">
           <div className="glass-panel p-5">
             <div className="mb-5 flex items-center justify-between">
@@ -726,66 +867,7 @@ function HomeView({
             </div>
           </div>
         </div>
-
-        <div className="flex flex-col gap-6">
-          <div className="glass-panel overflow-hidden p-5">
-            <div className="mb-5 flex items-center gap-2">
-              <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
-                <TrendingUp size={18} />
-              </div>
-              <h3 className="font-bold text-ink dark:text-white">Coleções em alta</h3>
-            </div>
-            
-            <div className="flex flex-col gap-4">
-              {summary?.ranking?.map((folder, index) => (
-                <button
-                  key={folder.id}
-                  onClick={() => navigate({ view: "home", publicCollection: folder.shareToken })}
-                  className="group flex flex-col gap-2 text-left"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 dark:bg-white/5 text-[10px] font-black text-slate-500 group-hover:bg-cyan group-hover:text-white dark:group-hover:text-black transition-colors">
-                      #{index + 1}
-                    </div>
-                    <div className="flex-1 overflow-hidden">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate font-bold text-ink dark:text-white text-sm group-hover:text-cyan transition-colors">
-                          {folder.name}
-                        </p>
-                        {folder.isStore ? (
-                          <span className="shrink-0 flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                            <ShoppingBag size={10} /> Loja
-                          </span>
-                        ) : (
-                          <span className="shrink-0 flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                            <LibraryBig size={10} /> Vitrine
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                        <span className="flex items-center gap-1 font-black text-slate-400 uppercase tracking-tighter">
-                          {folder.userName || "Usuário"}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Eye size={12} /> {folder.viewCount}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <LibraryBig size={12} /> {folder.itemCount} cartas
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="h-1 w-full rounded-full bg-white/5 overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-cyan to-magenta" 
-                      style={{ width: `${Math.min(100, (folder.viewCount / (summary?.ranking?.[0]?.viewCount || 1)) * 100)}%` }} 
-                    />
-                  </div>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        
       </div>
     </div>
   );

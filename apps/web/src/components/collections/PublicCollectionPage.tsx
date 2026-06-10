@@ -257,7 +257,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
       {collection && (
         <SEO 
           title={collection.name} 
-          description={collection.description || `Confira a coleção "${collection.name}" de ${collection.ownerName} no Coleciona cards. Veja cartas, valores e envie propostas.`}
+          description={`Confira a coleção "${collection.name}" de ${collection.ownerName} no Coleciona cards. Veja cartas, valores e envie propostas.`}
           image={collection.bannerUrl || undefined}
           url={`/p/${shareToken}`}
         />

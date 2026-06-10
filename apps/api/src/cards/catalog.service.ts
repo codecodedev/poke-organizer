@@ -13,7 +13,7 @@ import {
 } from "@poke-organizer/shared";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { normalizeCardNameForDb, toCardSummary, toPrismaLanguage } from "../common/mappers";
+import { fromPrismaLanguage, normalizeCardNameForDb, toCardSummary, toPrismaLanguage } from "../common/mappers";
 import { SearchCardsDto } from "./dto";
 
 type PokemonTcgCard = {
@@ -49,9 +49,11 @@ type PokemonTcgSet = {
   id: string;
   ptcgoCode?: string;
   name: string;
+  series?: string;
   printedTotal?: number;
   total?: number;
   releaseDate?: string;
+  images?: { symbol?: string; logo?: string };
 };
 
 @Injectable()
@@ -81,7 +83,7 @@ export class CatalogService {
     return toCardSummary(card);
   }
 
-  async listSets(): Promise<CardSetSummary[]> {
+  async listSets(userId?: string): Promise<CardSetSummary[]> {
     const localSets = await this.listLocalSets();
     const url = new URL("https://api.pokemontcg.io/v2/sets");
     url.searchParams.set("orderBy", "-releaseDate");
@@ -92,6 +94,7 @@ export class CatalogService {
         : {}
     });
 
+    let sets: CardSetSummary[] = [];
     if (response.ok) {
       const payload = (await response.json()) as { data?: PokemonTcgSet[] };
       const remoteSets = (payload.data ?? [])
@@ -100,14 +103,100 @@ export class CatalogService {
           id: set.id,
           code: set.ptcgoCode ?? null,
           name: set.name,
+          series: set.series ?? null,
           printedTotal: set.printedTotal,
           total: set.total ?? null,
-          releaseDate: set.releaseDate ?? null
+          releaseDate: set.releaseDate ?? null,
+          logoUrl: set.images?.logo ?? null,
+          symbolUrl: set.images?.symbol ?? null
         }));
-      return mergeCardSets(localSets, remoteSets);
+      sets = mergeCardSets(localSets, remoteSets);
+    } else {
+      sets = localSets;
     }
 
-    return localSets;
+    if (userId) {
+      const ownedPerSet = await this.prisma.collectionItem.groupBy({
+        by: ["cardId"],
+        where: { userId }
+      });
+
+      const cardIds = ownedPerSet.map((o) => o.cardId);
+      const cards = await this.prisma.card.findMany({
+        where: { id: { in: cardIds }, setId: { not: null } },
+        select: { setId: true, number: true }
+      });
+
+      const counts = new Map<string, Set<string>>();
+      for (const card of cards) {
+        if (!card.setId) continue;
+        if (!counts.has(card.setId)) counts.set(card.setId, new Set());
+        counts.get(card.setId)!.add(card.number);
+      }
+
+      return sets.map((set) => {
+        const owned = counts.get(set.id)?.size ?? 0;
+        const total = set.printedTotal || 1;
+        return {
+          ...set,
+          userProgress: {
+            owned,
+            total,
+            percentage: Math.min(100, Math.round((owned / total) * 100))
+          }
+        };
+      });
+    }
+
+    return sets;
+  }
+
+  async getSetDetails(setId: string, userId?: string) {
+    const sets = await this.listSets(userId);
+    const set = sets.find((s) => s.id === setId);
+    if (!set) {
+      throw new NotFoundException("Set not found");
+    }
+
+    const cards = await this.fetchAllCardsInSet(setId);
+    const userItems = userId
+      ? await this.prisma.collectionItem.findMany({
+          where: { userId, card: { setId } },
+          include: { card: true }
+        })
+      : [];
+
+    const itemsByNumber = new Map<string, any[]>();
+    for (const item of userItems) {
+      if (!itemsByNumber.has(item.card.number)) {
+        itemsByNumber.set(item.card.number, []);
+      }
+      itemsByNumber.get(item.card.number)!.push(item);
+    }
+
+    const cardsWithProgress = cards.map((card) => {
+      const cardUserItems = itemsByNumber.get(card.number) || [];
+      const owned = cardUserItems.length > 0;
+      const quantity = cardUserItems.reduce((sum, i) => sum + i.quantity, 0);
+
+      return {
+        ...card,
+        owned,
+        quantity,
+        userVariants: cardUserItems.map((i) => ({
+          variant: i.variant,
+          quantity: i.quantity,
+          foil: i.foil,
+          condition: i.condition,
+          language: fromPrismaLanguage(i.language)
+        }))
+      };
+    });
+
+    return {
+      set,
+      cards: cardsWithProgress
+    };
   }
 
   async ensureCardByExternalId(externalId: string): Promise<CardSummary> {
@@ -118,6 +207,58 @@ export class CatalogService {
 
     const remote = await this.fetchPokemonTcgCard(externalId);
     return this.upsertPokemonTcgCard(remote);
+  }
+
+  private async fetchAllCardsInSet(setId: string): Promise<CardSummary[]> {
+    const url = new URL("https://api.pokemontcg.io/v2/cards");
+    url.searchParams.set("q", `set.id:${setId}`);
+    url.searchParams.set("orderBy", "number");
+    url.searchParams.set("pageSize", "250");
+
+    const response = await fetch(url, {
+      headers: this.config.get<string>("POKEMON_TCG_API_KEY")
+        ? { "X-Api-Key": this.config.get<string>("POKEMON_TCG_API_KEY") ?? "" }
+        : {}
+    });
+
+    if (!response.ok) {
+      return [];
+    }
+
+    const payload = (await response.json()) as { data?: PokemonTcgCard[] };
+    const remoteCards = payload.data ?? [];
+
+    // Also try to get them from local if any were already cached to avoid upserting everything now
+    // But for a complete list, we should probably upsert them all or at least map them.
+    // Upserting 250 cards might be slow. Let's just map them for the view.
+    return remoteCards.map((card) => ({
+      id: card.id,
+      externalId: card.id,
+      name: card.name,
+      number: card.number,
+      printedTotal: card.set?.printedTotal ?? null,
+      setTotal: card.set?.total ?? null,
+      setId: card.set?.id ?? null,
+      setCode: card.set?.ptcgoCode ?? null,
+      setName: card.set?.name ?? null,
+      rarity: card.rarity ?? null,
+      artist: card.artist ?? null,
+      releaseDate: card.set?.releaseDate ?? null,
+      nationalPokedexNumbers: card.nationalPokedexNumbers ?? [],
+      supertype: card.supertype ?? null,
+      subtypes: card.subtypes ?? [],
+      types: card.types ?? [],
+      regulationMark: card.regulationMark ?? null,
+      rules: card.rules ?? [],
+      abilities: (card.abilities as any) ?? [],
+      attacks: (card.attacks as any) ?? [],
+      retreatCost: card.retreatCost ?? [],
+      convertedRetreatCost: card.convertedRetreatCost ?? null,
+      variants: this.extractPokemonTcgVariants(card),
+      language: "en", // Default for remote
+      imageSmall: card.images?.small ?? null,
+      imageLarge: card.images?.large ?? null
+    }));
   }
 
   private async listLocalSets(): Promise<CardSetSummary[]> {
@@ -457,7 +598,7 @@ function mergeCardSets(
   remoteSets: CardSetSummary[],
 ): CardSetSummary[] {
   const byKey = new Map<string, CardSetSummary>();
-  for (const set of [...localSets, ...remoteSets]) {
+  for (const set of [...remoteSets, ...localSets]) {
     const key = set.code || set.id || `${set.name}:${set.printedTotal}`;
     if (!byKey.has(key)) {
       byKey.set(key, set);

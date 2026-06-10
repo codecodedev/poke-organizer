@@ -800,15 +800,49 @@ export class CollectionService {
     };
   }
 
+  async getExpansionProgress(userId: string) {
+    const ownedItems = await this.prisma.collectionItem.findMany({
+      where: { userId, card: { setId: { not: null } } },
+      select: { card: { select: { setId: true, externalId: true } } },
+    });
+
+    const counts = new Map<string, Set<string>>();
+    for (const item of ownedItems) {
+      const setId = item.card.setId!;
+      if (!counts.has(setId)) counts.set(setId, new Set());
+      counts.get(setId)!.add(item.card.externalId);
+    }
+
+    const allSets = await this.catalog.listSets();
+    return allSets
+      .map((set) => {
+        const owned = counts.get(set.id)?.size ?? 0;
+        const total = set.printedTotal || set.total || 1;
+        return {
+          id: set.id,
+          name: set.name,
+          logoUrl: set.logoUrl,
+          symbolUrl: set.symbolUrl,
+          owned,
+          total,
+          percentage: Math.min(100, Math.round((owned / total) * 100)),
+        };
+      })
+      .filter((p) => p.owned > 0)
+      .sort((a, b) => b.percentage - a.percentage || a.name.localeCompare(b.name));
+  }
+
   async getHomeSummary(userId: string) {
-    const [recentProposals, ranking] = await Promise.all([
+    const [recentProposals, ranking, expansionProgress] = await Promise.all([
       this.listMyProposals(userId),
       this.getRanking(5, userId),
+      this.getExpansionProgress(userId),
     ]);
 
     return {
       recentProposals: recentProposals.slice(0, 5),
       ranking,
+      expansionProgress: expansionProgress.slice(0, 5),
     };
   }
 

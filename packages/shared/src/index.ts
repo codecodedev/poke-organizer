@@ -67,9 +67,17 @@ export type CardSetSummary = {
   id: string;
   code?: string | null;
   name: string;
+  series?: string | null;
   printedTotal: number;
   total?: number | null;
   releaseDate?: string | null;
+  logoUrl?: string | null;
+  symbolUrl?: string | null;
+  userProgress?: {
+    owned: number;
+    total: number;
+    percentage: number;
+  } | null;
 };
 
 export type PriceEstimate = {
@@ -157,9 +165,20 @@ export type PublicCollectionDetail = CollectionFolderDetail & {
   viewCount: number;
 };
 
+export type CardSetProgress = {
+  id: string;
+  name: string;
+  logoUrl?: string | null;
+  symbolUrl?: string | null;
+  owned: number;
+  total: number;
+  percentage: number;
+};
+
 export type HomeSummary = {
   recentProposals: CollectionCartOffer[];
   ranking: CollectionFolderSummary[];
+  expansionProgress: CardSetProgress[];
 };
 
 export type AuctionStatus = "open" | "closed" | "cancelled";

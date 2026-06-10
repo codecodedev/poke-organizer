@@ -23,7 +23,7 @@ import {
   type CollectionItem,
   type PriceEstimate,
 } from "@poke-organizer/shared";
-import { api } from "../lib/api";
+import { api, apiFeedback } from "../lib/api";
 import { formatBrl } from "../lib/format";
 import { CardVariantImage } from "./collection/CardVariantImage";
 import { Button } from "./ui/Button";
@@ -112,7 +112,6 @@ export function CardDetailModal({
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submitMessage, setSubmitMessage] = useState<string | null>(null);
 
   // Sync initial state and handle variant defaults
   useEffect(() => {
@@ -179,7 +178,6 @@ export function CardDetailModal({
 
     setSubmitting(true);
     setError(null);
-    setSubmitMessage(null);
 
     try {
       // Ensure the variant is valid before sending
@@ -207,13 +205,13 @@ export function CardDetailModal({
           ...details,
         });
         if (result?.action === "incremented") {
-          setSubmitMessage("Quantidade incrementada.");
+          apiFeedback.success("Quantidade incrementada no seu inventário.");
         } else {
-          setSubmitMessage("Carta adicionada.");
+          apiFeedback.success("Carta adicionada ao seu inventário.");
         }
       } else if (collectionItem && onUpdate) {
         await onUpdate(collectionItem.id, details);
-        setSubmitMessage("Alterações salvas.");
+        apiFeedback.success("Alterações salvas com sucesso.");
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao salvar");
@@ -399,9 +397,9 @@ export function CardDetailModal({
                   </label>
                 </div>
 
-                {(error || submitMessage) && (
-                  <div className={`mt-6 p-4 rounded-2xl text-[11px] font-black uppercase tracking-wider text-center ${error ? 'bg-magenta/10 border border-magenta/20 text-magenta' : 'bg-leaf/10 border border-leaf/20 text-leaf'}`}>
-                    {error || submitMessage}
+                {error && (
+                  <div className="mt-6 p-4 rounded-2xl text-[11px] font-black uppercase tracking-wider text-center bg-magenta/10 border border-magenta/20 text-magenta">
+                    {error}
                   </div>
                 )}
               </form>

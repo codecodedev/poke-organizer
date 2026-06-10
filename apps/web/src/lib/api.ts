@@ -246,6 +246,12 @@ export const api = {
   listCardSets() {
     return request<CardSetSummary[]>("/cards/sets");
   },
+  listCardSetsWithProgress(token?: string) {
+    return request<CardSetSummary[]>("/cards/sets", { token });
+  },
+  getCardSetDetails(id: string, token?: string) {
+    return request<{ set: CardSetSummary; cards: any[] }>(`/cards/sets/${id}`, { token });
+  },
   getPrice(
     cardId: string,
     params: {

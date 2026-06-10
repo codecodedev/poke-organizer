@@ -2023,7 +2023,7 @@ function CollectionDetailScreen({
               /> 
             )}
             
-            <label className="absolute right-6 bottom-6 cursor-pointer text-[10px] font-black text-white bg-black/40 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 hover:bg-black/60 transition uppercase tracking-wider">
+            <label className="absolute right-6 bottom-6 cursor-pointer text-[10px] font-black text-slate-600 dark:text-white bg-slate-300 dark:bg-black/40 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 hover:bg-black/60 transition uppercase tracking-wider">
               {bannerUploading ? "Enviando..." : (bannerUrl ? <>Alterar Banner<Pencil size={12} className="ml-1 inline" /></> : <>Adicionar Banner<Plus className="text-brand ml-1 inline" size={16} /></>)} 
               <input
                 type="file"
@@ -2409,7 +2409,7 @@ function CollectionDetailScreen({
             <button
               type="button"
               onClick={() => onTogglePickerModal(true)}
-              className="h-full p-4 sm:p-0 flex flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-slate-500 dark:border-slate-600 border-line/60 bg-black/6 dark:bg-white/6 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group"
+              className={`h-full ${paginatedVisibleItems.length === 0 ? "min-h-96" : ""} p-4 sm:p-0 flex flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-slate-500 dark:border-slate-600 border-line/60 bg-black/6 dark:bg-white/6 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group`}
             >
               <div className="grid h-12 w-12 place-items-center rounded-2xl group-hover:bg-brand/10 transition-colors shadow-sm">
                 <Plus size={30} />
@@ -2637,7 +2637,7 @@ function CardPickerPanel({
         <Button
           type="button"
           variant="ghost"
-          className="text-slate-500 hover:text-slate-700 text-sm justify-start "
+          className="text-slate-700 dark:text-slate-300 border-slate-500 hover:text-slate-700 text-sm justify-start "
           icon={showAllPickerItems ? <X size={14} /> : <Plus size={14} />}
           onClick={() => onShowAllChange(!showAllPickerItems)}
         >
