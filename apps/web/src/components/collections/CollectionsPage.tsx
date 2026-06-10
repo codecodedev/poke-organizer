@@ -1493,44 +1493,23 @@ function CollectionsListScreen({
       >
         {folders.length ? (
           <>
+            <hr className="mb-4 border-slate-300 dark:border-slate-700"/>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {paginatedFolders.map((folder) => (
                 <button
                   key={folder.id}
                   type="button"
                   onClick={() => onOpen(folder.id)}
-                  className="group rounded-[26px] border border-card-border/40 bg-card/60 p-5 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/40 hover:shadow-soft"
+                  className="group bg-slate-200 dark:bg-slate-800 rounded-[26px] border border-ink/30 p-5 text-left shadow-sm transition duration-200 hover:-translate-y-1 hover:border-brand/40 hover:shadow-soft"
                 >
                   <div className="flex flex-1 items-center gap-4">
-                    {folder.previewItems && folder.previewItems.length > 0 ? (
-                      <div className="grid grid-cols-2 grid-rows-2 h-16 w-14 shrink-0 gap-0.5 overflow-hidden rounded-xl border border-card-border/20 bg-muted">
-                        {folder.previewItems.slice(0, 4).map((item) => (
-                          <div key={item.id} className="relative overflow-hidden bg-accent/20">
-                            <img
-                              src={item.card.imageSmall || undefined}
-                              alt=""
-                              className="h-full w-full object-cover"
-                            />
-                            <div className="absolute bottom-0.5 right-0.5 rounded-md bg-card px-1 py-0.5 text-[7px] font-black text-foreground shadow-[0_2px_4px_rgba(0,0,0,0.1)] ring-1 ring-black/5">
-                              {formatCardNumber(item.card.number, item.card.printedTotal)}
-                            </div>
-                          </div>
-                        ))}
-                        {folder.previewItems.length < 4 && 
-                          Array.from({ length: 4 - folder.previewItems.length }).map((_, i) => (
-                            <div key={`empty-${i}`} className="bg-card/40 border border-dashed border-card-border/20" />
-                          ))
-                        }
-                      </div>
-                    ) : (
-                      <span className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br transition ${
-                        folder.isStore 
-                          ? "from-aqua/50 to-cyan/10 text-aqua" 
-                          : "from-lilac/20 to-aqua/20 text-lilac"
-                      }`}>
-                        {folder.isStore ? <ShoppingBag size={20} /> : <Layers3 size={20} />}
-                      </span>
-                    )}
+                    <span className={`grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br transition ${
+                      folder.isStore 
+                        ? "bg-aqua dark:bg-slate-700 text-white" 
+                        : "bg-aqua dark:bg-slate-700 text-white"
+                    }`}>
+                      {folder.isStore ? <ShoppingBag size={20} /> : <Layers3 size={20} />}
+                    </span>
 
                     <div className="min-w-0 flex-1">
                       <span className="block truncate text-xl font-black text-foreground">
@@ -1541,6 +1520,7 @@ function CollectionsListScreen({
                       </span>
                     </div>
                   </div>
+                  
                   <div className="mt-4 flex flex-wrap gap-2">
                     <span
                       className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-black ${
@@ -1750,14 +1730,15 @@ function CollectionCreateScreen({
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-7">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
+
               <button
-                type="button"
-                onClick={() => onTogglePickerModal(true)}
-                className="h-full min-h-60 flex flex-col items-center justify-center gap-3 rounded-[24px] border-2 border-dashed border-card-border/40 bg-card/20 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group"
+              type="button"
+              onClick={() =>onTogglePickerModal(true)}
+              className={`h-full w-full ${selectedItems.length === 0 ? "min-h-80" : ""} p-4 sm:p-0 flex flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-slate-500 dark:border-slate-600 border-line/60 bg-black/6 dark:bg-white/6 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group`}
               >
-                <div className="grid h-12 w-12 place-items-center rounded-2xl bg-card/50 group-hover:bg-brand/10 transition-colors shadow-sm">
-                  <Plus size={24} />
+                <div className="grid h-12 w-12 place-items-center rounded-2xl group-hover:bg-brand/10 transition-colors shadow-sm">
+                  <Plus size={30} />
                 </div>
                 <span className="text-[10px] font-black uppercase tracking-widest">Adicionar</span>
               </button>
@@ -2238,7 +2219,6 @@ function CollectionDetailScreen({
           </CollapsibleSection>
 
           <CollapsibleSection 
-            disable={!isStore}
             title="Vender" 
             defaultExpanded={isStore?false:false}
             action={
@@ -2405,11 +2385,11 @@ function CollectionDetailScreen({
             {visibleItems.length} de {unsoldCount} cartas visiveis
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-6 mt-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 mt-6">
             <button
               type="button"
               onClick={() => onTogglePickerModal(true)}
-              className={`h-full ${paginatedVisibleItems.length === 0 ? "min-h-96" : ""} p-4 sm:p-0 flex flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-slate-500 dark:border-slate-600 border-line/60 bg-black/6 dark:bg-white/6 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group`}
+              className={`h-full w-full ${paginatedVisibleItems.length === 0 ? "min-h-96" : ""} p-4 sm:p-0 flex flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-slate-500 dark:border-slate-600 border-line/60 bg-black/6 dark:bg-white/6 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group`}
             >
               <div className="grid h-12 w-12 place-items-center rounded-2xl group-hover:bg-brand/10 transition-colors shadow-sm">
                 <Plus size={30} />
@@ -2440,7 +2420,7 @@ function CollectionDetailScreen({
                         className="h-9 w-full text-[11px] text-white dark: bg-emerald-600/70 dark:bg-emerald-900/60 hover:bg-emerald-600"
                         onClick={() => setSellingItem(item)}
                       >
-                        Marcar vendida
+                        Marcar como vendida
                       </Button>
                     )}
                     {(item.store?.isSold || (item.store?.soldQuantity ?? 0) > 0) && (

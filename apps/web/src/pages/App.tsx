@@ -655,6 +655,7 @@ function HomeView({
 
   return (
     <div className="flex flex-col gap-6 pb-20">
+      {/* Cadastrar cartas */}
       <HeroPanel
         navigate={navigate}
         session={session}
@@ -663,211 +664,209 @@ function HomeView({
         onAdded={onAdded}
       />
 
-      <div className="grid pb-16 gap-6 lg:grid-cols-[1fr_320px]">
+      <div className="grid pb-16 gap-6 lg:grid-cols-2">
 
-        <div className="flex flex-col gap-6">
-          <div className="glass-panel overflow-hidden p-5">
-            <div className="mb-5 flex items-center gap-2">
-              <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
-                <TrendingUp size={18} />
-              </div>
-              <h3 className="font-bold text-ink dark:text-white">Coleções em alta</h3>
+        {/* Coleções em alta */}
+        <div className="glass-panel overflow-hidden p-5">
+          <div className="mb-5 flex items-center gap-2">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
+              <TrendingUp size={18} />
             </div>
-            
+            <h3 className="font-bold text-ink dark:text-white">Coleções em alta</h3>
+          </div>
+          
+          <div className="flex flex-col gap-4">
+            {summary?.ranking?.map((folder, index) => (
+              <button
+                key={folder.id}
+                onClick={() => navigate({ view: "home", publicCollection: folder.shareToken })}
+                className="group flex flex-col gap-2 text-left"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 dark:bg-white/5 text-[10px] font-black text-slate-500 group-hover:bg-cyan group-hover:text-white dark:group-hover:text-black transition-colors">
+                    #{index + 1}
+                  </div>
+                  <div className="flex-1 overflow-hidden">
+                    <div className="flex items-center gap-2">
+                      <p className="truncate font-bold text-ink dark:text-white text-sm group-hover:text-cyan transition-colors">
+                        {folder.name}
+                      </p>
+                      {folder.isStore ? (
+                        <span className="shrink-0 flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+                          <ShoppingBag size={10} />
+                        </span>
+                      ) : (
+                        <span className="shrink-0 flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                          <LibraryBig size={10} />
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                      <span className="flex items-center gap-1 font-black text-slate-400 uppercase tracking-tighter">
+                        {folder.userName || "Usuário"}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Eye size={12} /> {folder.viewCount}
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <LibraryBig size={12} /> {folder.itemCount} cartas
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="h-1 w-full rounded-full bg-white/5 overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-cyan to-magenta" 
+                    style={{ width: `${Math.min(100, (folder.viewCount / (summary?.ranking?.[0]?.viewCount || 1)) * 100)}%` }} 
+                  />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Expanções */}
+        {summary?.expansionProgress && summary.expansionProgress.length > 0 && (
+          <div className="glass-panel overflow-hidden p-5">
+            <div className="mb-5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/10 text-indigo-500">
+                  <Layers3 size={18} />
+                </div>
+                <h3 className="font-bold text-ink dark:text-white">Expansões</h3>
+              </div>
+              <button 
+                onClick={() => navigate({ view: "expansions" })}
+                className="text-[10px] font-black uppercase tracking-widest text-brand hover:underline flex items-center gap-1"
+              >
+                Ver Todos <ChevronRight size={12} />
+              </button>
+            </div>
+
             <div className="flex flex-col gap-4">
-              {summary?.ranking?.map((folder, index) => (
+              {summary.expansionProgress.map((set) => (
                 <button
-                  key={folder.id}
-                  onClick={() => navigate({ view: "home", publicCollection: folder.shareToken })}
+                  key={set.id}
+                  onClick={() => navigate({ view: "expansion-detail", setId: set.id })}
                   className="group flex flex-col gap-2 text-left"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 dark:bg-white/5 text-[10px] font-black text-slate-500 group-hover:bg-cyan group-hover:text-white dark:group-hover:text-black transition-colors">
-                      #{index + 1}
+                    <div className="h-10 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-200 dark:bg-white/5 p-1 flex items-center justify-center">
+                      {set.logoUrl ? (
+                        <img src={set.logoUrl} className="max-h-full max-w-full object-contain" alt="" />
+                      ) : (
+                        <div className="text-[10px] font-black text-slate-400 uppercase">{set.id}</div>
+                      )}
                     </div>
                     <div className="flex-1 overflow-hidden">
-                      <div className="flex items-center gap-2">
-                        <p className="truncate font-bold text-ink dark:text-white text-sm group-hover:text-cyan transition-colors">
-                          {folder.name}
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="truncate font-bold text-ink dark:text-white text-sm group-hover:text-indigo-400 transition-colors">
+                          {set.name}
                         </p>
-                        {folder.isStore ? (
-                          <span className="shrink-0 flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                            <ShoppingBag size={10} />
-                          </span>
-                        ) : (
-                          <span className="shrink-0 flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                            <LibraryBig size={10} />
-                          </span>
-                        )}
+                        <span className="shrink-0 text-[10px] font-black text-slate-500">
+                          {set.owned}/{set.total}
+                        </span>
                       </div>
-                      <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                        <span className="flex items-center gap-1 font-black text-slate-400 uppercase tracking-tighter">
-                          {folder.userName || "Usuário"}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Eye size={12} /> {folder.viewCount}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <LibraryBig size={12} /> {folder.itemCount} cartas
-                        </span>
+                      <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/5">
+                        <div 
+                          className="h-full bg-indigo-500 transition-all duration-1000" 
+                          style={{ width: `${set.percentage}%` }}
+                        />
                       </div>
                     </div>
-                  </div>
-                  <div className="h-1 w-full rounded-full bg-white/5 overflow-hidden">
-                    <div 
-                      className="h-full bg-gradient-to-r from-cyan to-magenta" 
-                      style={{ width: `${Math.min(100, (folder.viewCount / (summary?.ranking?.[0]?.viewCount || 1)) * 100)}%` }} 
-                    />
                   </div>
                 </button>
               ))}
             </div>
           </div>
+        )}
 
-          {summary?.expansionProgress && summary.expansionProgress.length > 0 && (
-            <div className="glass-panel overflow-hidden p-5">
-              <div className="mb-5 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/10 text-indigo-500">
-                    <Layers3 size={18} />
-                  </div>
-                  <h3 className="font-bold text-ink dark:text-white">Expansões</h3>
-                </div>
-                <button 
-                  onClick={() => navigate({ view: "expansions" })}
-                  className="text-[10px] font-black uppercase tracking-widest text-brand hover:underline flex items-center gap-1"
+        {/* Leilões em destaque */}
+        <div className="glass-panel p-5">
+          <div className="mb-5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-orange-500/10 text-orange-500">
+                <Flame size={18} />
+              </div>
+              <div>
+                <h3 className="font-bold text-ink dark:text-white text-lg">Leilões em destaque</h3>
+                <p className="text-xs text-slate-400">Participe dos leilões ativos da comunidade.</p>
+              </div>
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-slate-200 dark:bg-slate-800" />
+              ))}
+            </div>
+          ) : !auctions?.length ? (
+            <div className="py-12 text-center rounded-2xl border border-dashed border-white/10 bg-white/5">
+              <Gavel size={32} className="mx-auto text-slate-600 mb-3" />
+              <p className="text-slate-400 text-sm font-medium italic">Nenhum leilão ativo no momento.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
+              {auctions.map((auction) => (
+                <div
+                  key={auction.id}
+                  className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-white/5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-amber-500/10 hover:border-amber-500/30"
+                  onClick={() => navigate({ view: "home", auction: auction.shareToken })}
                 >
-                  Ver Todos <ChevronRight size={12} />
-                </button>
-              </div>
-
-              <div className="flex flex-col gap-4">
-                {summary.expansionProgress.map((set) => (
-                  <button
-                    key={set.id}
-                    onClick={() => navigate({ view: "expansion-detail", setId: set.id })}
-                    className="group flex flex-col gap-2 text-left"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-200 dark:bg-white/5 p-1 flex items-center justify-center">
-                        {set.logoUrl ? (
-                          <img src={set.logoUrl} className="max-h-full max-w-full object-contain" alt="" />
-                        ) : (
-                          <div className="text-[10px] font-black text-slate-400 uppercase">{set.id}</div>
-                        )}
-                      </div>
-                      <div className="flex-1 overflow-hidden">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate font-bold text-ink dark:text-white text-sm group-hover:text-indigo-400 transition-colors">
-                            {set.name}
-                          </p>
-                          <span className="shrink-0 text-[10px] font-black text-slate-500">
-                            {set.owned}/{set.total}
-                          </span>
-                        </div>
-                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/5">
-                          <div 
-                            className="h-full bg-indigo-500 transition-all duration-1000" 
-                            style={{ width: `${set.percentage}%` }}
-                          />
-                        </div>
-                      </div>
+                  <div className="aspect-[3/4] overflow-hidden bg-white/5">
+                    <img
+                      src={auction.card.imageSmall || ""}
+                      alt={auction.card.name}
+                      className="h-full w-full object-cover transition-transform group-hover:scale-110"
+                    />
+                  </div>
+                  <div className="p-3">
+                    <p className="truncate text-xs font-bold text-white">{auction.card.name}</p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-[10px] font-black text-amber-400">
+                        {formatBrl(auction.currentBid || auction.minBid)}
+                      </span>
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
+                        <Gavel size={10} /> {auction.bidCount}
+                      </span>
                     </div>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>
 
-        <div className="flex flex-col gap-6">
-          <div className="glass-panel p-5">
-            <div className="mb-5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-orange-500/10 text-orange-500">
-                  <Flame size={18} />
-                </div>
-                <div>
-                  <h3 className="font-bold text-ink dark:text-white text-lg">Leilões em destaque</h3>
-                  <p className="text-xs text-slate-400">Participe dos leilões ativos da comunidade.</p>
-                </div>
-              </div>
+        {/* Suas propostas */}
+        <div className="glass-panel p-5">
+          <div className="mb-4 flex items-center gap-2">
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
+              <ShoppingBag size={18} />
             </div>
-
-            {loading ? (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                {[...Array(5)].map((_, i) => (
-                  <div key={i} className="aspect-[3/4] animate-pulse rounded-2xl bg-slate-100" />
-                ))}
-              </div>
-            ) : !auctions?.length ? (
-              <div className="py-12 text-center rounded-2xl border border-dashed border-white/10 bg-white/5">
-                <Gavel size={32} className="mx-auto text-slate-600 mb-3" />
-                <p className="text-slate-400 text-sm font-medium italic">Nenhum leilão ativo no momento.</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                {auctions.map((auction) => (
-                  <div
-                    key={auction.id}
-                    className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-white/5 shadow-sm transition-all hover:-translate-y-1 hover:shadow-amber-500/10 hover:border-amber-500/30"
-                    onClick={() => navigate({ view: "home", auction: auction.shareToken })}
-                  >
-                    <div className="aspect-[3/4] overflow-hidden bg-white/5">
-                      <img
-                        src={auction.card.imageSmall || ""}
-                        alt={auction.card.name}
-                        className="h-full w-full object-cover transition-transform group-hover:scale-110"
-                      />
-                    </div>
-                    <div className="p-3">
-                      <p className="truncate text-xs font-bold text-white">{auction.card.name}</p>
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-[10px] font-black text-amber-400">
-                          {formatBrl(auction.currentBid || auction.minBid)}
-                        </span>
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-slate-400">
-                          <Gavel size={10} /> {auction.bidCount}
-                        </span>
-                      </div>
-                    </div>
+            <h3 className="font-bold text-ink dark:text-white">Suas propostas</h3>
+          </div>
+          {!summary?.recentProposals?.length && !loading ? (
+            <p className="py-4 text-center text-slate-400 text-sm italic">Nenhuma proposta enviada ainda.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {summary?.recentProposals?.map((offer) => (
+                <div key={offer.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Proposta em {offer.folderName || 'Loja'}</p>
+                    <p className="font-bold text-white">{formatBrl(offer.totalOffer)}</p>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2">
-            <div className="glass-panel p-5">
-              <div className="mb-4 flex items-center gap-2">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-magenta/10 text-magenta">
-                  <ShoppingBag size={18} />
+                  <div className="text-right">
+                    <span className={`text-[10px] font-bold uppercase ${offer.status === 'accepted' ? 'text-emerald-400' : offer.status === 'rejected' ? 'text-rose-400' : 'text-amber'}`}>
+                      {offer.status === 'accepted' ? 'Aceita' : offer.status === 'rejected' ? 'Recusada' : 'Pendente'}
+                    </span>
+                  </div>
                 </div>
-                <h3 className="font-bold text-ink dark:text-white">Suas propostas</h3>
-              </div>
-              {!summary?.recentProposals?.length && !loading ? (
-                <p className="py-4 text-center text-slate-400 text-sm italic">Nenhuma proposta enviada ainda.</p>
-              ) : (
-                <div className="flex flex-col gap-3">
-                  {summary?.recentProposals?.map((offer) => (
-                    <div key={offer.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3">
-                      <div>
-                        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Proposta em {offer.folderName || 'Loja'}</p>
-                        <p className="font-bold text-white">{formatBrl(offer.totalOffer)}</p>
-                      </div>
-                      <div className="text-right">
-                        <span className={`text-[10px] font-bold uppercase ${offer.status === 'accepted' ? 'text-emerald-400' : offer.status === 'rejected' ? 'text-rose-400' : 'text-amber'}`}>
-                          {offer.status === 'accepted' ? 'Aceita' : offer.status === 'rejected' ? 'Recusada' : 'Pendente'}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+              ))}
             </div>
-          </div>
+          )}
         </div>
-        
+      
       </div>
     </div>
   );

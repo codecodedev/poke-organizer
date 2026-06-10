@@ -158,6 +158,14 @@ export class CollectionService {
       throw new BadRequestException("Collection name is required");
     }
 
+    const existing = await this.prisma.collectionFolder.findUnique({
+      where: { userId_name: { userId, name } },
+    });
+
+    if (existing) {
+      throw new BadRequestException("Você já possui uma coleção com este nome");
+    }
+
     const folder = await this.prisma.collectionFolder.create({
       data: { userId, name, isStore: dto.isStore ?? false },
       include: {
@@ -260,6 +268,15 @@ export class CollectionService {
       if (!name) {
         throw new BadRequestException("Collection name is required");
       }
+
+      const existing = await this.prisma.collectionFolder.findUnique({
+        where: { userId_name: { userId, name } },
+      });
+
+      if (existing && existing.id !== id) {
+        throw new BadRequestException("Você já possui uma coleção com este nome");
+      }
+
       await this.prisma.collectionFolder.update({
         where: { id },
         data: { name },
@@ -1539,12 +1556,12 @@ export class CollectionService {
 
       if (displayId) {
         // Badge: White background with black text, centered at the bottom of the card
-        const badgeWidth = 140;
-        const badgeHeight = 44;
+        const badgeWidth = 210;
+        const badgeHeight = 66;
         const svgBadge = `
           <svg width="${badgeWidth}" height="${badgeHeight}">
-            <rect x="2" y="2" width="${badgeWidth - 4}" height="${badgeHeight - 4}" rx="12" fill="white" stroke="#e2e8f0" stroke-width="2" />
-            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="20" fill="black">${displayId}</text>
+            <rect x="2" y="2" width="${badgeWidth - 4}" height="${badgeHeight - 4}" rx="18" fill="white" stroke="#e2e8f0" stroke-width="2" />
+            <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="900" font-size="30" fill="black">${displayId}</text>
           </svg>
         `;
         

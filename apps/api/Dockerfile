@@ -2,7 +2,7 @@ FROM node:22-alpine AS deps
 
 WORKDIR /workspace
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl fontconfig ttf-dejavu
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
@@ -15,7 +15,7 @@ FROM node:22-alpine AS build
 
 WORKDIR /workspace
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl fontconfig ttf-dejavu
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 COPY --from=deps /workspace/node_modules node_modules
@@ -33,7 +33,7 @@ WORKDIR /workspace
 
 ENV NODE_ENV=production
 
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl fontconfig ttf-dejavu
 RUN corepack enable && corepack prepare pnpm@9.15.4 --activate
 
 COPY --from=build /workspace/node_modules node_modules

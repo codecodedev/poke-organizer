@@ -67,7 +67,7 @@ export function CollectionItemCard({
         }
       }}
       title={`${item.card.name} - ${formatBrl(displayPrice)}`}
-      className={`collection-item-card w-fit collection-item-card--${kind} group relative cursor-pointer rounded-[24px] border p-2 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-cyan/5 ${
+      className={`collection-item-card w-full collection-item-card--${kind} group relative cursor-pointer rounded-[24px] border p-2 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-cyan/5 ${
         selected
           ? "border-cyan/50 bg-cyan/10 shadow-[0_0_20px_rgba(var(--color-cyan)/0.1)]"
           : "border-slate-800/20 dark:border-slate-600 bg-card/40 backdrop-blur-md"
