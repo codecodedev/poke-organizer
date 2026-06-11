@@ -2053,12 +2053,12 @@ function CollectionDetailScreen({
                   <span className="h-1.5 w-1.5 rounded-full bg-violet-300" />
                   <span>{formatBrl(selectedTotalValue)}</span>
                 </div>
-                {pendingOffersCount > 0 && (
+                {/* {pendingOffersCount > 0 && (
                   <div className="flex items-center gap-2 rounded-full border border-aqua/25 bg-aqua/10 px-4 py-1.5 text-xs font-black text-sky-700">
                     <ShoppingBag size={14} />
                     {pendingOffersCount} propostas pendentes
                   </div>
-                )}
+                )} */}
               </div>
             </button>
             
@@ -2135,7 +2135,7 @@ function CollectionDetailScreen({
             title="Compartilhar" 
             defaultExpanded={false}
             action={
-              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black text-slate-700 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
+              <label className="inline-flex w-full flex-row justify-end cursor-pointer items-center gap-3 text-sm font-black text-slate-700 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
                 {/* <span className="hidden sm:inline"> <Lock size={14} /></span> */}
                 <input
                   type="checkbox"
@@ -2222,7 +2222,7 @@ function CollectionDetailScreen({
             title="Vender" 
             defaultExpanded={isStore?false:false}
             action={
-              <label className="inline-flex cursor-pointer items-center gap-3 text-sm font-black  dark:text-slate-400" onClick={(e) => e.stopPropagation()}>
+              <label className="inline-flex w-full cursor-pointer items-center justify-between gap-3 text-sm font-black  dark:text-slate-400" onClick={(e) => e.stopPropagation()}>
                 {/* <span className="hidden sm:inline">Visualizar</span> */}
                 <input
                   type="checkbox"
@@ -2230,6 +2230,11 @@ function CollectionDetailScreen({
                   checked={isStore}
                   onChange={(event) => onToggleStore(event.target.checked)}
                 />
+                {pendingOffersCount > 0 && (
+                  <span className="ml-2 rounded-full bg-red-500 px-2 py-0.5 text-[10px] text-white">
+                    {pendingOffersCount}
+                  </span>
+                )}
                 <span className="relative h-7 w-12 rounded-full bg-slate-300 transition after:absolute after:left-1 after:top-1 after:h-5 after:w-5 after:rounded-full after:bg-white after:shadow-sm after:transition peer-checked:bg-leaf peer-checked:after:translate-x-5" />
                 {/* <span className="hidden sm:inline">Vender</span> */}
               </label>

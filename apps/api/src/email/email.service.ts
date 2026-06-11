@@ -180,7 +180,7 @@ export class EmailService {
 
   async sendNewProposalEmail(email: string, buyerName: string, folderName: string, total: number, folderId: string) {
     const baseUrl = this.getBaseUrl();
-    const proposalUrl = `${baseUrl}/collections/${folderId}?openProposals=true`;
+    const proposalUrl = `${baseUrl}/?page=collections&collection=${folderId}&openProposals=true`;
 
     const html = this.wrapHtml(`
       <h1>Nova proposta recebida!</h1>
@@ -216,7 +216,7 @@ export class EmailService {
   async sendProposalDecisionEmail(email: string, sellerName: string, folderName: string, status: "accepted" | "rejected") {
     const isAccepted = status === "accepted";
     const baseUrl = this.getBaseUrl();
-    const proposalsUrl = `${baseUrl}/profile?tab=proposals`;
+    const proposalsUrl = `${baseUrl}/?page=profile&tab=proposals`;
     
     const html = this.wrapHtml(`
       <h1>Sua proposta foi ${isAccepted ? "aceita" : "recusada"}</h1>
@@ -253,7 +253,7 @@ export class EmailService {
 
   async sendAuctionWinnerEmail(email: string, sellerName: string, auctionTitle: string, amount: number) {
     const baseUrl = this.getBaseUrl();
-    const ordersUrl = `${baseUrl}/orders?tab=purchases`;
+    const ordersUrl = `${baseUrl}/?page=orders&tab=purchases`;
 
     const html = this.wrapHtml(`
       <h1>Você venceu o leilão!</h1>
@@ -298,7 +298,7 @@ export class EmailService {
         <p style="margin: 0;">Você pode acompanhar todos os seus pedidos e conversar com os vendedores diretamente na plataforma.</p>
       </div>
       <div style="text-align: center;">
-        <a href="${baseUrl}/orders" class="button">Ver Meus Pedidos</a>
+        <a href="${baseUrl}/?page=orders" class="button">Ver Meus Pedidos</a>
       </div>
     `, `Seu pedido #${orderId.slice(-6).toUpperCase()} foi ${statusText.toLowerCase()}`);
 

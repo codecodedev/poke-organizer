@@ -15,7 +15,7 @@ export function CollapsibleSection({ title, children, defaultExpanded = false, a
   return (
     <div className="rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm transition-all duration-200">
       <div className="flex w-full items-center justify-between gap-4">
-        <div className="flex flex-1 flex-wrap items-center justify-between gap-3 min-w-0">
+        <div className="flex flex-1 flex-row items-center justify-between gap-3 min-w-0">
           <button
             type="button"
             className="flex items-center outline-none text-left"
@@ -23,7 +23,7 @@ export function CollapsibleSection({ title, children, defaultExpanded = false, a
           >
             <h3 className="font-black text-ink dark:text-white/70 truncate">{title}</h3>
           </button>
-          {action && <div className="flex-shrink-0">{action}</div>}
+          {action && <div className="w-full">{action}</div>}
         </div>
         {
           (!disable || isExpanded) && (
