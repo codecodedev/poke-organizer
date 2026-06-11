@@ -2222,7 +2222,7 @@ function CollectionDetailScreen({
             title="Vender" 
             defaultExpanded={isStore?false:false}
             action={
-              <label className="inline-flex w-full cursor-pointer items-center justify-between gap-3 text-sm font-black  dark:text-slate-400" onClick={(e) => e.stopPropagation()}>
+              <label className={`${pendingOffersCount > 0 ? "justify-between" : "justify-end"} inline-flex w-full cursor-pointer items-center  gap-3 text-sm font-black  dark:text-slate-400`} onClick={(e) => e.stopPropagation()}>
                 {/* <span className="hidden sm:inline">Visualizar</span> */}
                 <input
                   type="checkbox"
