@@ -11,7 +11,7 @@ import {
   AlertCircle,
   Loader2,
 } from "lucide-react";
-import { api, type Session } from "../lib/api";
+import { api, apiFeedback, type Session } from "../lib/api";
 import { withAuthRetry } from "../lib/authRetry";
 import { Button } from "./ui/Button";
 import { Panel } from "./ui/Panel";
@@ -137,6 +137,15 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
       });
 
       setMessage({ type: "success", text: "Perfil atualizado com sucesso!" });
+      apiFeedback.success("Perfil atualizado com sucesso!");
+      
+      const params = new URLSearchParams(window.location.search);
+      const returnTo = params.get("returnTo");
+      if (returnTo) {
+        setTimeout(() => {
+          window.location.href = returnTo;
+        }, 1200);
+      }
     } catch (err) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao atualizar perfil" });
     } finally {

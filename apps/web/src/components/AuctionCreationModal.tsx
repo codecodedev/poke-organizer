@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Gavel } from "lucide-react";
 import type { CollectionItem } from "@poke-organizer/shared";
-import { api, type Session } from "../lib/api";
+import { api, apiFeedback, type Session } from "../lib/api";
 import { type AppRoute } from "../pages/App";
 import { withAuthRetry } from "../lib/authRetry";
 import { Button } from "./ui/Button";
@@ -76,7 +76,7 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
                   className="h-10 border-magenta/20 text-magenta hover:bg-magenta/10"
                   onClick={() => {
                     onClose();
-                    onNavigate({ view: "profile" });
+                    onNavigate({ view: "profile", returnTo: window.location.href });
                   }}
                 >
                   Ir para o Perfil

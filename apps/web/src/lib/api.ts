@@ -82,6 +82,10 @@ export const apiFeedback = {
     const id = ++feedbackEventId;
     feedbackListeners.forEach((listener) => listener({ type: "success", id, message }));
   },
+  error(message: string) {
+    const id = ++feedbackEventId;
+    feedbackListeners.forEach((listener) => listener({ type: "error", id, message }));
+  },
 };
 
 type RequestOptions = RequestInit & {

@@ -48,12 +48,14 @@ import { OrdersPage } from "../components/OrdersPage";
 import { MyAuctionsPage } from "../components/MyAuctionsPage";
 import { Sidebar } from "../components/layout/Sidebar";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
+import { FloatingCartButton } from "../components/ui/FloatingCartButton";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
 import { RequestPasswordResetPanel } from "../components/RequestPasswordResetPanel";
 import { ResetPasswordPanel } from "../components/ResetPasswordPanel";
 import { ConfirmEmailPanel } from "../components/ConfirmEmailPanel";
+import { CartAreaPage } from "../components/CartAreaPage";
 
-type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "expansion-detail" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email";
+type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "expansion-detail" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email" | "carts";
 type ThemeMode = "light" | "dark";
 export type AppRoute = {
   view: View;
@@ -64,6 +66,7 @@ export type AppRoute = {
   card?: string | null;
   token?: string | null;
   setId?: string | null;
+  returnTo?: string | null;
 };
 
 export function App() {
@@ -174,6 +177,17 @@ export function App() {
 
   function logout() {
     clearSession();
+    
+    // Limpar carrinhos do localStorage para evitar conflitos entre usuarios
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key?.startsWith("cart_")) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach(key => localStorage.removeItem(key));
+
     setSession(null);
     setSidebarOpen(false);
     setShowLogoutConfirm(false);
@@ -231,7 +245,12 @@ export function App() {
                 <span className="text-lg hidden sm:flex sm:text-xl font-black text-ink dark:text-white">coleciona<span className="gradient-text">.cards</span></span>
               </div>
 
-              <div className={`flex items-center justify-end ${session ? '' : 'hidden'}`}>
+              <div className={`flex items-center justify-end gap-3 ${session ? '' : 'hidden'}`}>
+                <FloatingCartButton 
+                  onClick={() => navigate({ view: "carts" })} 
+                  className="md:hidden h-10 w-10 scale-90"
+                  currentCollectionToken={route.publicCollection || undefined}
+                />
                 <ThemeToggle theme={theme} onToggle={toggleTheme} />
               </div>
 
@@ -446,6 +465,12 @@ export function App() {
                 onBack={() => navigate({ view: "home" })}
               />
             )}
+
+            {!isPublicView && view === "carts" && session && (
+              <CartAreaPage
+                onNavigate={navigate}
+              />
+            )}
           </main>
       </div>
       {showLogoutConfirm && (
@@ -458,6 +483,13 @@ export function App() {
           onCancel={() => setShowLogoutConfirm(false)}
         />
       )}
+          {session && (
+            <FloatingCartButton 
+              onClick={() => navigate({ view: "carts" })} 
+              className="fixed bottom-6 right-8 z-[100] hidden md:flex left-auto"
+              currentCollectionToken={route.publicCollection || undefined}
+            />
+          )}
     </div>
       <SpeedInsights />
     </>
@@ -542,7 +574,7 @@ function parseRoute(): AppRoute {
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
   const view: View =
-    (page === "cards" || page === "collections" || page === "decks" || page === "buy" || page === "expansions" || page === "expansion-detail" || page === "proposals" || page === "profile" || page === "my-auctions" || page === "orders" || page === "request-password-reset")
+    (page === "cards" || page === "collections" || page === "decks" || page === "buy" || page === "expansions" || page === "expansion-detail" || page === "proposals" || page === "profile" || page === "my-auctions" || page === "orders" || page === "request-password-reset" || page === "carts")
       ? page as View
       : (path.slice(1) || "home") as View;
 
@@ -551,10 +583,11 @@ function parseRoute(): AppRoute {
     publicCollection: null,
     publicProfile: null,
     auction: null,
-    collection: (view === "collections" || view === "profile" || view === "proposals") ? params.get("collection") : null,
+    collection: (view === "collections" || view === "profile" || view === "proposals" || view === "carts") ? params.get("collection") : null,
     card: params.get("card"),
     token: search.get("token"),
     setId: params.get("setId"),
+    returnTo: search.get("returnTo"),
   };
 }
 
@@ -581,7 +614,7 @@ function routeToUrl(route: AppRoute): string {
     params.set("page", route.view);
   }
 
-  if ((route.view === "collections" || route.view === "profile" || route.view === "proposals") && route.collection) {
+  if ((route.view === "collections" || route.view === "profile" || route.view === "proposals" || route.view === "carts") && route.collection) {
     params.set("collection", route.collection);
   }
 
@@ -591,6 +624,10 @@ function routeToUrl(route: AppRoute): string {
 
   if (route.card) {
     params.set("card", route.card);
+  }
+
+  if (route.returnTo) {
+    params.set("returnTo", route.returnTo);
   }
 
   const query = params.toString();

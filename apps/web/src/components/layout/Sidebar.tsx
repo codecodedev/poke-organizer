@@ -6,6 +6,7 @@ import {
   LogOut,
   Moon,
   ShoppingBag,
+  ShoppingCart,
   MessageSquare,
   Swords,
   Sun,
@@ -22,7 +23,7 @@ import { Button } from "../ui/Button";
 import { NotificationBell } from "../ui/NotificationBell";
 import type { Session } from "../../lib/api";
 
-type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "proposals" | "profile" | "my-auctions" | "orders";
+type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "proposals" | "profile" | "my-auctions" | "orders" | "carts";
 
 type NavItem = {
   id: View;

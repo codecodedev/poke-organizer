@@ -11,14 +11,15 @@ import {
   Check,
   ChevronRight
 } from "lucide-react";
-import { api, type Session } from "../lib/api";
+import { api, apiFeedback, type Session } from "../lib/api";
 import { withAuthRetry } from "../lib/authRetry";
 import { formatBrl } from "../lib/format";
 import type { AuctionDetail } from "@poke-organizer/shared";
+import type { AppRoute } from "../pages/App";
 import { Panel } from "./ui/Panel";
 import { Button } from "./ui/Button";
-import { SEO } from "./SEO";
 import { LoadingScreen } from "./ui/LoadingScreen";
+import { SEO } from "./SEO";
 
 type Props = {
   shareToken: string;
@@ -26,7 +27,7 @@ type Props = {
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
   onSelectProfile: (slug: string) => void;
-  onNavigate: (route: { view: any }) => void;
+  onNavigate: (route: AppRoute) => void;
 };
 
 export function AuctionPage({ shareToken, session, onSession, onUnauthorized, onSelectProfile, onNavigate }: Props) {
@@ -365,7 +366,7 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
                           <Button
                             variant="outline"
                             className="mt-3 w-full h-10 border-background/20 text-background hover:bg-background/10"
-                            onClick={() => onNavigate({ view: "profile" })}
+                            onClick={() => onNavigate({ view: "profile", returnTo: window.location.href })}
                           >
                             Ir para o Perfil
                           </Button>

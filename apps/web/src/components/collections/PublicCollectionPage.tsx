@@ -7,7 +7,7 @@ import type {
   PublicCollectionDetail,
   CollectionCartOffer,
 } from "@poke-organizer/shared";
-import { api, type Session } from "../../lib/api";
+import { api, apiFeedback, type Session } from "../../lib/api";
 import { type AppRoute } from "../../pages/App";
 import { withAuthRetry } from "../../lib/authRetry";
 import { formatBrl } from "../../lib/format";
@@ -206,7 +206,9 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
     }
 
     if (!session.user.whatsapp) {
-      setMessage("Você precisa cadastrar seu WhatsApp no seu perfil para enviar propostas.");
+      const msg = "Você precisa cadastrar seu WhatsApp no seu perfil para enviar propostas.";
+      setMessage(msg);
+      apiFeedback.error(msg);
       return;
     }
 
@@ -404,7 +406,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
                     <Button
                       variant="outline"
                       className="h-10 px-6 border-magenta/20 text-magenta hover:bg-magenta/10"
-                      onClick={() => onNavigate({ view: "profile" })}
+                      onClick={() => onNavigate({ view: "profile", returnTo: window.location.href })}
                     >
                       Ir para o Perfil
                     </Button>
