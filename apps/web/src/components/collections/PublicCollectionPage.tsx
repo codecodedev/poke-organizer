@@ -242,11 +242,12 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
   }
 
   function addToCart(item: CollectionItem) {
+    const price = item.store?.effectivePrice ?? item.price?.amount ?? 0;
     setCart(prev => ({
       ...prev,
       [item.id]: {
         item,
-        amount: String(item.store?.effectivePrice ?? item.price?.amount ?? 0),
+        amount: price.toFixed(2),
         quantity: 1
       }
     }));

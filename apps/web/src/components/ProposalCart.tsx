@@ -114,7 +114,7 @@ export function ProposalCart({
       await onSubmit(
         proposalItems, 
         message, 
-        isGlobalMode ? Number(globalTotal) : calculatedTotal,
+        isGlobalMode ? Number(globalTotal) : Number(calculatedTotal.toFixed(2)),
         isGlobalMode
       );
       setCart({});
@@ -276,7 +276,8 @@ export function ProposalCart({
                               : "text-foreground focus:ring-2 focus:ring-cyan/50"
                           }`}
                           type="number"
-                          value={isGlobalMode ? originalPrice : entry.amount}
+                          step="0.01"
+                          value={isGlobalMode ? originalPrice.toFixed(2) : entry.amount}
                           onChange={(e) => updateAmount(entry.item.id, e.target.value)}
                           disabled={isGlobalMode}
                           onClick={(e) => e.stopPropagation()}
@@ -307,7 +308,7 @@ export function ProposalCart({
                   onClick={(e) => {
                     e.stopPropagation();
                     setIsGlobalMode(!isGlobalMode);
-                    if (!isGlobalMode) setGlobalTotal(String(calculatedTotal));
+                    if (!isGlobalMode) setGlobalTotal(calculatedTotal.toFixed(2));
                   }}
                   className={`flex w-full items-center gap-4 rounded-2xl border p-4 transition-all text-left ${
                     isGlobalMode 
@@ -341,6 +342,7 @@ export function ProposalCart({
                     <input 
                       className="w-full h-14 rounded-2xl border-2 border-brand bg-brand/5 pl-12 text-xl font-black text-brand outline-none focus:ring-4 focus:ring-brand/10 transition-all"
                       type="number"
+                      step="0.01"
                       value={globalTotal}
                       onChange={(e) => setGlobalTotal(e.target.value)}
                       placeholder="0,00"
