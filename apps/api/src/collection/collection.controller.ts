@@ -58,6 +58,11 @@ export class CollectionController {
     return this.collection.listMyProposals(user.id);
   }
 
+  @Get("received-proposals")
+  listMyReceivedProposals(@CurrentUser() user: RequestUser) {
+    return this.collection.listMyReceivedProposals(user.id);
+  }
+
   @Post("folders")
   createFolder(@CurrentUser() user: RequestUser, @Body() dto: CreateCollectionFolderDto) {
     return this.collection.createFolder(user.id, dto);

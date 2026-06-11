@@ -423,6 +423,8 @@ export type OrderItem = {
   imageSmall?: string | null;
   condition?: string | null;
   variant?: string | null;
+  cardNumber?: string | null;
+  cardTotal?: number | null;
 };
 
 export type OrderSummary = {

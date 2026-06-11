@@ -178,17 +178,67 @@ export class EmailService {
     }
   }
 
-  async sendNewProposalEmail(email: string, buyerName: string, folderName: string, total: number, folderId: string) {
+  private renderItemsTable(items: any[]) {
+    if (!items || items.length === 0) return "";
+
+    const rows = items.map(item => {
+      const card = item.folderItem?.collectionItem?.card || item.item?.card;
+      const imageUrl = card?.imageUrl || "";
+      const name = card?.name || "Carta Desconhecida";
+      const setCode = card?.setCode || "";
+      const quantity = item.quantity || 1;
+      const amount = item.amountBrl || item.amount || 0;
+
+      return `
+        <tr>
+          <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9;">
+            <div style="display: flex; align-items: center;">
+              ${imageUrl ? `<img src="${imageUrl}" style="width: 40px; height: 56px; object-fit: contain; border-radius: 4px; margin-right: 12px; background: #f8fafc; border: 1px solid #e2e8f0;" />` : ""}
+              <div>
+                <div style="font-weight: 900; color: #0f172a; font-size: 14px;">${quantity}x ${name}</div>
+                <div style="font-size: 11px; color: #94a3b8; text-transform: uppercase; font-weight: 700;">${setCode}</div>
+              </div>
+            </div>
+          </td>
+          <td style="padding: 12px 0; border-bottom: 1px solid #f1f5f9; text-align: right; font-weight: 700; color: #475569; font-size: 14px;">
+            R$ ${Number(amount).toFixed(2).replace(".", ",")}
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    return `
+      <table style="width: 100%; border-collapse: collapse; margin: 24px 0;">
+        <thead>
+          <tr>
+            <th style="text-align: left; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 8px; border-bottom: 2px solid #f1f5f9;">Item</th>
+            <th style="text-align: right; font-size: 10px; font-weight: 900; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.05em; padding-bottom: 8px; border-bottom: 2px solid #f1f5f9;">Subtotal</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows}
+        </tbody>
+      </table>
+    `;
+  }
+
+  async sendNewProposalEmail(email: string, buyerName: string, folderName: string, total: number, folderId: string, items: any[] = []) {
     const baseUrl = this.getBaseUrl();
-    const proposalUrl = `${baseUrl}/?page=collections&collection=${folderId}&openProposals=true`;
+    const proposalUrl = `${baseUrl}/?page=proposals`;
+
+    const itemsHtml = this.renderItemsTable(items);
 
     const html = this.wrapHtml(`
       <h1>Nova proposta recebida!</h1>
       <p>O colecionador <strong>${buyerName}</strong> enviou uma proposta pela sua pasta <strong>"${folderName}"</strong>.</p>
+      
+      ${itemsHtml}
+
       <div class="highlight-box" style="text-align: center;">
-        <p style="margin: 0; text-transform: uppercase; font-size: 12px; font-weight: 900; color: #94a3b8;">Valor da Proposta</p>
+        <p style="margin: 0; text-transform: uppercase; font-size: 12px; font-weight: 900; color: #94a3b8;">Valor Total da Proposta</p>
         <p class="price-text" style="margin: 8px 0 0 0;">R$ ${total.toFixed(2).replace(".", ",")}</p>
       </div>
+      
       <p>Acesse sua conta para revisar os itens da proposta e responder ao interessado.</p>
       <div style="text-align: center;">
         <a href="${proposalUrl}" class="button">Analisar Proposta</a>
@@ -216,20 +266,21 @@ export class EmailService {
   async sendProposalDecisionEmail(email: string, sellerName: string, folderName: string, status: "accepted" | "rejected") {
     const isAccepted = status === "accepted";
     const baseUrl = this.getBaseUrl();
-    const proposalsUrl = `${baseUrl}/?page=profile&tab=proposals`;
+    const targetUrl = isAccepted ? `${baseUrl}/?page=orders&tab=purchases` : `${baseUrl}/?page=proposals`;
     
     const html = this.wrapHtml(`
       <h1>Sua proposta foi ${isAccepted ? "aceita" : "recusada"}</h1>
       <p><strong>${sellerName}</strong> avaliou sua proposta pela pasta <strong>"${folderName}"</strong> e decidiu <strong>${isAccepted ? "ACEITAR" : "RECUSAR"}</strong>.</p>
       ${isAccepted 
         ? `
-          <div class="highlight-box">
-            <p style="margin: 0;"><strong>Parabéns!</strong> O próximo passo é entrar em contato com o vendedor para combinar o pagamento e a entrega dos cards.</p>
+          <div class="highlight-box" style="background: #ecfdf5; border-color: #10b981;">
+            <p style="margin: 0; color: #065f46;"><strong>Parabéns!</strong> Um novo pedido foi aberto em sua conta.</p>
+            <p style="margin: 12px 0 0 0; font-size: 14px; color: #047857;">O próximo passo é entrar em contato com o vendedor via WhatsApp para combinar o pagamento e a entrega dos cards.</p>
           </div>
         ` 
         : "<p>Não foi dessa vez. Você pode tentar enviar uma nova proposta com um valor diferente ou buscar outros itens no catálogo.</p>"}
       <div style="text-align: center;">
-        <a href="${proposalsUrl}" class="button">Ver Detalhes</a>
+        <a href="${targetUrl}" class="button">${isAccepted ? "Ver Meu Pedido" : "Ver Detalhes"}</a>
       </div>
     `, `Sua proposta foi ${isAccepted ? "aceita" : "recusada"}`);
 

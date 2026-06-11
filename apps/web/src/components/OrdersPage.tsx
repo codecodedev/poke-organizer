@@ -14,7 +14,7 @@ import { withAuthRetry } from "../lib/authRetry";
 import { Button } from "./ui/Button";
 import { Panel } from "./ui/Panel";
 import { formatBrl } from "../lib/format";
-import type { OrderSummary, OrderStatus } from "@poke-organizer/shared";
+import { type OrderSummary, type OrderStatus, formatCardVariant } from "@poke-organizer/shared";
 import { ConfirmationModal } from "./ui/ConfirmationModal";
 
 type Props = {
@@ -61,13 +61,36 @@ export function OrdersPage({ session, onSession, onUnauthorized, onBack }: Props
     }
   }
 
-  function handleWhatsApp(phone: string | null | undefined, orderId: string) {
+  function handleWhatsApp(order: OrderSummary) {
+    const isSeller = tab === "sales";
+    const phone = isSeller ? order.buyerWhatsapp : order.sellerWhatsapp;
+    
     if (!phone) {
-      // In a real app we'd use a Toast or another Modal, but for now we follow the "no alert" rule
       return;
     }
+
     const cleanPhone = phone.replace(/\D/g, "");
-    const message = encodeURIComponent(`Olá! Estou entrando em contato sobre o pedido #${orderId} no Coleciona Cards.`);
+    const otherPartyName = isSeller ? order.buyerName : order.sellerName;
+    const itemsList = order.items.map(item => {
+        const number = item.cardNumber ? (item.cardTotal ? ` #${item.cardNumber}/${item.cardTotal}` : ` #${item.cardNumber}`) : '';
+        const variant = item.variant && item.variant !== 'normal' ? ` [${formatCardVariant(item.variant)}]` : '';
+        return `- ${item.quantity}x ${item.name}${number}${variant} (${formatBrl(item.price)})`;
+    }).join('\n');
+    
+    let text = "";
+    if (isSeller) {
+        text = `Olá ${otherPartyName}! Sou o vendedor do Coleciona Cards sobre o pedido #${order.id.slice(-6)}.\n\n` +
+               `*Itens do Pedido:*\n${itemsList}\n\n` +
+               `*Total:* ${formatBrl(order.totalAmount)}\n\n` +
+               `Podemos combinar o pagamento e o envio?`;
+    } else {
+        text = `Olá ${otherPartyName}! Sou o comprador do Coleciona Cards sobre o pedido #${order.id.slice(-6)}.\n\n` +
+               `*Itens do Pedido:*\n${itemsList}\n\n` +
+               `*Total:* ${formatBrl(order.totalAmount)}\n\n` +
+               `Como podemos combinar o pagamento e o envio?`;
+    }
+
+    const message = encodeURIComponent(text);
     window.open(`https://wa.me/55${cleanPhone}?text=${message}`, "_blank");
   }
 
@@ -157,7 +180,10 @@ export function OrdersPage({ session, onSession, onUnauthorized, onBack }: Props
                         <img src={item.imageSmall || ""} className="h-full w-full object-contain" alt="" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-black text-foreground text-sm sm:text-base truncate">{item.quantity}x {item.name}</p>
+                        <p className="font-black text-foreground text-sm sm:text-base truncate">
+                            {item.quantity}x {item.name}
+                            {item.cardNumber && <span className="ml-2 text-[10px] text-muted-foreground">#{item.cardNumber}{item.cardTotal ? `/${item.cardTotal}` : ''}</span>}
+                        </p>
                         <div className="flex flex-wrap items-center gap-2 mt-1">
                           {item.condition && <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded uppercase">{item.condition}</span>}
                           {item.variant && <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded uppercase">{item.variant}</span>}
@@ -173,8 +199,9 @@ export function OrdersPage({ session, onSession, onUnauthorized, onBack }: Props
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                   <Button
                     variant="brand"
+                    classChildren="flex flex-row gap-2"
                     className="h-11 px-6 gap-2 bg-leaf hover:bg-emerald-600 text-white border-none shadow-glow shadow-leaf/20 w-full sm:w-auto"
-                    onClick={() => handleWhatsApp(tab === "sales" ? order.buyerWhatsapp : order.sellerWhatsapp, order.id)}
+                    onClick={() => handleWhatsApp(order)}
                   >
                     <MessageCircle size={18} />
                     Conversar no WhatsApp
@@ -204,6 +231,7 @@ export function OrdersPage({ session, onSession, onUnauthorized, onBack }: Props
                     </button>
                     <Button
                       variant="brand"
+                      classChildren="flex flex-row gap-2"
                       className="h-11 px-6 w-full sm:w-auto order-1 sm:order-2"
                       onClick={() => setConfirming({ id: order.id, status: "delivered" })}
                     >

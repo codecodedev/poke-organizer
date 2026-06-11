@@ -48,6 +48,8 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
   }, [initialTab]);
 
   const [proposals, setProposals] = useState<CollectionCartOffer[]>([]);
+  const [receivedProposals, setReceivedProposals] = useState<CollectionCartOffer[]>([]);
+  const [proposalsSubTab, setProposalsSubTab] = useState<"sent" | "received">("sent");
   const [loading, setLoading] = useState(true);
 
   const [name, setName] = useState(session.user.name || "");
@@ -96,22 +98,39 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
     return () => clearTimeout(timer);
   }, [profileSlug, session.user.profileSlug]);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const nextProposals = await withAuthRetry(session, onSession, onUnauthorized, async (token) => {
-          return api.listMyProposals(token);
-        });
-        setProposals(nextProposals);
-      } catch (err) {
-        console.error("Failed to load profile data", err);
-      } finally {
-        setLoading(false);
-      }
+  async function loadProposals() {
+    setLoading(true);
+    try {
+      const [sent, received] = await withAuthRetry(session, onSession, onUnauthorized, async (token) => {
+        return Promise.all([
+          api.listMyProposals(token),
+          api.listReceivedProposals(token)
+        ]);
+      });
+      setProposals(sent);
+      setReceivedProposals(received);
+    } catch (err) {
+      console.error("Failed to load profile data", err);
+    } finally {
+      setLoading(false);
     }
-    void load();
+  }
+
+  useEffect(() => {
+    void loadProposals();
   }, [session, onSession, onUnauthorized]);
+
+  async function handleDecideOffer(offer: CollectionCartOffer, status: "accepted" | "rejected") {
+    try {
+      await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.decideCollectionOffer(token, offer.folderId, offer.id, status)
+      );
+      apiFeedback.success(status === "accepted" ? "Proposta aceita!" : "Proposta recusada.");
+      void loadProposals();
+    } catch (err) {
+      apiFeedback.error(err instanceof Error ? err.message : "Erro ao decidir proposta");
+    }
+  }
 
   async function handleUpdateProfile() {
     setMessage(null);
@@ -172,11 +191,11 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
           </button>
           <div>
             <h1 className="text-3xl font-black text-foreground">
-              {tab === "proposals" ? "Suas Propostas" : "Configurações de Perfil"}
+              {tab === "proposals" ? "Propostas de Negociação" : "Configurações de Perfil"}
             </h1>
             <p className="text-sm font-semibold text-muted-foreground">
               {tab === "proposals" 
-                ? "Gerencie as propostas que você enviou para outros colecionadores." 
+                ? "Gerencie as propostas enviadas e recebidas em coleções." 
                 : "Gerencie suas informações e visibilidade do seu perfil público."}
             </p>
           </div>
@@ -190,14 +209,35 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
           <div className="divide-y divide-card-border/20">
             {tab === "proposals" ? (
               <>
-                {proposals.length === 0 ? (
+                <div className="bg-muted/10 p-4 border-b border-card-border/20">
+                    <div className="flex gap-2 rounded-2xl bg-muted/30 p-1 w-fit">
+                        <button
+                            className={`rounded-xl px-6 py-2 text-xs font-black transition ${proposalsSubTab === "sent" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                            onClick={() => setProposalsSubTab("sent")}
+                        >
+                            Propostas que eu fiz
+                        </button>
+                        <button
+                            className={`rounded-xl px-6 py-2 text-xs font-black transition ${proposalsSubTab === "received" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                            onClick={() => setProposalsSubTab("received")}
+                        >
+                            Propostas que recebi
+                        </button>
+                    </div>
+                </div>
+
+                {(proposalsSubTab === "sent" ? proposals : receivedProposals).length === 0 ? (
                   <div className="py-24 text-center">
-                    <p className="text-sm font-bold text-muted-foreground">Você ainda não fez nenhuma proposta em coleções.</p>
+                    <p className="text-sm font-bold text-muted-foreground">
+                        {proposalsSubTab === "sent" 
+                            ? "Você ainda não fez nenhuma proposta em coleções." 
+                            : "Você ainda não recebeu nenhuma proposta em suas coleções."}
+                    </p>
                   </div>
                 ) : (
-                  proposals.map((offer) => (
-                    <div key={offer.id} className="p-6 transition hover:bg-accent/30">
-                      <div className="flex flex-wrap items-start justify-between gap-6">
+                  (proposalsSubTab === "sent" ? proposals : receivedProposals).map((offer) => (
+                    <div key={offer.id} className="p-4 sm:p-6 transition hover:bg-accent/30">
+                      <div className="flex flex-col md:flex-row md:items-start justify-between gap-6">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-3">
                             <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Proposta</span>
@@ -214,25 +254,61 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                                 </span>
                             )}
                           </div>
-                          <h3 className="mt-2 text-xl font-black text-foreground">Valor sugerido: {formatBrl(offer.totalOffer)}</h3>
-                          <p className="mt-1 text-sm font-semibold text-muted-foreground">Enviada em: {new Date(offer.createdAt).toLocaleDateString()}</p>
+                          
+                          <div className="mt-2">
+                             {proposalsSubTab === "received" && (
+                                <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-1">De: {offer.buyerName}</p>
+                             )}
+                             <h3 className="text-xl sm:text-2xl font-black text-foreground">Valor sugerido: {formatBrl(offer.totalOffer)}</h3>
+                             <p className="mt-1 text-sm font-semibold text-muted-foreground">
+                                {proposalsSubTab === "sent" ? "Enviada" : "Recebida"} em: {new Date(offer.createdAt).toLocaleDateString()}
+                             </p>
+                          </div>
                           
                           <div className="mt-4 flex flex-wrap gap-2">
                             {offer.items.map((item) => (
-                              <div key={item.id} className="rounded-xl bg-card px-3 py-1.5 text-xs font-bold text-muted-foreground border border-card-border/40 shadow-sm">
+                              <div key={item.id} className="rounded-xl bg-card px-3 py-1.5 text-[10px] sm:text-xs font-bold text-muted-foreground border border-card-border/40 shadow-sm">
                                 {item.quantity}x {item.item.card.name}
                               </div>
                             ))}
                           </div>
+
+                          {offer.message && (
+                            <div className="mt-4 rounded-2xl bg-muted/20 p-4 border border-card-border/30">
+                                <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-1">Mensagem</p>
+                                <p className="text-sm italic text-foreground">"{offer.message}"</p>
+                            </div>
+                          )}
                         </div>
-                        <Button
-                          variant="brand"
-                          className="h-11 px-6 gap-2 text-sm"
-                          onClick={() => window.location.href = `/?publicCollection=${offer.folderId}`}
-                        >
-                          <ExternalLink size={16} />
-                          Ver Coleção
-                        </Button>
+                        
+                        <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
+                            {proposalsSubTab === "received" && offer.status === "pending" && (
+                                <div className="flex gap-2 w-full">
+                                    <Button
+                                        variant="brand"
+                                        className="h-11 flex-1 md:px-6 bg-leaf hover:bg-emerald-600 text-white border-none shadow-sm"
+                                        onClick={() => handleDecideOffer(offer, "accepted")}
+                                    >
+                                        Aceitar
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        className="h-11 flex-1 md:px-6 text-magenta border-magenta/20 hover:bg-magenta/5"
+                                        onClick={() => handleDecideOffer(offer, "rejected")}
+                                    >
+                                        Recusar
+                                    </Button>
+                                </div>
+                            )}
+                            <Button
+                                variant={proposalsSubTab === "sent" ? "brand" : "outline"}
+                                className="h-11 px-6 text-sm w-full md:w-auto"
+                                icon={<ExternalLink size={16} />}
+                                onClick={() => window.location.href = `/?publicCollection=${offer.folderId}`}
+                            >
+                                {proposalsSubTab === "sent" ? "Ver Coleção" : "Ir para Coleção"}
+                            </Button>
+                        </div>
                       </div>
                     </div>
                   ))
@@ -241,6 +317,16 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
             ) : (
               <div className="p-8 space-y-8">
                 <div className="grid gap-8 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">E-mail</label>
+                    <input
+                      className="premium-input w-full opacity-60 cursor-not-allowed"
+                      value={session.user.email}
+                      disabled
+                      title="O e-mail não pode ser alterado"
+                    />
+                  </div>
+
                   <div className="space-y-2">
                     <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Nome de Exibição</label>
                     <input

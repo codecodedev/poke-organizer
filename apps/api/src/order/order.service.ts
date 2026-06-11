@@ -133,6 +133,8 @@ export class OrderService {
         imageSmall: i.imageSmall,
         condition: i.condition,
         variant: i.variant,
+        cardNumber: i.cardNumber,
+        cardTotal: i.cardTotal,
       })),
     };
   }

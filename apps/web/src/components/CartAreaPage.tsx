@@ -146,6 +146,7 @@ export function CartAreaPage({ onNavigate }: Props) {
 
                 <Button
                   variant="brand"
+                  classChildren="flex flex-row gap-2"
                   className="w-full h-12 gap-2"
                   onClick={() => onNavigate({ view: "home", publicCollection: cart.shareToken })}
                 >

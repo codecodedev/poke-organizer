@@ -196,7 +196,10 @@ export class AuctionService {
               imageSmall: auction.collectionItem.card.imageSmall,
               condition: auction.collectionItem.condition,
               variant: auction.collectionItem.variant,
-            }
+              cardNumber: auction.collectionItem.card.number,
+              cardTotal: auction.collectionItem.card.printedTotal,
+              }
+
           }
         }
       });

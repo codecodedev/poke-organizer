@@ -25,6 +25,7 @@ const PUBLIC_COLLECTION_PAGE_SIZE = 24;
 
 type Props = {
   shareToken: string;
+  initialQuery?: string;
   session: Session | null;
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
@@ -34,12 +35,12 @@ type Props = {
   onToggleTheme?: () => void;
 };
 
-export function PublicCollectionPage({ shareToken, session, onSession, onUnauthorized, onNavigate, hideHeader, theme, onToggleTheme }: Props) {
+export function PublicCollectionPage({ shareToken, initialQuery = "", session, onSession, onUnauthorized, onNavigate, hideHeader, theme, onToggleTheme }: Props) {
   const [collection, setCollection] = useState<PublicCollectionDetail | null>(
     null,
   );
   const [selectedItem, setSelectedItem] = useState<CollectionItem | null>(null);
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
   const [typeFilter, setTypeFilter] = useState(() => localStorage.getItem("pc_typeFilter") ?? "");
   const [rarityFilter, setRarityFilter] = useState(() => localStorage.getItem("pc_rarityFilter") ?? "");
   const [variantFilter, setVariantFilter] = useState(() => localStorage.getItem("pc_variantFilter") ?? "");

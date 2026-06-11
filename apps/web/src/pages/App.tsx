@@ -67,6 +67,7 @@ export type AppRoute = {
   token?: string | null;
   setId?: string | null;
   returnTo?: string | null;
+  q?: string | null;
 };
 
 export function App() {
@@ -303,6 +304,7 @@ export function App() {
             {route.publicCollection && (
               <PublicCollectionPage
                 shareToken={route.publicCollection}
+                initialQuery={route.q || ""}
                 session={session}
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
@@ -588,12 +590,15 @@ function parseRoute(): AppRoute {
     token: search.get("token"),
     setId: params.get("setId"),
     returnTo: search.get("returnTo"),
+    q: params.get("q"),
   };
 }
 
 function routeToUrl(route: AppRoute): string {
   if (route.publicCollection) {
-    return `/p/${encodeURIComponent(route.publicCollection)}`;
+    const url = `/p/${encodeURIComponent(route.publicCollection)}`;
+    if (route.q) return `${url}?q=${encodeURIComponent(route.q)}`;
+    return url;
   }
   if (route.publicProfile) {
     return `/public/profile/${encodeURIComponent(route.publicProfile)}`;
@@ -624,6 +629,10 @@ function routeToUrl(route: AppRoute): string {
 
   if (route.card) {
     params.set("card", route.card);
+  }
+
+  if (route.q) {
+    params.set("q", route.q);
   }
 
   if (route.returnTo) {

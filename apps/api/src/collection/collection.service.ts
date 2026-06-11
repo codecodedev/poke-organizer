@@ -149,6 +149,19 @@ export class CollectionService {
     return offers.map((offer) => this.mapCartOffer(offer));
   }
 
+  async listMyReceivedProposals(userId: string): Promise<CollectionCartOffer[]> {
+    const offers = await this.prisma.collectionCartOffer.findMany({
+      where: { folder: { userId } },
+      include: {
+        buyer: true,
+        folder: { include: { user: true } },
+        items: { include: { folderItem: { include: folderItemInclude } } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+    return offers.map((offer) => this.mapCartOffer(offer));
+  }
+
   async createFolder(
     userId: string,
     dto: CreateCollectionFolderDto,
@@ -505,14 +518,14 @@ export class CollectionService {
         userId: folder.userId,
         title: "Nova Proposta Recebida!",
         message: `${offer.buyer.name || offer.buyer.email} enviou uma proposta na coleção "${folder.name}".`,
-        link: `/collections/${folder.id}?openProposals=true`,
+        link: `/?page=proposals`,
       },
     });
 
     // Send email notification
     const seller = await this.prisma.user.findUnique({ where: { id: folder.userId } });
     if (seller) {
-      void this.emailService.sendNewProposalEmail(seller.email, offer.buyer.name || offer.buyer.email, folder.name, totalOfferBrl, folder.id)
+      void this.emailService.sendNewProposalEmail(seller.email, offer.buyer.name || offer.buyer.email, folder.name, totalOfferBrl, folder.id, offer.items)
         .catch(err => console.error("Failed to send proposal email", err));
     }
 
@@ -583,7 +596,10 @@ export class CollectionService {
                 imageSmall: item.folderItem.collectionItem.card.imageSmall,
                 condition: item.folderItem.collectionItem.condition,
                 variant: item.folderItem.collectionItem.variant,
-              }))
+                cardNumber: item.folderItem.collectionItem.card.number,
+                cardTotal: item.folderItem.collectionItem.card.printedTotal,
+                }))
+
             }
           }
         });
@@ -616,8 +632,8 @@ export class CollectionService {
           data: {
             userId: offer.buyerId,
             title: "Proposta Aceita!",
-            message: `Sua proposta na coleção "${offer.folder.name}" foi aceita pelo vendedor.`,
-            link: `/profile?tab=proposals`,
+            message: `Sua proposta na coleção "${offer.folder.name}" foi aceita! Um novo pedido foi aberto em sua conta.`,
+            link: `/?page=orders&tab=purchases`,
           },
         });
 
@@ -631,7 +647,7 @@ export class CollectionService {
             userId: offer.buyerId,
             title: "Proposta Recusada",
             message: `Sua proposta na coleção "${offer.folder.name}" foi recusada pelo vendedor.`,
-            link: `/profile?tab=proposals`,
+            link: `/?page=proposals`,
           },
         });
 
@@ -1476,15 +1492,8 @@ export class CollectionService {
       where: { shareToken },
       include: {
         items: {
-          take: 8,
-          orderBy: { createdAt: "desc" },
-          include: {
-            collectionItem: {
-              include: {
-                card: true,
-              },
-            },
-          },
+          where: { isSold: false },
+          include: folderItemInclude,
         },
       },
     });
@@ -1492,6 +1501,12 @@ export class CollectionService {
     if (!folder) {
       throw new NotFoundException("Coleção não encontrada");
     }
+
+    // Sort by price descending and take top 8
+    const sortedItems = folder.items
+      .map((item) => this.mapItem(item.collectionItem as any, item as any))
+      .sort((a, b) => (b.store?.effectivePrice ?? 0) - (a.store?.effectivePrice ?? 0))
+      .slice(0, 8);
 
     // Tentar carregar o banner primeiro
     if (folder.bannerUrl && !folder.bannerUrl.includes("preview-image")) {
@@ -1585,12 +1600,12 @@ export class CollectionService {
       return this.toOgJpeg(generated);
     };
 
-    const cardCount = folder.items.length;
+    const cardCount = sortedItems.length;
     if (cardCount === 0) return fallbackLogo();
 
     const images = await Promise.all(
-      folder.items.map(async (item) => {
-        const url = item.collectionItem?.card?.imageSmall;
+      sortedItems.map(async (item) => {
+        const url = item.card?.imageSmall;
         if (!url) return null;
         try {
           const response = await fetch(url, { signal: AbortSignal.timeout(5000) });
@@ -1633,7 +1648,7 @@ export class CollectionService {
     const cardsPerRow = 4;
 
     for (let r = 0; r < rowCount; r++) {
-      const cardsInThisRow = hasMore ? cardsPerRow : cardCount;
+      const cardsInThisRow = hasMore ? (r === 0 ? cardsPerRow : Math.min(cardsPerRow, cardCount - cardsPerRow)) : cardCount;
       const totalWidth = cardsInThisRow * cardWidth + (cardsInThisRow - 1) * gap;
       const startX = (width - totalWidth) / 2;
       const top = r === 0 ? row1Top : row2Top;
@@ -1646,9 +1661,9 @@ export class CollectionService {
         let displayId: string | null = null;
 
         if (index < cardCount) {
-          const item = folder.items[index];
-          const cardNumber = item?.collectionItem?.card?.number ?? "";
-          const printedTotal = item?.collectionItem?.card?.printedTotal;
+          const item = sortedItems[index];
+          const cardNumber = item?.card?.number ?? "";
+          const printedTotal = item?.card?.printedTotal;
           displayId = printedTotal ? `${cardNumber}/${printedTotal}` : cardNumber;
 
           if (images[index]) {

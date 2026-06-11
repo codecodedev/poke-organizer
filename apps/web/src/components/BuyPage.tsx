@@ -10,7 +10,7 @@ type Props = {
   session: Session;
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
-  onNavigate: (route: { view: any; publicCollection?: string; auction?: string }) => void;
+  onNavigate: (route: { view: any; publicCollection?: string; auction?: string; q?: string }) => void;
 };
 
 export function BuyPage({ session, onNavigate }: Props) {
@@ -101,7 +101,11 @@ export function BuyPage({ session, onNavigate }: Props) {
                     price={auction.currentBid || auction.minBid}
                     sellerName={auction.sellerName}
                     number={auction.card.number}
-                    onClick={() => onNavigate({ view: "home", auction: auction.shareToken })}
+                    onClick={() => onNavigate({ 
+                      view: "home", 
+                      auction: auction.shareToken,
+                      q: auction.card.printedTotal ? `${auction.card.number}/${auction.card.printedTotal}` : auction.card.number
+                    })}
                   />
                 ))}
               </div>
@@ -129,7 +133,11 @@ export function BuyPage({ session, onNavigate }: Props) {
                     <CollectionItemCard
                       item={item}
                       price={item.price}
-                      onOpen={() => onNavigate({ view: "home", publicCollection: item.shareToken })}
+                      onOpen={() => onNavigate({ 
+                        view: "home", 
+                        publicCollection: item.shareToken,
+                        q: item.card.printedTotal ? `${item.card.number}/${item.card.printedTotal}` : item.card.number
+                      })}
                     >
                       <div className="mt-2 flex flex-col p-2 gap-1">
                         <div className="flex items-center gap-1 text-[10px] font-black text-muted-foreground uppercase">
