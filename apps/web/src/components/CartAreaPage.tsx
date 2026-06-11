@@ -32,6 +32,8 @@ export function CartAreaPage({ onNavigate }: Props) {
           if (!cartStr) continue;
           
           const cart = JSON.parse(cartStr);
+          if (!cart || typeof cart !== 'object') continue;
+          
           const items = Object.values(cart);
           
           const isGlobalMode = localStorage.getItem(`cart_global_mode_${shareToken}`) === "true";
@@ -39,10 +41,15 @@ export function CartAreaPage({ onNavigate }: Props) {
 
           if (items.length === 0 && !isGlobalMode) continue;
 
-          const totalItems = items.reduce((sum: number, entry: any) => sum + (entry.quantity || 1), 0);
+          const totalItems = items.reduce((sum: number, entry: any) => {
+             const qty = Number(entry?.quantity) || 0;
+             return sum + qty;
+          }, 0);
+          
           const totalValue = items.reduce((sum: number, entry: any) => {
-             const price = Number(entry.amount) || 0;
-             return sum + (price * (entry.quantity || 1));
+             const price = Number(entry?.amount) || 0;
+             const qty = Number(entry?.quantity) || 1;
+             return sum + (price * qty);
           }, 0);
 
           entries.push({

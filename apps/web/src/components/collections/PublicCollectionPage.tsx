@@ -19,6 +19,7 @@ import { Button } from "../ui/Button";
 import { ThemeToggle } from "../ui/ThemeToggle";
 import { FilterContainer, FilterSelect } from "../ui/Filters";
 import { SEO } from "../SEO";
+import { LoadingScreen } from "../ui/LoadingScreen";
 
 const PUBLIC_COLLECTION_PAGE_SIZE = 24;
 
@@ -307,9 +308,7 @@ export function PublicCollectionPage({ shareToken, session, onSession, onUnautho
 
       <div className={hideHeader ? "grid gap-5" : "mx-auto grid max-w-7xl gap-5 px-5 py-6"}>
         {loading && (
-          <Panel>
-            <p className="section-copy">Carregando colecao...</p>
-          </Panel>
+          <LoadingScreen message="Carregando coleção..." fullScreen={false} />
         )}
 
         {!loading && error && (

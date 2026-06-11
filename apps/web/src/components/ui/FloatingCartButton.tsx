@@ -23,26 +23,28 @@ export function FloatingCartButton({ onClick, className = "", currentCollectionT
       let currentHasItems = false;
       
       keys.forEach(key => {
-        if (key.startsWith("cart_")) {
-          if (key.includes("_global_mode_")) {
-            const token = key.replace("cart_global_mode_", "");
-            if (localStorage.getItem(key) === "true") {
-              cartTokens.add(token);
-              if (token === currentCollectionToken) currentHasItems = true;
-            }
-          } else if (!key.includes("_global_")) {
-            const token = key.replace("cart_", "");
-            try {
+        try {
+          if (key.startsWith("cart_")) {
+            if (key.includes("_global_mode_")) {
+              const token = key.replace("cart_global_mode_", "");
+              if (localStorage.getItem(key) === "true") {
+                cartTokens.add(token);
+                if (token === currentCollectionToken) currentHasItems = true;
+              }
+            } else if (!key.includes("_global_")) {
+              const token = key.replace("cart_", "");
               const cartStr = localStorage.getItem(key);
               if (cartStr) {
                 const cart = JSON.parse(cartStr);
-                if (Object.keys(cart).length > 0) {
+                if (cart && typeof cart === "object" && Object.keys(cart).length > 0) {
                   cartTokens.add(token);
                   if (token === currentCollectionToken) currentHasItems = true;
                 }
               }
-            } catch {}
+            }
           }
+        } catch (e) {
+          console.error("Error parsing cart from localStorage", e);
         }
       });
       
