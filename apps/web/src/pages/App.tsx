@@ -56,8 +56,9 @@ import { ResetPasswordPanel } from "../components/ResetPasswordPanel";
 import { ConfirmEmailPanel } from "../components/ConfirmEmailPanel";
 import { CartAreaPage } from "../components/CartAreaPage";
 import { TourProvider, useTour } from "../lib/TourContext";
+import { LegalPage } from "../components/LegalPage";
 
-type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "expansion-detail" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email" | "carts";
+type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "expansion-detail" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email" | "carts" | "terms" | "privacy";
 type ThemeMode = "light" | "dark";
 export type AppRoute = {
   view: View;
@@ -222,7 +223,7 @@ function AppContent() {
     setRefreshKey((value) => value + 1);
   }
 
-  const isPublicView = route.publicCollection || route.publicProfile || route.auction;
+  const isPublicView = route.publicCollection || route.publicProfile || route.auction || view === "terms" || view === "privacy";
 
   return (
     <>
@@ -327,6 +328,14 @@ function AppContent() {
                 theme={theme} 
                 onRequestPasswordReset={() => navigate({ view: "request-password-reset" })}
               />
+            )}
+
+            {view === "terms" && (
+              <LegalPage type="terms" onBack={() => navigate({ view: "home" })} />
+            )}
+
+            {view === "privacy" && (
+              <LegalPage type="privacy" onBack={() => navigate({ view: "home" })} />
             )}
 
             {view === "request-password-reset" && (
@@ -624,11 +633,17 @@ function parseRoute(): AppRoute {
   if (path === "/reset-password") {
     return { view: "reset-password", token: search.get("token") };
   }
+  if (path === "/terms") {
+    return { view: "terms" };
+  }
+  if (path === "/privacy") {
+    return { view: "privacy" };
+  }
 
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
   const view: View =
-    (page === "cards" || page === "collections" || page === "decks" || page === "buy" || page === "expansions" || page === "expansion-detail" || page === "proposals" || page === "profile" || page === "my-auctions" || page === "orders" || page === "request-password-reset" || page === "carts")
+    (page === "cards" || page === "collections" || page === "decks" || page === "buy" || page === "expansions" || page === "expansion-detail" || page === "proposals" || page === "profile" || page === "my-auctions" || page === "orders" || page === "request-password-reset" || page === "carts" || page === "terms" || page === "privacy")
       ? page as View
       : (path.slice(1) || "home") as View;
 
@@ -664,6 +679,12 @@ function routeToUrl(route: AppRoute): string {
   }
   if (route.view === "reset-password") {
     return `/reset-password${route.token ? `?token=${encodeURIComponent(route.token)}` : ""}`;
+  }
+  if (route.view === "terms") {
+    return "/terms";
+  }
+  if (route.view === "privacy") {
+    return "/privacy";
   }
 
   const params = new URLSearchParams();

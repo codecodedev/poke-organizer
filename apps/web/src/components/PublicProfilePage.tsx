@@ -51,7 +51,7 @@ export function PublicProfilePage({ slug, session, onSelectCollection, onSelectA
     <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
       <SEO 
         title={`Perfil de ${profile.name}`} 
-        description={profile.bio || `Confira as coleções e leilões de Pokémon TCG de ${profile.name} no Coleciona cards.`}
+        description={profile.bio || `Confira as coleções e negociações por lances de Pokémon TCG de ${profile.name} no Coleciona cards.`}
         url={`/public/profile/${profile.slug}`}
       />
       <aside className="space-y-6">
@@ -81,7 +81,7 @@ export function PublicProfilePage({ slug, session, onSelectCollection, onSelectA
             </div>
             <div className="flex items-center gap-3 text-muted-foreground">
               <Gavel size={18} className="text-muted-foreground/60" />
-              <span className="text-sm font-bold">{profile.auctions.length} Leilões</span>
+              <span className="text-sm font-bold">{profile.auctions.length} Ofertas abertas</span>
             </div>
           </div>
         </div>
@@ -106,7 +106,7 @@ export function PublicProfilePage({ slug, session, onSelectCollection, onSelectA
           <TabButton 
             active={tab === "auctions"} 
             onClick={() => setTab("auctions")}
-            label="Leilões"
+            label="Ofertas abertas"
             count={profile.auctions.length}
             icon={<Gavel size={18} />}
           />
@@ -116,7 +116,7 @@ export function PublicProfilePage({ slug, session, onSelectCollection, onSelectA
           {tab === "auctions" ? (
             <div className="grid gap-4 sm:grid-cols-2">
               {profile.auctions.length === 0 ? (
-                <EmptyState message="Nenhum leilão ativo no momento." />
+                <EmptyState message="Nenhuma oferta aberta no momento." />
               ) : (
                 profile.auctions.map(auction => (
                   <AuctionCard key={auction.id} auction={auction} onClick={() => onSelectAuction(auction.shareToken)} />

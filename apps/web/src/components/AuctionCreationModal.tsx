@@ -22,14 +22,15 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
   const [durationDays, setDurationDays] = useState("7");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [acceptedListingResponsibility, setAcceptedListingResponsibility] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!session.user.whatsapp) {
-      setError("Você precisa cadastrar seu WhatsApp no seu perfil para iniciar leilões.");
+    if (!acceptedListingResponsibility) {
+      setError("Confirme sua responsabilidade pelas informações do item e pela negociação final.");
       return;
     }
 
@@ -47,11 +48,12 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
           description: description || undefined,
           minBidBrl: Number(minBid),
           endsAt: endsAt.toISOString(),
+          acceptedResponsibility: acceptedListingResponsibility,
         }),
       );
       onCreated(auction.shareToken);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Falha ao criar leilão");
+      setError(err instanceof Error ? err.message : "Falha ao criar negociação por lances");
     } finally {
       setSubmitting(false);
     }
@@ -59,7 +61,7 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
 
   return (
     <Modal 
-      title="Novo Leilão" 
+      title="Nova negociação por lances" 
       subtitle="Configure os detalhes do seu anúncio"
       icon={<Gavel size={20} />}
       onClose={onClose}
@@ -69,19 +71,6 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
           {error && (
             <div className="p-4 mb-4 rounded-2xl bg-magenta/10 border border-magenta/20 flex flex-col gap-3">
               <p className="text-magenta text-sm font-bold">{error}</p>
-              {error.includes("WhatsApp") && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="h-10 border-magenta/20 text-magenta hover:bg-magenta/10"
-                  onClick={() => {
-                    onClose();
-                    onNavigate({ view: "profile", returnTo: window.location.href });
-                  }}
-                >
-                  Ir para o Perfil
-                </Button>
-              )}
             </div>
           )}
           <Button
@@ -89,9 +78,9 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
             type="submit"
             variant="brand"
             className="w-full h-14 shadow-glow shadow-cyan/20"
-            disabled={submitting}
+            disabled={submitting || !acceptedListingResponsibility}
           >
-            {submitting ? "Iniciando..." : "Iniciar Leilão Agora"}
+            {submitting ? "Iniciando..." : "Iniciar negociação por lances"}
           </Button>
           <p className="text-[10px] font-bold text-center text-muted-foreground uppercase tracking-wider">
              Ao iniciar, você receberá um link público para compartilhar.
@@ -161,6 +150,19 @@ export function AuctionCreationModal({ item, session, onSession, onUnauthorized,
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Detalhes adicionais sobre o estado da carta..."
             />
+          </label>
+
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-card-border/50 bg-muted/30 p-4">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-card-border accent-cyan"
+              checked={acceptedListingResponsibility}
+              onChange={(event) => setAcceptedListingResponsibility(event.target.checked)}
+              required
+            />
+            <span className="text-xs font-semibold leading-5 text-muted-foreground">
+              Confirmo que sou responsável pelas informações, disponibilidade, autenticidade, estado de conservação, envio e conclusão da negociação deste item. O Coleciona Cards apenas conecta colecionadores.
+            </span>
           </label>
         </form>
       </div>

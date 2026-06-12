@@ -19,6 +19,8 @@ export class OrderService {
         seller: true,
         buyer: true,
         items: true,
+        proposal: { include: { items: { include: { folderItem: { include: { collectionItem: { include: { card: true } } } } } } } },
+        auction: { include: { collectionItem: { include: { card: true } } } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -32,6 +34,8 @@ export class OrderService {
         seller: true,
         buyer: true,
         items: true,
+        proposal: { include: { items: { include: { folderItem: { include: { collectionItem: { include: { card: true } } } } } } } },
+        auction: { include: { collectionItem: { include: { card: true } } } },
       },
       orderBy: { createdAt: "desc" },
     });
@@ -48,6 +52,8 @@ export class OrderService {
         seller: true,
         buyer: true,
         items: true,
+        proposal: { include: { items: { include: { folderItem: { include: { collectionItem: { include: { card: true } } } } } } } },
+        auction: { include: { collectionItem: { include: { card: true } } } },
         messages: {
           include: { sender: true },
           orderBy: { createdAt: "asc" },
@@ -135,6 +141,8 @@ export class OrderService {
           seller: true,
           buyer: true,
           items: true,
+          proposal: { include: { items: { include: { folderItem: { include: { collectionItem: { include: { card: true } } } } } } } },
+          auction: { include: { collectionItem: { include: { card: true } } } },
         },
       });
 
@@ -210,17 +218,36 @@ export class OrderService {
       proposalId: o.proposalId,
       createdAt: o.createdAt.toISOString(),
       updatedAt: o.updatedAt.toISOString(),
-      items: o.items.map((i: any) => ({
-        id: i.id,
-        name: i.name,
-        quantity: i.quantity,
-        price: Number(i.priceBrl),
-        imageSmall: i.imageSmall,
-        condition: i.condition,
-        variant: i.variant,
-        cardNumber: i.cardNumber,
-        cardTotal: i.cardTotal,
-      })),
+      items: o.items.map((i: any) => {
+        let language = i.language;
+        if (!language) {
+          if (o.proposal) {
+            const match = o.proposal.items.find((pi: any) => 
+              pi.folderItem.collectionItem.card.name === i.name && 
+              pi.folderItem.collectionItem.condition === i.condition && 
+              pi.folderItem.collectionItem.variant === i.variant
+            );
+            if (match) {
+              language = match.folderItem.collectionItem.language;
+            }
+          } else if (o.auction && o.auction.collectionItem) {
+            language = o.auction.collectionItem.language;
+          }
+        }
+
+        return {
+          id: i.id,
+          name: i.name,
+          quantity: i.quantity,
+          price: Number(i.priceBrl),
+          imageSmall: i.imageSmall,
+          condition: i.condition,
+          variant: i.variant,
+          language: language,
+          cardNumber: i.cardNumber,
+          cardTotal: i.cardTotal,
+        };
+      }),
     };
   }
 

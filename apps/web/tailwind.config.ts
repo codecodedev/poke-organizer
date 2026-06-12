@@ -63,12 +63,17 @@ export default {
         shimmer: {
           "0%": { backgroundPosition: "0% 50%" },
           "100%": { backgroundPosition: "200% 50%" }
+        },
+        wobble: {
+          "0%, 100%": { transform: "rotate(15deg)" },
+          "50%": { transform: "rotate(-10deg)" }
         }
       },
       animation: {
         "soft-pop": "soft-pop .22s ease-out",
         "mic-pulse": "mic-pulse 1.7s ease-in-out infinite",
-        shimmer: "shimmer 6s linear infinite"
+        shimmer: "shimmer 6s linear infinite",
+        wobble: "wobble 1s ease-in-out infinite"
       }
     }
   },

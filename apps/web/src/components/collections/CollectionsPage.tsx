@@ -2224,7 +2224,7 @@ function CollectionDetailScreen({
                   <div className="mt-4 grid gap-5 border-t border-line/40 pt-4">
                     <div className="grid gap-1.5 min-w-0">
                       <span className="px-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
-                        Link de compartilhamento (WhatsApp)
+                        Link de compartilhamento
                       </span>
                       <div className="relative flex items-center min-w-0 w-full">
                         <p className="flex-1 truncate rounded-xl bg-slate-50 dark:bg-slate-800 py-3 pl-3 pr-10 text-sm font-semibold text-muted-foreground border border-line/40">

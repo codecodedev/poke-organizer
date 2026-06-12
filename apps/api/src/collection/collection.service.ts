@@ -544,14 +544,14 @@ export class CollectionService {
         userId: folder.userId,
         title: "Nova Proposta Recebida!",
         message: `${offer.buyer.name || offer.buyer.email} enviou uma proposta na coleção "${folder.name}".`,
-        link: `/?page=proposals`,
+        link: `/?page=proposals&proposalId=${offer.id}&subTab=received`,
       },
     });
 
     // Send email notification
     const seller = await this.prisma.user.findUnique({ where: { id: folder.userId } });
     if (seller) {
-      void this.emailService.sendNewProposalEmail(seller.email, offer.buyer.name || offer.buyer.email, folder.name, totalOfferBrl, folder.id, offer.items)
+      void this.emailService.sendNewProposalEmail(seller.email, offer.buyer.name || offer.buyer.email, folder.name, totalOfferBrl, folder.id, offer.items, offer.id)
         .catch(err => console.error("Failed to send proposal email", err));
     }
 
@@ -664,7 +664,7 @@ export class CollectionService {
         });
 
         // Send decision email (Accepted)
-        void this.emailService.sendProposalDecisionEmail(offer.buyer.email, offer.folder.user.name || offer.folder.user.email, offer.folder.name, "accepted")
+        void this.emailService.sendProposalDecisionEmail(offer.buyer.email, offer.folder.user.name || offer.folder.user.email, offer.folder.name, "accepted", offerId)
           .catch(err => console.error("Failed to send accept email", err));
 
       } else if (status === "REJECTED") {
@@ -673,12 +673,12 @@ export class CollectionService {
             userId: offer.buyerId,
             title: "Proposta Recusada",
             message: `Sua proposta na coleção "${offer.folder.name}" foi recusada pelo vendedor.`,
-            link: `/?page=proposals`,
+            link: `/?page=proposals&proposalId=${offerId}&subTab=sent`,
           },
         });
 
         // Send decision email (Rejected)
-        void this.emailService.sendProposalDecisionEmail(offer.buyer.email, offer.folder.user.name || offer.folder.user.email, offer.folder.name, "rejected")
+        void this.emailService.sendProposalDecisionEmail(offer.buyer.email, offer.folder.user.name || offer.folder.user.email, offer.folder.name, "rejected", offerId)
           .catch(err => console.error("Failed to send reject email", err));
       }
       return decided;
@@ -1471,6 +1471,7 @@ export class CollectionService {
       id: offer.id,
       folderId: offer.folderId,
       folderName: offer.folder.name,
+      folderShareToken: offer.folder.shareToken,
       buyerId: offer.buyerId,
       buyerName: offer.buyer.name?.trim() || offer.buyer.email,
       status: offer.status === "ACCEPTED" ? "accepted" : offer.status === "REJECTED" ? "rejected" : "pending",

@@ -59,7 +59,7 @@ export class AuctionService {
       },
       include: auctionInclude,
     });
-    if (!auction) throw new NotFoundException("Leilão não encontrado");
+    if (!auction) throw new NotFoundException("Negociação por lances não encontrada");
     return this.mapDetail(auction);
   }
 
@@ -93,12 +93,12 @@ export class AuctionService {
       include: { bids: { take: 1, orderBy: { amountBrl: "desc" } } },
     });
 
-    if (!auction) throw new NotFoundException("Leilão não encontrado");
+    if (!auction) throw new NotFoundException("Negociação por lances não encontrada");
     if (auction.status !== "OPEN" || auction.endsAt < new Date()) {
-      throw new BadRequestException("Este leilão já foi encerrado");
+      throw new BadRequestException("Esta negociação por lances já foi encerrada");
     }
     if (auction.sellerId === userId) {
-      throw new BadRequestException("Você não pode dar lances no seu próprio leilão");
+      throw new BadRequestException("Você não pode dar lances na sua própria negociação");
     }
 
     const minAmount = auction.bids[0] 
@@ -124,8 +124,8 @@ export class AuctionService {
       this.prisma.notification.create({
         data: {
           userId: auction.sellerId,
-          title: "Novo Lance no Leilão!",
-          message: `O seu leilão recebeu um novo lance de R$ ${dto.amountBrl.toFixed(2)}.`,
+          title: "Novo lance recebido",
+          message: `Sua negociação por lances recebeu uma nova oferta de R$ ${dto.amountBrl.toFixed(2)}.`,
           link: `/auctions/${auction.shareToken}`,
         },
       }),
@@ -145,7 +145,7 @@ export class AuctionService {
     const auction = await this.prisma.auction.findFirst({
       where: { id, sellerId: userId },
     });
-    if (!auction) throw new NotFoundException("Leilão não encontrado");
+    if (!auction) throw new NotFoundException("Negociação por lances não encontrada");
 
     const updated = await this.prisma.auction.update({
       where: { id },
@@ -162,7 +162,7 @@ export class AuctionService {
       include: { bids: true, collectionItem: { include: { card: true } } },
     });
 
-    if (!auction) throw new NotFoundException("Leilão não encontrado");
+    if (!auction) throw new NotFoundException("Negociação por lances não encontrada");
     
     const bid = auction.bids.find(b => b.id === bidId);
     if (!bid) throw new NotFoundException("Lance não encontrado");
@@ -211,7 +211,7 @@ export class AuctionService {
         data: {
           userId: bid.bidderId,
           title: "Seu lance venceu!",
-          message: `Parabéns! Seu lance de R$ ${Number(bid.amountBrl).toFixed(2)} no leilão "${auction.title || 'Carta Pokémon'}" foi o vencedor.`,
+          message: `Parabéns! Seu lance de R$ ${Number(bid.amountBrl).toFixed(2)} na negociação "${auction.title || 'Carta Pokémon'}" foi o maior.`,
           link: `/orders?tab=purchases`,
         },
       });
@@ -219,7 +219,7 @@ export class AuctionService {
       void this.emailService.sendAuctionWinnerEmail(
         bidder.email, 
         updated.seller.name || updated.seller.email, 
-        auction.title || "Leilão de Carta", 
+        auction.title || "Negociação por lances", 
         Number(bid.amountBrl)
       ).catch(err => console.error("Failed to send bid winner email", err));
     }
@@ -232,7 +232,7 @@ export class AuctionService {
       where: { id, sellerId: userId },
     });
 
-    if (!auction) throw new NotFoundException("Leilão não encontrado");
+    if (!auction) throw new NotFoundException("Negociação por lances não encontrada");
 
     const bid = await this.prisma.auctionBid.findFirst({
       where: { id: bidId, auctionId: id }

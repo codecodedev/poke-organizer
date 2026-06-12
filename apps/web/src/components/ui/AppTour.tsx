@@ -9,6 +9,7 @@ type AppTourProps = {
   run?: boolean;
   onComplete?: () => void;
   showHelpButton?: boolean;
+  autoStart?: boolean;
 };
 
 
@@ -19,30 +20,24 @@ function CustomBeacon(props: any) {
       {...beaconProps} 
       className="relative flex items-center justify-center cursor-pointer group pointer-events-auto"
     >
-      <div className="absolute h-8 w-8 animate-ping rounded-full bg-brand/30" />
-      <div className="relative animate-bounce-slow">
+      <div className="absolute h-10 w-10 animate-ping rounded-full bg-brand/30" />
+      <div className="relative animate-wobble">
         <svg 
-          width="32" 
-          height="32" 
-          viewBox="0 0 24 24" 
-          fill="none" 
-          stroke="currentColor" 
-          strokeWidth="3" 
-          strokeLinecap="round" 
-          strokeLinejoin="round" 
-          className="text-brand drop-shadow-[0_2px_4px_rgba(0,0,0,0.3)] rotate-[15deg] group-hover:rotate-0 transition-transform"
+          width="38" 
+          height="38" 
+          viewBox="-64 0 512 512" 
+          fill="currentColor"
+          className="text-brand drop-shadow-[0_4px_8px_rgba(0,0,0,0.4)]"
+          xmlns="http://www.w3.org/2000/svg"
         >
-          <path d="M18 11V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-          <path d="M14 10V4a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-          <path d="M10 10.5V6a2 2 0 0 0-2-2v0a2 2 0 0 0-2 2v0" />
-          <path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" />
+          <path d="M135.652 0c23.625 0 43.826 20.65 43.826 44.8v99.851c17.048-16.34 49.766-18.346 70.944 6.299 22.829-14.288 53.017-2.147 62.315 16.45C361.878 158.426 384 189.346 384 240c0 2.746-.203 13.276-.195 16 .168 61.971-31.065 76.894-38.315 123.731C343.683 391.404 333.599 400 321.786 400H150.261l-.001-.002c-18.366-.011-35.889-10.607-43.845-28.464C93.421 342.648 57.377 276.122 29.092 264 10.897 256.203.008 242.616 0 224c-.014-34.222 35.098-57.752 66.908-44.119 8.359 3.583 16.67 8.312 24.918 14.153V44.8c0-23.45 20.543-44.8 43.826-44.8zM136 416h192c13.255 0 24 10.745 24 24v48c0 13.255-10.745 24-24 24H136c-13.255 0-24-10.745-24-24v-48c0-13.255 10.745-24 24-24zm168 28c-11.046 0-20 8.954-20 20s8.954 20 20 20 20-8.954 20-20-8.954-20-20-20z"/>
         </svg>
       </div>
     </div>
   );
 }
 
-export function AppTour({ tourId, steps, run = true, onComplete, showHelpButton = true }: AppTourProps) {
+export function AppTour({ tourId, steps, run = true, onComplete, showHelpButton = true, autoStart = false }: AppTourProps) {
   const { isTourCompleted, completeTour, restartTour } = useTour();
   const [isMounted, setIsMounted] = useState(false);
   const shouldRun = run && !isTourCompleted(tourId);
@@ -89,11 +84,17 @@ export function AppTour({ tourId, steps, run = true, onComplete, showHelpButton 
 
   const brandColor = "#ef5d75";
 
+  // Conditionally skip beacons for individual steps
+  const finalSteps = autoStart ? steps.map(step => ({
+    ...step,
+    skipBeacon: true, // v3 uses skipBeacon instead of disableBeacon
+  })) : steps;
+
   return (
     <>
       <Joyride
         {...{
-          steps: steps,
+          steps: finalSteps,
           run: isTourActive,
           continuous: true,
           scrollToFirstStep: true,

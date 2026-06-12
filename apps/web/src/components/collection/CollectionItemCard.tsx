@@ -8,6 +8,14 @@ import {
   Trash2,
   Sparkles,
   Flame,
+  MessageSquare,
+  MessageCircle,
+  BadgeInfo,
+  Users,
+  ContactRound,
+  Handshake,
+  BadgeDollarSign,
+  FileText,
 } from "lucide-react";
 import {
   type CollectionItem,
@@ -104,14 +112,14 @@ export function CollectionItemCard({
 
       {(item.store?.proposalsCount ?? 0) > 0 && (
         <span
-          className={`absolute right-4 z-30 flex items-center gap-1 rounded-full border border-orange-500/40 bg-orange-500/90 px-2 py-1 text-xs font-black text-white shadow-sm backdrop-blur ${
+          className={`absolute right-4 z-30 flex items-center gap-1 rounded-full border border-orange-500/40 bg-red-500 px-2 py-1 text-xs font-black text-white shadow-sm backdrop-blur ${
             item.quantity > 1
               ? (onToggleSelection ? "top-24" : "top-14")
               : (onToggleSelection ? "top-14" : "top-4")
           }`}
-          title={`${item.store?.proposalsCount} proposta(s) atrelada(s) a esta carta`}
+          title={`${item.store?.proposalsCount} pessoas interessadas na carta`}
         >
-          <Flame size={12} className="fill-orange-200" />
+          <Handshake size={12} className="stroke-white" />
           {item.store?.proposalsCount}
         </span>
       )}

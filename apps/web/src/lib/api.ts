@@ -37,6 +37,8 @@ export type Session = {
     email: string; 
     name?: string | null;
     whatsapp?: string | null;
+    state?: string | null;
+    city?: string | null;
     profileSlug?: string | null;
     profileBio?: string | null;
     isPublicProfile?: boolean;
@@ -222,10 +224,10 @@ export const api = {
       body: JSON.stringify({ email, password }),
     });
   },
-  register(email: string, password: string, name?: string) {
-    return request<Session>("/auth/register", {
+  register(email: string, password: string, name: string | undefined, acceptTerms: boolean, acceptPrivacy: boolean, state?: string, city?: string) {
+    return request<{ message: string }>("/auth/register", {
       method: "POST",
-      body: JSON.stringify({ email, password, name }),
+      body: JSON.stringify({ email, password, name, acceptTerms, acceptPrivacy, state, city }),
     });
   },
   refresh(refreshToken: string) {
@@ -462,7 +464,7 @@ export const api = {
   checkProfileSlug(slug: string) {
     return request<{ available: boolean }>(`/users/check-slug/${encodeURIComponent(slug)}`);
   },
-  updateUserProfile(token: string, payload: { name?: string; whatsapp?: string; profileSlug?: string; profileBio?: string; isPublicProfile?: boolean }) {
+  updateUserProfile(token: string, payload: { name?: string; whatsapp?: string; state?: string; city?: string; profileSlug?: string; profileBio?: string; isPublicProfile?: boolean }) {
     return request<any>("/users/profile", {
       method: "PATCH",
       token,
@@ -478,18 +480,18 @@ export const api = {
   getAuctionDetail(idOrToken: string, token?: string) {
     return request<AuctionDetail>(`/auctions/${encodeURIComponent(idOrToken)}`, { token });
   },
-  createAuction(token: string, payload: { collectionItemId: string; title?: string; description?: string; minBidBrl: number; endsAt: string }) {
+  createAuction(token: string, payload: { collectionItemId: string; title?: string; description?: string; minBidBrl: number; endsAt: string; acceptedResponsibility: boolean }) {
     return request<AuctionDetail>("/auctions", {
       method: "POST",
       token,
       body: JSON.stringify(payload),
     });
   },
-  placeBid(token: string, auctionId: string, amountBrl: number) {
+  placeBid(token: string, auctionId: string, amountBrl: number, acceptedResponsibility: boolean) {
     return request<AuctionDetail>(`/auctions/${encodeURIComponent(auctionId)}/bids`, {
       method: "POST",
       token,
-      body: JSON.stringify({ amountBrl }),
+      body: JSON.stringify({ amountBrl, acceptedResponsibility }),
     });
   },
   closeAuction(token: string, auctionId: string) {
@@ -610,6 +612,7 @@ export const api = {
       message?: string;
       totalOffer?: number;
       isGlobalOffer?: boolean;
+      acceptedResponsibility: boolean;
       items: Array<{ folderItemId: string; quantity?: number; amount: number }>;
     },
   ) {

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import { ShoppingBag, X, Plus, Minus, MessageSquare, ChevronDown, ChevronUp, Check } from "lucide-react";
+import { ShoppingBag, X, Plus, Minus, MessageSquare, ChevronDown, ChevronUp, Check, Trash2 } from "lucide-react";
 import type { CollectionItem, CollectionCartOffer } from "@poke-organizer/shared";
 import { formatBrl } from "../lib/format";
 import { Button } from "./ui/Button";
@@ -44,6 +44,7 @@ export function ProposalCart({
   const [isExpanded, setIsExpanded] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [acceptedResponsibility, setAcceptedResponsibility] = useState(false);
 
   useEffect(() => {
     onExpandedChange?.(isExpanded);
@@ -109,6 +110,11 @@ export function ProposalCart({
        return;
     }
 
+    if (!acceptedResponsibility) {
+      setError("Confirme que você entende que pagamento, envio e entrega são responsabilidade dos usuários.");
+      return;
+    }
+
     const proposalItems = cartList.map((entry) => ({
       folderItemId: entry.item.folderItemId!,
       amount: Number(entry.amount),
@@ -130,6 +136,7 @@ export function ProposalCart({
       setMessage("");
       setGlobalTotal("");
       setIsGlobalMode(false);
+      setAcceptedResponsibility(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao enviar proposta");
     }
@@ -268,9 +275,10 @@ export function ProposalCart({
                       </div>
                       <button 
                         onClick={(e) => { e.stopPropagation(); removeFromCart(entry.item.id); }}
-                        className="p-2 text-muted-foreground hover:text-rose-500 transition-colors opacity-0 group-hover:opacity-100"
+                        className="p-2 text-muted-foreground hover:text-rose-500 transition-colors"
+                        title="Remover do carrinho"
                       >
-                        <X size={16} />
+                        <Trash2 size={16} />
                       </button>
                     </div>
 
@@ -373,7 +381,7 @@ export function ProposalCart({
           </div>
 
           {/* Expanded Footer Area */}
-          <div className={`border-t border-card-border/30 bg-muted/50 p-5 backdrop-blur-md transition-all duration-500 ${isExpanded ? "opacity-100" : "opacity-0 pointer-events-none h-0 p-0"}`}>
+          <div className={`border-t border-card-border/30 bg-muted/50 p-5 backdrop-blur-md transition-all duration-500 ${isExpanded ? "opacity-100 inline-block" : "opacity-0 hidden pointer-events-none h-0 p-0"}`}>
             <div className="mb-4 flex items-center justify-between px-1">
               <span className="text-sm font-black text-muted-foreground uppercase tracking-widest">Total da Proposta</span>
               <span className={`text-2xl font-black transition-colors ${isGlobalMode ? "text-brand" : "text-foreground"}`}>
@@ -382,10 +390,27 @@ export function ProposalCart({
             </div>
             {error && <p className="mb-4 text-[10px] font-bold text-rose-500 text-center">{error}</p>}
 
+            {session && (
+              <label
+                className="mb-4 flex cursor-pointer items-start gap-3 rounded-2xl border border-card-border/50 bg-card/80 p-3 text-left"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1 h-4 w-4 rounded border-card-border accent-cyan"
+                  checked={acceptedResponsibility}
+                  onChange={(event) => setAcceptedResponsibility(event.target.checked)}
+                />
+                <span className="text-[10px] font-bold leading-4 text-muted-foreground">
+                  Entendo que o Coleciona Cards apenas conecta comprador e vendedor. Pagamento, envio, entrega, autenticidade e conclusão da negociação são responsabilidade dos usuários envolvidos.
+                </span>
+              </label>
+            )}
+
             <Button 
               className="w-full h-14 text-base shadow-glow tour-finalize-proposal"
               variant="brand"
-              disabled={isSubmitting || cartList.length === 0}
+              disabled={isSubmitting || cartList.length === 0 || Boolean(session && !acceptedResponsibility)}
               onClick={(e) => { e.stopPropagation(); handleFinalize(); }}
             >
               {isSubmitting ? "Enviando..." : (session ? "Finalizar Proposta" : "Fazer Login para Enviar")}

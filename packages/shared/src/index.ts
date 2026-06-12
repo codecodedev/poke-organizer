@@ -223,6 +223,8 @@ export type UserPublicProfile = {
   slug: string | null;
   bio: string | null;
   avatarUrl: string | null;
+  state?: string | null;
+  city?: string | null;
   collections: {
     viewing: CollectionFolderSummary[];
     selling: CollectionFolderSummary[];
@@ -244,6 +246,7 @@ export type CollectionCartOffer = {
   id: string;
   folderId: string;
   folderName: string;
+  folderShareToken: string | null;
   buyerId: string;
   buyerName: string;
   status: CollectionOfferStatus;
@@ -425,6 +428,7 @@ export type OrderItem = {
   imageSmall?: string | null;
   condition?: string | null;
   variant?: string | null;
+  language?: string | null;
   cardNumber?: string | null;
   cardTotal?: number | null;
 };
@@ -458,6 +462,9 @@ export type OrderSummary = {
 export type OrderDetail = OrderSummary & {
   messages: OrderMessage[];
 };
+
+export const LEGAL_TERMS_VERSION = "2026-06-12";
+export const LEGAL_PRIVACY_VERSION = "2026-06-12";
 
 export function normalizeCardNumber(value: string): string {
   return value.trim().replace(/\s+/g, "").toUpperCase();

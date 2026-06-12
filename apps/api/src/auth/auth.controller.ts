@@ -1,5 +1,6 @@
-import { Body, Controller, Get, Post, UseGuards } from "@nestjs/common";
+import { Body, Controller, Get, Post, Req, UseGuards } from "@nestjs/common";
 import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import type { FastifyRequest } from "fastify";
 import { CurrentUser, RequestUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { AuthService } from "./auth.service";
@@ -11,8 +12,16 @@ export class AuthController {
   constructor(private readonly auth: AuthService) {}
 
   @Post("register")
-  register(@Body() dto: RegisterDto) {
-    return this.auth.register(dto);
+  register(@Body() dto: RegisterDto, @Req() req: FastifyRequest) {
+    const forwardedFor = req.headers["x-forwarded-for"];
+    const ip = Array.isArray(forwardedFor)
+      ? forwardedFor[0]
+      : forwardedFor?.split(",")[0]?.trim() || req.ip;
+
+    return this.auth.register(dto, {
+      ip,
+      userAgent: req.headers["user-agent"],
+    });
   }
 
   @Post("confirm-email")

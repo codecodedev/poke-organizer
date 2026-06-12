@@ -326,7 +326,7 @@ function OrderCard({ order, tab, onOpenDetail }: { order: OrderSummary; tab: Tab
               rel="noopener noreferrer"
             >
               <ExternalLink size={14} />
-              Ver Leilão
+              Ver negociação
             </a>
           )}
         </div>
@@ -468,27 +468,40 @@ function OrderDetailView({
 }
 
 function OrderItems({ items, compact = false }: { items: OrderSummary["items"]; compact?: boolean }) {
+  const displayItems = compact ? items.slice(0, 10) : items;
+  const hasMore = compact && items.length > 10;
+
   return (
     <div className={`${compact ? "p-4 sm:p-6 bg-muted/20" : "p-5"}`}>
       <div className="grid gap-4">
-        {items.map((item) => (
+        {displayItems.map((item) => (
           <div key={item.id} className="flex items-center gap-4">
-            <div className="h-12 w-9 sm:h-16 sm:w-12 overflow-hidden rounded-lg bg-input border border-card-border/40 shadow-sm shrink-0">
-              <img src={item.imageSmall || ""} className="h-full w-full object-contain" alt="" />
-            </div>
+            {!compact && (
+              <div className="h-12 w-9 sm:h-16 sm:w-12 overflow-hidden rounded-lg bg-input border border-card-border/40 shadow-sm shrink-0">
+                <img src={item.imageSmall || ""} className="h-full w-full object-contain" alt="" />
+              </div>
+            )}
             <div className="flex-1 min-w-0">
               <p className="font-black text-foreground text-sm sm:text-base truncate">
-                {item.quantity}x {item.name}
+                <span className="text-brand mr-1">{item.quantity}x</span> {item.name}
                 {item.cardNumber && <span className="ml-2 text-[10px] text-muted-foreground">#{item.cardNumber}{item.cardTotal ? `/${item.cardTotal}` : ""}</span>}
               </p>
-              <div className="flex flex-wrap items-center gap-2 mt-1">
-                {item.condition && <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded uppercase">{item.condition}</span>}
-                {item.variant && item.variant !== "normal" && <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded uppercase">{formatCardVariant(item.variant)}</span>}
-              </div>
+              {!compact && (
+                <div className="flex flex-wrap items-center gap-2 mt-1">
+                  {item.condition && <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded uppercase">{item.condition}</span>}
+                  {item.variant && item.variant !== "normal" && <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded uppercase">{formatCardVariant(item.variant)}</span>}
+                  {item.language && <span className="text-[9px] sm:text-[10px] font-bold text-muted-foreground bg-muted px-1.5 py-0.5 rounded uppercase">{item.language}</span>}
+                </div>
+              )}
             </div>
-            <p className="font-bold text-foreground text-sm sm:text-base">{formatBrl(item.price)}</p>
+            {!compact && <p className="font-bold text-foreground text-sm sm:text-base">{formatBrl(item.price)}</p>}
           </div>
         ))}
+        {hasMore && (
+          <div className="text-[10px] font-black text-brand uppercase tracking-widest pt-2">
+            + {items.length - 10} cartas (Ver detalhes do pedido)
+          </div>
+        )}
       </div>
     </div>
   );

@@ -2,6 +2,7 @@ import { ConflictException, Injectable, UnauthorizedException, BadRequestExcepti
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { User } from "@prisma/client";
+import { LEGAL_PRIVACY_VERSION, LEGAL_TERMS_VERSION } from "@poke-organizer/shared";
 import * as argon2 from "argon2";
 import * as randomstring from "randomstring";
 import { PrismaService } from "../prisma/prisma.service";
@@ -13,6 +14,11 @@ type TokenPair = {
   refreshToken: string;
 };
 
+type RegisterContext = {
+  ip?: string;
+  userAgent?: string | string[];
+};
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -22,7 +28,11 @@ export class AuthService {
     private readonly emailService: EmailService
   ) {}
 
-  async register(dto: RegisterDto) {
+  async register(dto: RegisterDto, context: RegisterContext = {}) {
+    if (!dto.acceptTerms || !dto.acceptPrivacy) {
+      throw new BadRequestException("É necessário aceitar os Termos de Uso e a Política de Privacidade.");
+    }
+
     const email = dto.email.toLowerCase().trim();
     
     // Check if user or identity already exists
@@ -46,8 +56,18 @@ export class AuthService {
         data: {
           email,
           name: dto.name?.trim() || null,
+          state: dto.state?.trim() || null,
+          city: dto.city?.trim() || null,
           passwordHash: await argon2.hash(dto.password),
           emailConfirmationToken,
+          termsAcceptedAt: new Date(),
+          termsVersion: LEGAL_TERMS_VERSION,
+          privacyAcceptedAt: new Date(),
+          privacyVersion: LEGAL_PRIVACY_VERSION,
+          legalAcceptedIp: context.ip || null,
+          legalAcceptedUserAgent: Array.isArray(context.userAgent)
+            ? context.userAgent.join(", ")
+            : context.userAgent || null,
           identities: {
             create: {
               provider: "password",
@@ -195,6 +215,8 @@ export class AuthService {
         profileBio: true,
         isPublicProfile: true,
         whatsapp: true,
+        state: true,
+        city: true,
         createdAt: true
       }
     });
@@ -211,7 +233,9 @@ export class AuthService {
         profileSlug: user.profileSlug,
         profileBio: user.profileBio,
         isPublicProfile: user.isPublicProfile,
-        whatsapp: user.whatsapp
+        whatsapp: user.whatsapp,
+        state: user.state,
+        city: user.city
       },
       ...tokens
     };

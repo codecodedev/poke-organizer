@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useEffect, type ReactNode } from "react";
 import {
   FolderOpen,
   Home,
@@ -70,10 +70,21 @@ export function Sidebar({
   onUnauthorized,
 }: Props) {
   const [isHovered, setIsHovered] = useState(false);
+  const [canHover, setCanHover] = useState(false);
   const dark = theme === "dark";
+  
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const mediaQuery = window.matchMedia('(hover: hover)');
+      setCanHover(mediaQuery.matches);
+      
+      const listener = (e: MediaQueryListEvent) => setCanHover(e.matches);
+      mediaQuery.addEventListener('change', listener);
+      return () => mediaQuery.removeEventListener('change', listener);
+    }
+  }, []);
 
-  // Only allow hover to expand sidebar on desktop
-  const effectiveOpen = isOpen || (isHovered && typeof window !== 'undefined' && window.innerWidth >= 768);
+  const effectiveOpen = isOpen || (isHovered && typeof window !== 'undefined' && window.innerWidth >= 768 && canHover);
 
   return (
     <>

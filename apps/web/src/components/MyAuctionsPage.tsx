@@ -52,11 +52,11 @@ export function MyAuctionsPage({ session, onSession, onUnauthorized, onSelectAuc
     <div className="space-y-6">
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black text-foreground">Meus Leilões</h1>
-          <p className="text-muted-foreground font-medium">Gerencie suas vendas por leilão</p>
+          <h1 className="text-2xl font-black text-foreground">Minhas negociações por lances</h1>
+          <p className="text-muted-foreground font-medium">Gerencie suas ofertas abertas</p>
         </div>
         <Button variant="brand" className="text-white dark:text-ink" icon={<Plus size={18} />} onClick={() => setShowWizard(true)}>
-          Novo Leilão
+          Nova negociação
         </Button>
       </header>
 
@@ -79,11 +79,11 @@ export function MyAuctionsPage({ session, onSession, onUnauthorized, onSelectAuc
       </Panel>
 
       {loading ? (
-        <LoadingScreen message="Carregando seus leilões..." fullScreen={false} />
+        <LoadingScreen message="Carregando suas negociações..." fullScreen={false} />
       ) : filteredAuctions.length === 0 ? (
         <div className="py-20 text-center rounded-[32px] border-2 border-dashed border-slate-400/40 bg-card/20">
           <Gavel size={40} className="mx-auto text-muted-foreground/40 mb-4" />
-          <p className="text-muted-foreground font-bold">Nenhum leilão encontrado nesta categoria.</p>
+          <p className="text-muted-foreground font-bold">Nenhuma negociação encontrada nesta categoria.</p>
         </div>
       ) : (
         <div className="grid gap-4">

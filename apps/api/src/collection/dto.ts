@@ -10,6 +10,7 @@ import { Transform, Type } from "class-transformer";
 import {
   IsArray,
   IsBoolean,
+  Equals,
   IsIn,
   IsInt,
   IsNumber,
@@ -232,6 +233,12 @@ export class CreateCollectionCartOfferDto {
   @Transform(({ value }) => value === true || value === "true")
   @IsBoolean()
   isGlobalOffer?: boolean;
+
+  @ApiProperty({ example: true })
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  @Equals(true)
+  acceptedResponsibility!: boolean;
 }
 
 export class DecideCollectionCartOfferDto {

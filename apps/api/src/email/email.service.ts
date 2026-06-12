@@ -149,22 +149,22 @@ export class EmailService {
 
     const html = this.wrapHtml(`
       <h1>Novo lance recebido!</h1>
-      <p>Ótimas notícias! Seu leilão <strong>"${auctionTitle}"</strong> acaba de receber uma nova oferta.</p>
+      <p>Ótimas notícias! Sua negociação por lances <strong>"${auctionTitle}"</strong> acaba de receber uma nova oferta.</p>
       <div class="highlight-box" style="text-align: center;">
         <p style="margin: 0; text-transform: uppercase; font-size: 12px; font-weight: 900; color: #94a3b8;">Lance Atual</p>
         <p class="price-text" style="margin: 8px 0 0 0;">R$ ${amount.toFixed(2).replace(".", ",")}</p>
       </div>
-      <p>O leilão está ficando movimentado. Fique de olho para não perder nenhuma atualização!</p>
+      <p>A negociação está ficando movimentada. Fique de olho para não perder nenhuma atualização!</p>
       <div style="text-align: center;">
-        <a href="${auctionUrl}" class="button">Ver meu Leilão</a>
+        <a href="${auctionUrl}" class="button">Ver negociação</a>
       </div>
-    `, `Novo lance de R$ ${amount.toFixed(2)} no seu leilão!`);
+    `, `Novo lance de R$ ${amount.toFixed(2)} na sua negociação!`);
 
     try {
       const { data, error } = await this.resend.emails.send({
         from: this.config.get("SMTP_FROM") || "Coleciona Cards <onboarding@resend.dev>",
         to: [email],
-        subject: "Novo lance no seu leilão!",
+        subject: "Novo lance na sua negociação!",
         html,
       });
 
@@ -222,9 +222,9 @@ export class EmailService {
     `;
   }
 
-  async sendNewProposalEmail(email: string, buyerName: string, folderName: string, total: number, folderId: string, items: any[] = []) {
+  async sendNewProposalEmail(email: string, buyerName: string, folderName: string, total: number, folderId: string, items: any[] = [], offerId?: string) {
     const baseUrl = this.getBaseUrl();
-    const proposalUrl = `${baseUrl}/?page=proposals`;
+    const proposalUrl = `${baseUrl}/?page=proposals` + (offerId ? `&proposalId=${offerId}&subTab=received` : "");
 
     const itemsHtml = this.renderItemsTable(items);
 
@@ -263,10 +263,10 @@ export class EmailService {
     }
   }
 
-  async sendProposalDecisionEmail(email: string, sellerName: string, folderName: string, status: "accepted" | "rejected") {
+  async sendProposalDecisionEmail(email: string, sellerName: string, folderName: string, status: "accepted" | "rejected", offerId?: string) {
     const isAccepted = status === "accepted";
     const baseUrl = this.getBaseUrl();
-    const targetUrl = isAccepted ? `${baseUrl}/?page=orders&tab=purchases` : `${baseUrl}/?page=proposals`;
+    const targetUrl = isAccepted ? `${baseUrl}/?page=orders&tab=purchases` : `${baseUrl}/?page=proposals` + (offerId ? `&proposalId=${offerId}&subTab=sent` : "");
     
     const html = this.wrapHtml(`
       <h1>Sua proposta foi ${isAccepted ? "aceita" : "recusada"}</h1>
@@ -307,8 +307,8 @@ export class EmailService {
     const ordersUrl = `${baseUrl}/?page=orders&tab=purchases`;
 
     const html = this.wrapHtml(`
-      <h1>Você venceu o leilão!</h1>
-      <p>Parabéns! Seu lance foi o vencedor no leilão <strong>"${auctionTitle}"</strong>.</p>
+      <h1>Você fez a maior oferta!</h1>
+      <p>Parabéns! Seu lance foi o maior na negociação <strong>"${auctionTitle}"</strong>.</p>
       <div class="highlight-box" style="text-align: center;">
         <p style="margin: 0; text-transform: uppercase; font-size: 12px; font-weight: 900; color: #94a3b8;">Lance Vencedor</p>
         <p class="price-text" style="margin: 8px 0 0 0;">R$ ${amount.toFixed(2).replace(".", ",")}</p>
@@ -317,13 +317,13 @@ export class EmailService {
       <div style="text-align: center;">
         <a href="${ordersUrl}" class="button">Ver meu Pedido</a>
       </div>
-    `, `Parabéns! Você venceu o leilão "${auctionTitle}"!`);
+    `, `Parabéns! Você fez a maior oferta em "${auctionTitle}"!`);
 
     try {
       const { data, error } = await this.resend.emails.send({
         from: this.config.get("SMTP_FROM") || "Coleciona Cards <onboarding@resend.dev>",
         to: [email],
-        subject: `Você venceu o leilão: ${auctionTitle}!`,
+        subject: `Você fez a maior oferta: ${auctionTitle}!`,
         html,
       });
 

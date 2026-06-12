@@ -99,6 +99,8 @@ model User {
   profileBio   String?
   isPublicProfile Boolean       @default(false)
   whatsapp     String?
+  state        String?
+  city         String?
   
   // Email confirmation
   emailConfirmedAt      DateTime?
@@ -107,6 +109,14 @@ model User {
   // Password reset
   passwordResetToken     String?    @unique
   passwordResetExpiresAt DateTime?
+
+  // Legal acceptance
+  termsAcceptedAt        DateTime?
+  termsVersion           String?
+  privacyAcceptedAt      DateTime?
+  privacyVersion         String?
+  legalAcceptedIp        String?
+  legalAcceptedUserAgent String?
 
   identities   UserIdentity[]
   refreshTokens RefreshToken[]

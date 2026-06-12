@@ -28,4 +28,14 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   whatsapp?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  state?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  city?: string;
 }

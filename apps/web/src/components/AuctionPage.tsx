@@ -38,13 +38,14 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [timeLeft, setTimeLeft] = useState("");
+  const [acceptedBidResponsibility, setAcceptedBidResponsibility] = useState(false);
 
   const load = useCallback(async () => {
     try {
       const data = await api.getAuctionDetail(shareToken, session?.accessToken);
       setAuction(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Leilão não encontrado");
+      setError(err instanceof Error ? err.message : "Negociação por lances não encontrada");
     } finally {
       setLoading(false);
     }
@@ -89,15 +90,21 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
   async function handleBid(e: React.FormEvent) {
     e.preventDefault();
     if (!session) return;
+
+    if (!acceptedBidResponsibility) {
+      setMessage({ type: "error", text: "Confirme que você entende que este lance é uma intenção de negociação e que a plataforma não participa do pagamento, envio ou entrega." });
+      return;
+    }
     
     setSubmitting(true);
     setMessage(null);
     try {
       await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-        api.placeBid(token, shareToken, Number(bidAmount))
+        api.placeBid(token, shareToken, Number(bidAmount), acceptedBidResponsibility)
       );
       setMessage({ type: "success", text: "Lance realizado com sucesso!" });
       setBidAmount("");
+      setAcceptedBidResponsibility(false);
       void load();
     } catch (err) {
       setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao realizar lance" });
@@ -115,7 +122,7 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
       );
       void load();
     } catch (err) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao encerrar leilão" });
+      setMessage({ type: "error", text: err instanceof Error ? err.message : "Erro ao encerrar negociação" });
     } finally {
       setSubmitting(false);
     }
@@ -151,8 +158,8 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
     }
   }
 
-  if (loading) return <LoadingScreen message="Carregando leilão..." />;
-  if (error || !auction) return <div className="p-10 text-center font-bold text-magenta">{error || "Leilão não encontrado"}</div>;
+  if (loading) return <LoadingScreen message="Carregando negociação..." />;
+  if (error || !auction) return <div className="p-10 text-center font-bold text-magenta">{error || "Negociação por lances não encontrada"}</div>;
 
   const isOwner = session?.user.id === auction.sellerId;
   const isOpen = auction.status === "open" && new Date(auction.endsAt) > new Date();
@@ -162,8 +169,8 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
     <div className="grid gap-8 lg:grid-cols-[1fr_360px]">
       {auction && (
         <SEO 
-          title={`Leilão: ${auction.card.name}`} 
-          description={`Participe do leilão de ${auction.card.name} (${auction.card.rarity}) de ${auction.sellerName} no Coleciona cards. Lance atual: ${formatBrl(auction.currentBid ?? auction.minBid)}.`}
+          title={`Negociação por lances: ${auction.card.name}`} 
+          description={`Participe da negociação por lances de ${auction.card.name} (${auction.card.rarity}) de ${auction.sellerName} no Coleciona cards. Lance atual: ${formatBrl(auction.currentBid ?? auction.minBid)}.`}
           image={auction.card.imageLarge || undefined}
           url={`/auctions/${shareToken}`}
         />
@@ -179,7 +186,7 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                  <span className="rounded-lg bg-amber/10 px-2 py-1 text-[10px] font-black text-amber uppercase tracking-wider flex items-center gap-1 border border-amber/20">
-                   <Gavel size={12} /> Leilão
+                   <Gavel size={12} /> Oferta aberta
                  </span>
                  <span className={`rounded-lg px-2 py-1 text-[10px] font-black uppercase tracking-wider ${
                    isOpen ? "bg-leaf/10 text-leaf border border-leaf/20" : "bg-muted text-muted-foreground border border-card-border"
@@ -327,7 +334,7 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
                   <div className="space-y-4">
                     <div className="rounded-2xl bg-slate-200 dark:bg-slate-800 bg-background/10 p-4 border border-background/10">
                       <p className="text-xs text-ink dark:text-white font-bold opacity-70 text-center mb-4">
-                        Você é o dono deste leilão.
+                        Você é o dono desta negociação.
                       </p>
                       <Button
                         variant="brand"
@@ -362,22 +369,27 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
                         message.type === "success" ? "bg-leaf/20 text-leaf" : "bg-magenta/20 text-magenta"
                       }`}>
                         <p>{message.text}</p>
-                        {message.text.includes("WhatsApp") && (
-                          <Button
-                            variant="outline"
-                            className="mt-3 w-full h-10 border-background/20 text-background hover:bg-background/10"
-                            onClick={() => onNavigate({ view: "profile", returnTo: window.location.href })}
-                          >
-                            Ir para o Perfil
-                          </Button>
-                        )}
                       </div>
+                    )}
+
+                    {session && (
+                      <label className="flex cursor-pointer items-start gap-3 rounded-2xl border border-background/10 bg-slate-200 p-3 text-left dark:bg-slate-800">
+                        <input
+                          type="checkbox"
+                          className="mt-1 h-4 w-4 rounded border-card-border accent-amber"
+                          checked={acceptedBidResponsibility}
+                          onChange={(event) => setAcceptedBidResponsibility(event.target.checked)}
+                        />
+                        <span className="text-[10px] font-bold leading-4 text-ink/70 dark:text-white/60">
+                          Entendo que este lance representa intenção de negociação. O Coleciona Cards não participa do pagamento, envio, entrega ou autenticação do item.
+                        </span>
+                      </label>
                     )}
 
                     <Button
                       variant="brand"
                       className="w-full h-14 text-base shadow-glow shadow-amber/20 bg-amber text-amber-950 hover:bg-amber/90 border-none"
-                      disabled={submitting || !bidAmount || Number(bidAmount) < minNextBid}
+                      disabled={submitting || !bidAmount || Number(bidAmount) < minNextBid || Boolean(session && !acceptedBidResponsibility)}
                       onClick={handleBid}
                     >
                       {submitting ? "Processando..." : "Confirmar Lance"}
@@ -393,7 +405,7 @@ export function AuctionPage({ shareToken, session, onSession, onUnauthorized, on
               </div>
             ) : (
               <div className="rounded-2xl bg-background/5 p-6 border border-background/10 text-center">
-                 <p className="text-sm font-black text-background">Este leilão foi encerrado.</p>
+                 <p className="text-sm font-black text-background">Esta negociação foi encerrada.</p>
                  <p className="text-xs font-medium opacity-40 mt-1">
                    {auction.currentBid ? "Vendido pelo maior lance." : "Encerrado sem lances."}
                  </p>

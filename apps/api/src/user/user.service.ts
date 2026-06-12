@@ -40,6 +40,8 @@ export class UserService {
       slug: user.profileSlug,
       bio: user.profileBio,
       avatarUrl: null, // To be implemented
+      state: user.state,
+      city: user.city,
       collections: { viewing, selling },
       auctions: user.auctions.map(a => ({
         id: a.id,
@@ -93,7 +95,9 @@ export class UserService {
         profileSlug: dto.profileSlug,
         profileBio: dto.profileBio,
         isPublicProfile: dto.isPublicProfile,
-        whatsapp: dto.whatsapp
+        whatsapp: dto.whatsapp,
+        state: dto.state,
+        city: dto.city
       }
     });
   }

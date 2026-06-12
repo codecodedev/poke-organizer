@@ -68,7 +68,7 @@ export const COLLECTION_DETAIL_TOUR: Step[] = [
   {
     target: ".tour-share-collection",
     title: "Compartilhe seu link",
-    content: "Gere um link exclusivo da sua coleção para postar em redes sociais ou enviar para interessados no WhatsApp.",
+    content: "Gere um link exclusivo da sua coleção para postar em redes sociais ou enviar para interessados.",
   }
 ];
 

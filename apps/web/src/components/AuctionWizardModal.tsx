@@ -63,7 +63,7 @@ export function AuctionWizardModal({ session, onSession, onUnauthorized, onClose
 
   return (
     <Modal 
-      title="Novo Leilão" 
+      title="Nova negociação por lances" 
       subtitle="Selecione uma carta da sua coleção"
       icon={<Gavel size={20} />}
       onClose={onClose}

@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsDateString, IsNumber, IsOptional, IsString, Min } from "class-validator";
+import { Equals, IsBoolean, IsDateString, IsNumber, IsOptional, IsString, Min } from "class-validator";
 
 export class CreateAuctionDto {
   @ApiProperty()
@@ -24,6 +24,11 @@ export class CreateAuctionDto {
   @ApiProperty()
   @IsDateString()
   endsAt!: string;
+
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  @Equals(true)
+  acceptedResponsibility!: boolean;
 }
 
 export class PlaceAuctionBidDto {
@@ -31,4 +36,9 @@ export class PlaceAuctionBidDto {
   @IsNumber()
   @Min(0.01)
   amountBrl!: number;
+
+  @ApiProperty({ example: true })
+  @IsBoolean()
+  @Equals(true)
+  acceptedResponsibility!: boolean;
 }

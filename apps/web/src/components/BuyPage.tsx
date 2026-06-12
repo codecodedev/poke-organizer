@@ -44,7 +44,7 @@ export function BuyPage({ session, onNavigate }: Props) {
       <Panel>
         <div className="mb-6">
           <h1 className="text-3xl font-black text-foreground">Comprar Cartas</h1>
-          <p className="section-copy mt-1">Busque cartas à venda ou em leilão na comunidade.</p>
+          <p className="section-copy mt-1">Busque cartas à venda ou em negociação por lances na comunidade.</p>
         </div>
 
         <div className="relative">
@@ -81,7 +81,7 @@ export function BuyPage({ session, onNavigate }: Props) {
           <section>
             <div className="mb-4 flex items-center gap-2 px-1">
               <Gavel size={20} className="text-amber" />
-              <h2 className="text-xl font-black text-foreground">Leilões Ativos</h2>
+              <h2 className="text-xl font-black text-foreground">Ofertas abertas</h2>
               <span className="ml-2 rounded-full bg-amber/10 border border-amber/20 px-2 py-0.5 text-xs font-black text-amber">
                 {results.auctions.length}
               </span>
@@ -89,7 +89,7 @@ export function BuyPage({ session, onNavigate }: Props) {
 
             {results.auctions.length === 0 ? (
               <p className="py-8 text-center text-sm font-bold text-muted-foreground rounded-2xl border border-dashed border-card-border/60">
-                Nenhum leilão encontrado para "{query}"
+                Nenhuma oferta aberta encontrada para "{query}"
               </p>
             ) : (
               <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

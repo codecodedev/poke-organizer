@@ -15,7 +15,10 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
+  const [state, setState] = useState("");
+  const [city, setCity] = useState("");
   const [password, setPassword] = useState("");
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -32,9 +35,14 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
         saveSession(session);
         onSession(session);
       } else {
-        await api.register(email, password, name || undefined);
+        if (!acceptedLegal) {
+          setError("Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar a conta.");
+          return;
+        }
+        await api.register(email, password, name || undefined, acceptedLegal, acceptedLegal, state || undefined, city || undefined);
         setSuccessMessage("Conta criada! Verifique seu e-mail para confirmar seu cadastro antes de entrar.");
         setMode("login");
+        setAcceptedLegal(false);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao autenticar");
@@ -81,15 +89,39 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
         </div>
 
         {mode === "register" && (
-          <div className="mb-5">
-            <label className="mb-2 block text-sm font-bold text-muted-foreground">Nome</label>
-            <input
-              className="input-dark w-full"
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Ex: Ash Ketchum"
-            />
-          </div>
+          <>
+            <div className="mb-5">
+              <label className="mb-2 block text-sm font-bold text-muted-foreground">Nome</label>
+              <input
+                className="input-dark w-full"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Ex: Ash Ketchum"
+              />
+            </div>
+
+            <div className="mb-5 grid grid-cols-2 gap-4">
+              <div>
+                <label className="mb-2 block text-sm font-bold text-muted-foreground">Estado (UF)</label>
+                <input
+                  className="input-dark w-full"
+                  value={state}
+                  onChange={(event) => setState(event.target.value.toUpperCase().slice(0, 2))}
+                  placeholder="Ex: SP"
+                  maxLength={2}
+                />
+              </div>
+              <div>
+                <label className="mb-2 block text-sm font-bold text-muted-foreground">Cidade</label>
+                <input
+                  className="input-dark w-full"
+                  value={city}
+                  onChange={(event) => setCity(event.target.value)}
+                  placeholder="Ex: São Paulo"
+                />
+              </div>
+            </div>
+          </>
         )}
 
         <div className="mb-5">
@@ -131,9 +163,32 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
         {error && <p className="mb-6 rounded-xl border border-magenta/20 bg-magenta/10 px-4 py-3 text-sm font-semibold text-magenta">{error}</p>}
         {successMessage && <p className="mb-6 rounded-xl border border-leaf/20 bg-leaf/10 px-4 py-3 text-sm font-semibold text-leaf">{successMessage}</p>}
 
+        {mode === "register" && (
+          <label className="mb-6 flex cursor-pointer items-start gap-3 rounded-2xl border border-card-border/50 bg-muted/30 p-4 text-left">
+            <input
+              type="checkbox"
+              className="mt-1 h-4 w-4 rounded border-card-border accent-cyan"
+              checked={acceptedLegal}
+              onChange={(event) => setAcceptedLegal(event.target.checked)}
+              required
+            />
+            <span className="text-xs font-semibold leading-5 text-muted-foreground">
+              Li e aceito os{" "}
+              <a className="font-black text-brand hover:underline" href="/terms" target="_blank" rel="noreferrer">
+                Termos de Uso
+              </a>{" "}
+              e a{" "}
+              <a className="font-black text-brand hover:underline" href="/privacy" target="_blank" rel="noreferrer">
+                Política de Privacidade
+              </a>
+              .
+            </span>
+          </label>
+        )}
+
         <button
           type="submit"
-          disabled={loading}
+          disabled={loading || (mode === "register" && !acceptedLegal)}
           className="btn-gradient flex h-14 w-full items-center justify-center gap-3 rounded-2xl text-lg disabled:opacity-50"
         >
           {loading ? (
@@ -146,9 +201,14 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
           )}
         </button>
         
-        {/* <p className="mt-6 text-center text-xs text-muted-foreground/60">
-          Ao continuar, você concorda com nossos Termos de Uso.
-        </p> */}
+        {mode === "login" && (
+          <p className="mt-6 text-center text-xs font-semibold text-muted-foreground/60">
+            Ao entrar, você continua sujeito aos{" "}
+            <a className="text-brand hover:underline" href="/terms" target="_blank" rel="noreferrer">Termos de Uso</a>
+            {" "}e à{" "}
+            <a className="text-brand hover:underline" href="/privacy" target="_blank" rel="noreferrer">Política de Privacidade</a>.
+          </p>
+        )}
       </form>
     </section>
   );

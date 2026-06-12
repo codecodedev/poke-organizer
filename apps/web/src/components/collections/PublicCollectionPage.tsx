@@ -7,7 +7,7 @@ import type {
   PublicCollectionDetail,
   CollectionCartOffer,
 } from "@poke-organizer/shared";
-import { api, apiFeedback, type Session } from "../../lib/api";
+import { api, type Session } from "../../lib/api";
 import { type AppRoute } from "../../pages/App";
 import { withAuthRetry } from "../../lib/authRetry";
 import { formatBrl } from "../../lib/format";
@@ -68,7 +68,6 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
     return localStorage.getItem(`cart_global_total_${shareToken}`) || "";
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showMyProposalsModal, setShowMyProposalsModal] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [myProposals, setMyProposals] = useState<CollectionCartOffer[]>([]);
   const [isCartExpanded, setIsCartExpanded] = useState(false);
@@ -233,18 +232,6 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
       return;
     }
 
-    if (!session.user.whatsapp) {
-      const msg = "Você precisa cadastrar seu WhatsApp no seu perfil para enviar propostas.";
-      apiFeedback.error(msg, {
-        ttl: 7000,
-        action: {
-          label: "Completar Perfil",
-          onClick: () => onNavigate({ view: "profile" })
-        }
-      });
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       await withAuthRetry(session, onSession, onUnauthorized, (token) =>
@@ -252,7 +239,8 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
           items: proposalItems, 
           message: proposalMessage || undefined,
           totalOffer,
-          isGlobalOffer
+          isGlobalOffer,
+          acceptedResponsibility: true,
         }),
       );
       setMessage("Proposta enviada para o dono da colecao.");
@@ -294,7 +282,7 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
         <Suspense fallback={null}>
           <AppTour tourId={`public_collection_${shareToken}`} steps={PUBLIC_COLLECTION_TOUR} />
           {Object.keys(cart).length > 0 && isCartExpanded && (
-            <AppTour tourId="public_collection_cart_v1" steps={cartTourSteps}/>
+            <AppTour tourId="public_collection_cart_v1" steps={cartTourSteps} autoStart={true} />
           )}
         </Suspense>
       )}
@@ -421,7 +409,7 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
                       variant="primary"
                       className="border-brand/40 bg-brand/5 text-brand"
                       icon={<ShoppingBag size={18} />}
-                      onClick={() => setShowMyProposalsModal(true)}
+                      onClick={() => onNavigate({ view: "proposals", collection: collection.id })}
                     >
                       Minhas propostas
                     </Button>
@@ -441,15 +429,6 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
                   message.includes("enviada") ? "bg-leaf/10 text-leaf" : "bg-magenta/10 text-magenta"
                 }`}>
                   <p className="text-sm font-bold">{message}</p>
-                  {message.includes("WhatsApp") && (
-                    <Button
-                      variant="outline"
-                      className="h-10 px-6 border-magenta/20 text-magenta hover:bg-magenta/10"
-                      onClick={() => onNavigate({ view: "profile", returnTo: window.location.href })}
-                    >
-                      Ir para o Perfil
-                    </Button>
-                  )}
                 </div>
               )}
             </Panel>
@@ -573,13 +552,6 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
 
       )}
 
-      {showMyProposalsModal && (
-        <MyProposalsModal
-          proposals={myProposals}
-          onClose={() => setShowMyProposalsModal(false)}
-        />
-      )}
-
       {showFiltersModal && (
         <div 
           className="fixed inset-0 z-[60] flex items-end justify-center bg-background/60 backdrop-blur-sm sm:items-center p-0 sm:p-4"
@@ -679,85 +651,6 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
         </div>
       )}
     </main>
-  );
-}
-
-function MyProposalsModal({
-  proposals,
-  onClose,
-}: {
-  proposals: CollectionCartOffer[];
-  onClose: () => void;
-}) {
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-background/60 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
-      <div
-        className="animate-soft-pop flex h-full max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-[26px] border border-card-border bg-card shadow-card"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-card-border px-6 py-5">
-          <div>
-            <h2 className="text-xl font-black text-foreground">Minhas Propostas</h2>
-            <p className="text-sm font-semibold text-muted-foreground">Histórico de propostas nesta coleção.</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="grid h-10 w-10 place-items-center rounded-xl border border-card-border bg-card text-foreground transition hover:bg-accent"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <div className="flex-1 overflow-auto p-6">
-          <div className="grid gap-3">
-            {proposals.map((offer) => (
-              <div
-                key={offer.id}
-                className="rounded-2xl border border-card-border bg-accent/30 p-5"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-4">
-                  <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">
-                      Enviada em {new Date(offer.createdAt).toLocaleDateString()}
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <p className="font-black text-foreground">Total: {formatBrl(offer.totalOffer)}</p>
-                      {offer.isGlobalOffer && (
-                        <span className="rounded-lg bg-brand px-2 py-0.5 text-[10px] font-black text-white uppercase tracking-tighter">
-                          Proposta Global
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {offer.items.map((item) => (
-                        <span key={item.id} className="rounded-lg bg-card px-2 py-0.5 text-[10px] font-bold text-muted-foreground border border-card-border">
-                          {item.quantity}x {item.item.card.name} {offer.isGlobalOffer ? "" : `(${formatBrl(item.amount)})`}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                  <span
-                    className={`rounded-full px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${
-                      offer.status === "accepted"
-                        ? "bg-leaf text-white"
-                        : offer.status === "rejected"
-                          ? "bg-magenta text-white"
-                          : "bg-amber/20 text-amber"
-                    }`}
-                  >
-                    {offer.status === "accepted"
-                      ? "Aceita"
-                      : offer.status === "rejected"
-                        ? "Recusada"
-                        : "Pendente"}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
   );
 }
 
