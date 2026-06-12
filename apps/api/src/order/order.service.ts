@@ -1,13 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { OrderSummary, OrderStatus } from "@poke-organizer/shared";
+import { OrderDetail, OrderMessage, OrderSummary, OrderStatus } from "@poke-organizer/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
+import { OrderRealtimeService } from "./order-realtime.service";
 
 @Injectable()
 export class OrderService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly emailService: EmailService
+    private readonly emailService: EmailService,
+    private readonly realtime: OrderRealtimeService,
   ) {}
 
   async listMySales(userId: string): Promise<OrderSummary[]> {
@@ -34,6 +36,84 @@ export class OrderService {
       orderBy: { createdAt: "desc" },
     });
     return orders.map((o) => this.mapOrder(o));
+  }
+
+  async getOrder(userId: string, orderId: string): Promise<OrderDetail> {
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id: orderId,
+        OR: [{ sellerId: userId }, { buyerId: userId }],
+      },
+      include: {
+        seller: true,
+        buyer: true,
+        items: true,
+        messages: {
+          include: { sender: true },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!order) throw new NotFoundException("Pedido não encontrado");
+
+    return this.mapOrderDetail(order);
+  }
+
+  async createMessage(userId: string, orderId: string, rawMessage: string): Promise<OrderDetail> {
+    const message = rawMessage.trim();
+    if (!message) {
+      throw new BadRequestException("Mensagem é obrigatória");
+    }
+
+    const order = await this.prisma.order.findFirst({
+      where: {
+        id: orderId,
+        OR: [{ sellerId: userId }, { buyerId: userId }],
+      },
+      include: {
+        seller: true,
+        buyer: true,
+        messages: true,
+      },
+    });
+
+    if (!order) throw new NotFoundException("Pedido não encontrado");
+
+    const isFirstMessage = order.messages.length === 0;
+    const recipient = userId === order.sellerId ? order.buyer : order.seller;
+    const sender = userId === order.sellerId ? order.seller : order.buyer;
+
+    await this.prisma.orderMessage.create({
+      data: {
+        orderId,
+        senderId: userId,
+        message,
+      },
+    });
+
+    if (isFirstMessage) {
+      const orderCode = orderId.slice(-6).toUpperCase();
+      await this.prisma.notification.create({
+        data: {
+          userId: recipient.id,
+          title: "Nova mensagem no pedido",
+          message: `${sender.name || sender.email} enviou uma mensagem sobre o pedido #${orderCode}.`,
+          link: `/?page=orders&order=${orderId}`,
+        },
+      });
+
+      void this.emailService.sendOrderMessageEmail(
+        recipient.email,
+        orderId,
+        sender.name || sender.email,
+      ).catch(err => console.error("Failed to send order message email", err));
+    }
+
+    const detail = await this.getOrder(userId, orderId);
+    this.realtime.emitOrderDetail(orderId, detail);
+
+    return detail;
   }
 
   async updateStatus(userId: string, orderId: string, status: "delivered" | "cancelled"): Promise<OrderSummary> {
@@ -107,7 +187,12 @@ export class OrderService {
       status
     ).catch(err => console.error("Failed to send order status email", err));
 
-    return this.mapOrder(updated);
+    const summary = this.mapOrder(updated);
+
+    const detail = await this.getOrder(userId, orderId);
+    this.realtime.emitOrderDetail(orderId, detail);
+
+    return summary;
   }
 
   private mapOrder(o: any): OrderSummary {
@@ -135,6 +220,20 @@ export class OrderService {
         variant: i.variant,
         cardNumber: i.cardNumber,
         cardTotal: i.cardTotal,
+      })),
+    };
+  }
+
+  private mapOrderDetail(o: any): OrderDetail {
+    return {
+      ...this.mapOrder(o),
+      messages: (o.messages ?? []).map((message: any): OrderMessage => ({
+        id: message.id,
+        orderId: message.orderId,
+        senderId: message.senderId,
+        senderName: message.sender?.name || message.sender?.email || "Usuário",
+        message: message.message,
+        createdAt: message.createdAt.toISOString(),
       })),
     };
   }

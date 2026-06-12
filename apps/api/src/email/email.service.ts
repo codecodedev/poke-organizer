@@ -275,7 +275,7 @@ export class EmailService {
         ? `
           <div class="highlight-box" style="background: #ecfdf5; border-color: #10b981;">
             <p style="margin: 0; color: #065f46;"><strong>Parabéns!</strong> Um novo pedido foi aberto em sua conta.</p>
-            <p style="margin: 12px 0 0 0; font-size: 14px; color: #047857;">O próximo passo é entrar em contato com o vendedor via WhatsApp para combinar o pagamento e a entrega dos cards.</p>
+            <p style="margin: 12px 0 0 0; font-size: 14px; color: #047857;">O próximo passo é abrir o pedido e usar a conversa da plataforma para combinar pagamento, entrega e detalhes finais.</p>
           </div>
         ` 
         : "<p>Não foi dessa vez. Você pode tentar enviar uma nova proposta com um valor diferente ou buscar outros itens no catálogo.</p>"}
@@ -313,7 +313,7 @@ export class EmailService {
         <p style="margin: 0; text-transform: uppercase; font-size: 12px; font-weight: 900; color: #94a3b8;">Lance Vencedor</p>
         <p class="price-text" style="margin: 8px 0 0 0;">R$ ${amount.toFixed(2).replace(".", ",")}</p>
       </div>
-      <p>O vendedor <strong>${sellerName}</strong> entrará em contato em breve para combinar os detalhes finais.</p>
+      <p>Use a conversa do pedido dentro da plataforma para combinar os detalhes finais com <strong>${sellerName}</strong>.</p>
       <div style="text-align: center;">
         <a href="${ordersUrl}" class="button">Ver meu Pedido</a>
       </div>
@@ -368,6 +368,40 @@ export class EmailService {
       console.log(`[EmailService] Order status email sent successfully to ${email} (ID: ${data?.id})`);
     } catch (error) {
       console.error(`[EmailService] Failed to send order status email to ${email}:`, error);
+    }
+  }
+
+  async sendOrderMessageEmail(email: string, orderId: string, senderName: string) {
+    const baseUrl = this.getBaseUrl();
+    const orderUrl = `${baseUrl}/?page=orders&order=${encodeURIComponent(orderId)}`;
+    const orderCode = orderId.slice(-6).toUpperCase();
+
+    const html = this.wrapHtml(`
+      <h1>Nova mensagem no pedido #${orderCode}</h1>
+      <p><strong>${senderName}</strong> enviou uma mensagem sobre o pedido <strong>#${orderCode}</strong>.</p>
+      <div class="highlight-box">
+        <p style="margin: 0;">A conversa acontece dentro do Coleciona Cards para proteger os dados de contato de comprador e vendedor.</p>
+      </div>
+      <div style="text-align: center;">
+        <a href="${orderUrl}" class="button">Abrir conversa</a>
+      </div>
+    `, `Nova mensagem no pedido #${orderCode}`);
+
+    try {
+      const { data, error } = await this.resend.emails.send({
+        from: this.config.get("SMTP_FROM") || "Coleciona Cards <onboarding@resend.dev>",
+        to: [email],
+        subject: `Nova mensagem no pedido #${orderCode}`,
+        html,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      console.log(`[EmailService] Order message email sent successfully to ${email} (ID: ${data?.id})`);
+    } catch (error) {
+      console.error(`[EmailService] Failed to send order message email to ${email}:`, error);
     }
   }
 }

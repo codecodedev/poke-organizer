@@ -66,6 +66,7 @@ export type AppRoute = {
   auction?: string | null;
   collection?: string | null;
   card?: string | null;
+  order?: string | null;
   token?: string | null;
   setId?: string | null;
   returnTo?: string | null;
@@ -514,6 +515,8 @@ function AppContent() {
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
                 onBack={() => navigate({ view: "home" })}
+                initialOrderId={route.order ?? null}
+                onOrderRouteChange={(orderId) => navigate({ view: "orders", order: orderId })}
               />
             )}
 
@@ -636,6 +639,7 @@ function parseRoute(): AppRoute {
     auction: null,
     collection: (view === "collections" || view === "profile" || view === "proposals" || view === "carts") ? params.get("collection") : null,
     card: params.get("card"),
+    order: view === "orders" ? params.get("order") : null,
     token: search.get("token"),
     setId: params.get("setId"),
     returnTo: search.get("returnTo"),
@@ -678,6 +682,10 @@ function routeToUrl(route: AppRoute): string {
 
   if (route.card) {
     params.set("card", route.card);
+  }
+
+  if (route.view === "orders" && route.order) {
+    params.set("order", route.order);
   }
 
   if (route.q) {

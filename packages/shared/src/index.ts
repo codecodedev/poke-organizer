@@ -427,6 +427,15 @@ export type OrderItem = {
   cardTotal?: number | null;
 };
 
+export type OrderMessage = {
+  id: string;
+  orderId: string;
+  senderId: string;
+  senderName: string;
+  message: string;
+  createdAt: string;
+};
+
 export type OrderSummary = {
   id: string;
   sellerId: string;
@@ -442,6 +451,10 @@ export type OrderSummary = {
   createdAt: string;
   updatedAt: string;
   items: OrderItem[];
+};
+
+export type OrderDetail = OrderSummary & {
+  messages: OrderMessage[];
 };
 
 export function normalizeCardNumber(value: string): string {

@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { CurrentUser } from "../common/current-user.decorator";
 import { OrderService } from "./order.service";
-import { UpdateOrderStatusDto } from "./dto";
+import { CreateOrderMessageDto, UpdateOrderStatusDto } from "./dto";
 
 @ApiTags("Orders")
 @ApiBearerAuth()
@@ -22,6 +22,11 @@ export class OrderController {
     return this.orderService.listMyPurchases(userId);
   }
 
+  @Get(":id")
+  async getOrder(@CurrentUser("id") userId: string, @Param("id") id: string) {
+    return this.orderService.getOrder(userId, id);
+  }
+
   @Post(":id/status")
   async updateStatus(
     @CurrentUser("id") userId: string,
@@ -29,5 +34,14 @@ export class OrderController {
     @Body() dto: UpdateOrderStatusDto
   ) {
     return this.orderService.updateStatus(userId, id, dto.status);
+  }
+
+  @Post(":id/messages")
+  async createMessage(
+    @CurrentUser("id") userId: string,
+    @Param("id") id: string,
+    @Body() dto: CreateOrderMessageDto
+  ) {
+    return this.orderService.createMessage(userId, id, dto.message);
   }
 }

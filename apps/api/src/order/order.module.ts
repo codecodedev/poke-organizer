@@ -4,10 +4,12 @@ import { OrderService } from "./order.service";
 import { PrismaModule } from "../prisma/prisma.module";
 import { EmailModule } from "../email/email.module";
 import { JwtModule } from "@nestjs/jwt";
+import { OrderGateway } from "./order.gateway";
+import { OrderRealtimeService } from "./order-realtime.service";
 
 @Module({
-  imports: [PrismaModule, JwtModule.register({})],
+  imports: [PrismaModule, EmailModule, JwtModule.register({})],
   controllers: [OrderController],
-  providers: [OrderService],
+  providers: [OrderService, OrderGateway, OrderRealtimeService],
 })
 export class OrderModule {}

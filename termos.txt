@@ -1,0 +1,180 @@
+Essa é uma excelente pergunta, porque existe uma diferença grande entre um site de anúncios/negociação e uma plataforma de leilões propriamente dita.
+
+Pelo que você descreveu hoje no Poke Organizer:
+
+* O usuário cadastra uma carta.
+* Outros usuários fazem ofertas/lances.
+* O site apenas conecta as partes.
+* A negociação final acontece no WhatsApp.
+* O pagamento acontece fora da plataforma.
+* Você não recebe comissão nem intermedia o dinheiro.
+
+Nesse cenário, juridicamente você está muito mais próximo de um:
+
+* Mercado de classificados
+* Marketplace de anúncios
+* Plataforma de conexão entre colecionadores
+
+do que de um leiloeiro oficial.
+
+O que eu faria agora
+
+Deixaria muito claro nos Termos de Uso algo como:
+
+O Poke Organizer atua apenas como plataforma de divulgação e intermediação de contato entre colecionadores. A negociação, pagamento, envio e entrega dos itens são de inteira responsabilidade dos usuários envolvidos.
+
+Isso já reduz bastante seu risco.
+
+⸻
+
+O que pode dar problema mesmo sem pagamento?
+
+1. Usuário não cumprir o lance
+
+Exemplo:
+
+* João dá lance de R$ 500.
+* Ganha o leilão.
+* Some.
+
+Você precisa definir regra.
+
+Por exemplo:
+
+Os lances possuem caráter de intenção de compra, não constituindo contrato vinculante entre as partes.
+
+ou
+
+Ao realizar um lance, o usuário manifesta interesse na negociação, cabendo às partes concluir o acordo posteriormente.
+
+Se não definir isso, pode gerar discussão.
+
+⸻
+
+2. Produto falso
+
+Imagine:
+
+* Alguém anuncia uma Charizard falsa.
+* Outro compra.
+
+Mesmo sem receber o dinheiro, podem reclamar da plataforma.
+
+Por isso quase todos os marketplaces colocam cláusulas do tipo:
+
+A plataforma não garante autenticidade, estado de conservação ou procedência dos itens anunciados.
+
+⸻
+
+3. Golpes entre usuários
+
+Exemplo:
+
+* Comprador paga via Pix.
+* Vendedor desaparece.
+
+Se você não participa da transação, o risco jurídico é menor, mas ainda assim é importante ter:
+
+* Termos de uso
+* Canal para denúncia
+* Possibilidade de bloquear usuários
+
+⸻
+
+Quando começar a receber pagamentos
+
+Aí muda bastante.
+
+Suponha:
+
+Usuário A paga R$ 500
+↓
+Dinheiro entra na plataforma
+↓
+Você repassa ao vendedor
+
+Agora você está:
+
+* Intermediando pagamento
+* Guardando recursos de terceiros
+* Criando responsabilidades adicionais
+
+Nesse ponto normalmente entram:
+
+* KYC (identificação do usuário)
+* Antifraude
+* Compliance financeiro
+* LGPD mais robusta
+* Mediação de disputas
+
+Por isso quase todo marketplace usa:
+
+* Mercado Pago
+* Pagar.me
+* Stripe
+* Asaas
+
+Em vez de segurar dinheiro diretamente.
+
+⸻
+
+Um detalhe importante sobre a palavra “Leilão”
+
+Eu teria cuidado com a nomenclatura.
+
+No Brasil, quando alguém lê:
+
+LEILÃO
+
+muita gente entende:
+
+* compromisso de compra
+* arrematação
+* regras rígidas
+* vencedor obrigatório
+
+Talvez para a sua fase atual seja mais seguro chamar de:
+
+Recebendo ofertas
+
+ou
+
+Maior oferta
+
+ou
+
+Negociação por lances
+
+ou
+
+Oferta aberta
+
+Porque tecnicamente o que você tem hoje parece mais um sistema de ofertas do que um leilão formal.
+
+⸻
+
+O que eu implementaria agora no Poke Organizer
+
+Antes de lançar:
+
+✅ Termos de Uso
+
+✅ Política de Privacidade (LGPD)
+
+✅ Campo “Ao enviar um lance, concordo com os Termos”
+
+✅ Botão de denúncia
+
+✅ Possibilidade de bloquear usuário
+
+✅ Aviso:
+
+O Poke Organizer não participa do pagamento, envio ou entrega dos itens anunciados.
+
+✅ Histórico de lances
+
+✅ Logs de quem deu lance e quando
+
+Isso já te coloca em uma posição muito mais segura para crescer o produto.
+
+Para o modelo que você descreveu hoje (colecionadores negociando cartas Pokémon e concluindo a venda pelo WhatsApp), eu não vejo necessidade de registro especial ou autorização de leiloeiro. O ponto principal é deixar claro que você é uma plataforma de conexão e não a parte vendedora nem a intermediadora financeira.

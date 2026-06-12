@@ -24,6 +24,7 @@ import type {
   PriceEstimate,
   PublicCollectionDetail,
   RecognitionCandidate,
+  OrderDetail,
   OrderSummary,
 } from "@poke-organizer/shared";
 
@@ -720,11 +721,21 @@ export const api = {
   listMyPurchases(token: string) {
     return request<OrderSummary[]>("/orders/purchases", { token });
   },
+  getOrder(token: string, orderId: string) {
+    return request<OrderDetail>(`/orders/${encodeURIComponent(orderId)}`, { token });
+  },
   updateOrderStatus(token: string, orderId: string, status: "delivered" | "cancelled") {
     return request<OrderSummary>(`/orders/${encodeURIComponent(orderId)}/status`, {
       method: "POST",
       token,
       body: JSON.stringify({ status }),
+    });
+  },
+  sendOrderMessage(token: string, orderId: string, message: string) {
+    return request<OrderDetail>(`/orders/${encodeURIComponent(orderId)}/messages`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ message }),
     });
   },
   syncMetagame(token: string, payload: { includeLimitless?: boolean } = {}) {

@@ -118,6 +118,7 @@ model User {
   collectionOffers CollectionCartOffer[]
   sellerOrders   Order[]          @relation("SellerOrders")
   buyerOrders    Order[]          @relation("BuyerOrders")
+  orderMessages  OrderMessage[]
   notifications    Notification[]
   decks        Deck[]
   createdAt    DateTime         @default(now())
@@ -395,10 +396,26 @@ model Order {
   auction         Auction?    @relation(fields: [auctionId], references: [id], onDelete: SetNull)
   proposal        CollectionCartOffer? @relation(fields: [proposalId], references: [id], onDelete: SetNull)
   items           OrderItem[]
+  messages        OrderMessage[]
 
   @@index([sellerId])
   @@index([buyerId])
   @@index([status])
+  @@schema("public")
+}
+
+model OrderMessage {
+  id        String   @id @default(cuid())
+  orderId   String
+  senderId  String
+  message   String
+  createdAt DateTime @default(now())
+
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId, createdAt])
+  @@index([senderId])
   @@schema("public")
 }
 

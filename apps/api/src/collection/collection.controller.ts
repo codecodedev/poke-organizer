@@ -54,8 +54,8 @@ export class CollectionController {
 
   @Get("folders")
   @ApiOperation({ summary: "Listar pastas", description: "Retorna a lista de pastas/coleções do usuário." })
-  listFolders(@CurrentUser() user: RequestUser, @Query() query: CollectionFolderQueryDto) {
-    return this.collection.listFolders(user.id, query);
+  listFolders(@CurrentUser() user: RequestUser) {
+    return this.collection.listFolders(user.id);
   }
 
   @Post("folders")
@@ -72,11 +72,6 @@ export class CollectionController {
   @Get("received-proposals")
   listMyReceivedProposals(@CurrentUser() user: RequestUser) {
     return this.collection.listMyReceivedProposals(user.id);
-  }
-
-  @Post("folders")
-  createFolder(@CurrentUser() user: RequestUser, @Body() dto: CreateCollectionFolderDto) {
-    return this.collection.createFolder(user.id, dto);
   }
 
   @Get("folders/:id")
