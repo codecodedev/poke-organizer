@@ -7,6 +7,7 @@ import {
   TrendingUp,
   Trash2,
   Sparkles,
+  Flame,
 } from "lucide-react";
 import {
   type CollectionItem,
@@ -98,6 +99,20 @@ export function CollectionItemCard({
           className={`absolute right-4 z-30 rounded-full border border-card-border/50 bg-card/90 px-2.5 py-1 text-xs font-black text-foreground shadow-sm backdrop-blur ${onToggleSelection ? "top-14" : "top-4"}`}
         >
           x{item.quantity}
+        </span>
+      )}
+
+      {(item.store?.proposalsCount ?? 0) > 0 && (
+        <span
+          className={`absolute right-4 z-30 flex items-center gap-1 rounded-full border border-orange-500/40 bg-orange-500/90 px-2 py-1 text-xs font-black text-white shadow-sm backdrop-blur ${
+            item.quantity > 1
+              ? (onToggleSelection ? "top-24" : "top-14")
+              : (onToggleSelection ? "top-14" : "top-4")
+          }`}
+          title={`${item.store?.proposalsCount} proposta(s) atrelada(s) a esta carta`}
+        >
+          <Flame size={12} className="fill-orange-200" />
+          {item.store?.proposalsCount}
         </span>
       )}
 

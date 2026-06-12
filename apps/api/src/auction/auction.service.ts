@@ -87,10 +87,7 @@ export class AuctionService {
 
   async placeBid(userId: string, id: string, dto: PlaceAuctionBidDto): Promise<AuctionDetail> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.whatsapp) {
-      throw new BadRequestException("Você precisa cadastrar um número de WhatsApp no seu perfil para dar lances.");
-    }
-
+    
     const auction = await this.prisma.auction.findUnique({
       where: { id },
       include: { bids: { take: 1, orderBy: { amountBrl: "desc" } } },

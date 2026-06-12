@@ -267,6 +267,7 @@ export const COLLECTION_FOLDER_SORTS = [
   "price-change-asc",
   "newest",
   "oldest",
+  "proposals-desc",
 ] as const;
 export type CollectionFolderSort = (typeof COLLECTION_FOLDER_SORTS)[number];
 

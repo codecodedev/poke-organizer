@@ -55,6 +55,7 @@ const collectionItemInclude = {
 
 const folderItemInclude = {
   collectionItem: { include: collectionItemInclude },
+  _count: { select: { cartOfferItems: true } },
   folder: true,
 } satisfies Prisma.CollectionFolderItemInclude;
 
@@ -477,10 +478,7 @@ export class CollectionService {
     dto: CreateCollectionCartOfferDto,
   ): Promise<CollectionCartOffer> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    if (!user?.whatsapp) {
-      throw new BadRequestException("Você precisa cadastrar um número de WhatsApp no seu perfil para enviar propostas.");
-    }
-
+    
     const folder = await this.findPublicStoreFolder(shareToken);
     if (folder.userId === userId) {
       throw new BadRequestException("O dono da colecao nao pode enviar proposta para a propria loja");
@@ -839,7 +837,7 @@ export class CollectionService {
 
     return {
       items: storeItems.map(item => ({
-        ...this.mapItem(item.collectionItem, item),
+        ...this.mapItem(item.collectionItem, item as any),
         folderId: item.folderId,
         folderName: item.folder.name,
         shareToken: item.folder.shareToken,
@@ -1337,6 +1335,8 @@ export class CollectionService {
         soldPrice: folderItem.soldPriceBrl === null ? null : Number(folderItem.soldPriceBrl),
         soldQuantity: folderItem.soldQuantity,
         soldAt: folderItem.soldAt?.toISOString() ?? null,
+        soldToUserId: folderItem.soldToUserId,
+        proposalsCount: folderItem._count?.cartOfferItems ?? 0,
       } : null,
       createdAt: item.createdAt.toISOString(),
       updatedAt: item.updatedAt.toISOString(),
@@ -1433,6 +1433,11 @@ export class CollectionService {
       return [...items].sort(
         (left, right) =>
           Date.parse(left.createdAt) - Date.parse(right.createdAt),
+      );
+    }
+    if (sort === "proposals-desc") {
+      return [...items].sort(
+        (left, right) => (right.store?.proposalsCount ?? 0) - (left.store?.proposalsCount ?? 0),
       );
     }
     return [...items].sort(

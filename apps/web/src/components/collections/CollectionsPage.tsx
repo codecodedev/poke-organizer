@@ -2401,6 +2401,7 @@ function CollectionDetailScreen({
                       <option value="value-asc">Menor valor</option>
                       <option value="price-change-desc">Maior alta</option>
                       <option value="price-change-asc">Maior queda</option>
+                      <option value="proposals-desc">Mais propostas</option>
                     </select>
                   </FilterField>
                   {isStore && (
@@ -2744,6 +2745,7 @@ function CardPickerPanel({
                   <option value="value-asc">Menor valor</option>
                   <option value="price-change-desc">Maior alta</option>
                   <option value="price-change-asc">Maior queda</option>
+                  <option value="proposals-desc">Mais propostas</option>
                 </select>
               </FilterField>
             </div>
@@ -2904,6 +2906,11 @@ function sortItems(
     return [...items].sort(
       (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
     );
+  if (sort === "proposals-desc") {
+    return [...items].sort(
+      (left, right) => (right.store?.proposalsCount ?? 0) - (left.store?.proposalsCount ?? 0),
+    );
+  }
   return [...items].sort(
     (left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt),
   );

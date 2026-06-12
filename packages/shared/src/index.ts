@@ -121,7 +121,8 @@ export type CollectionItemStore = {
   soldPrice: number | null;
   soldQuantity: number;
   soldAt: string | null;
-  soldByAuction?: boolean;
+  soldToUserId: string | null;
+  proposalsCount?: number;
 };
 
 export type CollectionAddAction = "created" | "incremented";
@@ -137,7 +138,8 @@ export type CollectionFolderSort =
   | "price-change-desc"
   | "price-change-asc"
   | "newest"
-  | "oldest";
+  | "oldest"
+  | "proposals-desc";
 
 export type CollectionFolderSummary = {
   id: string;

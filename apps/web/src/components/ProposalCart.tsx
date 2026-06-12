@@ -49,8 +49,6 @@ export function ProposalCart({
     onExpandedChange?.(isExpanded);
   }, [isExpanded, onExpandedChange]);
 
-  const missingWhatsApp = session && !session.user.whatsapp;
-
   const [hasNewItems, setHasNewItems] = useState(false);
   const prevCartLength = useRef(Object.keys(cart).length);
 
@@ -383,25 +381,11 @@ export function ProposalCart({
               </span>
             </div>
             {error && <p className="mb-4 text-[10px] font-bold text-rose-500 text-center">{error}</p>}
-            
-            {missingWhatsApp && (
-                <div className="mb-4 rounded-2xl bg-amber/10 p-4 border border-amber/20">
-                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
-                        Adicione seu WhatsApp no perfil para enviar propostas.
-                    </p>
-                    <button 
-                        onClick={() => onNavigate({ view: "profile" })}
-                        className="mt-2 text-[10px] font-black uppercase tracking-wider text-amber-600 underline hover:text-amber-700"
-                    >
-                        Completar Perfil
-                    </button>
-                </div>
-            )}
 
             <Button 
               className="w-full h-14 text-base shadow-glow tour-finalize-proposal"
               variant="brand"
-              disabled={isSubmitting || cartList.length === 0 || missingWhatsApp}
+              disabled={isSubmitting || cartList.length === 0}
               onClick={(e) => { e.stopPropagation(); handleFinalize(); }}
             >
               {isSubmitting ? "Enviando..." : (session ? "Finalizar Proposta" : "Fazer Login para Enviar")}
