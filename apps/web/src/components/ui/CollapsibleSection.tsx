@@ -7,13 +7,14 @@ type Props = {
   defaultExpanded?: boolean;
   action?: ReactNode;
   disable?: boolean;
+  className?: string;
 };
 
-export function CollapsibleSection({ title, children, defaultExpanded = false, action, disable }: Props) {
+export function CollapsibleSection({ title, children, defaultExpanded = false, action, disable, className = "" }: Props) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
 
   return (
-    <div className="rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm transition-all duration-200">
+    <div className={`rounded-[26px] border border-line/80 bg-white/72 p-4 shadow-sm transition-all duration-200 ${className}`}>
       <div className="flex w-full items-center justify-between gap-4">
         <div className="flex flex-1 flex-row items-center justify-between gap-3 min-w-0">
           <button

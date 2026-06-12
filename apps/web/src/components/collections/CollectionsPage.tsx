@@ -20,6 +20,7 @@ import {
   Unlock,
   Upload,
   X,
+  HelpCircle,
 } from "lucide-react";
 import {
   formatCardVariant,
@@ -41,9 +42,14 @@ import { SEO } from "../SEO";
 import { CardDetailModal, type UpdateCardDetails } from "../CardDetailModal";
 import { PaginationControls } from "../ui/PaginationControls";
 import { Modal } from "../ui/Modal";
+import { useTour } from "../../lib/TourContext";
 import { ConfirmationModal } from "../ui/ConfirmationModal";
 import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { FilterField, FilterGroup } from "../ui/Filters";
+import { COLLECTIONS_LIST_TOUR, COLLECTION_DETAIL_TOUR, COLLECTION_CREATE_TOUR } from "./CollectionsTour";
+import { lazy, Suspense } from "react";
+
+const AppTour = lazy(() => import("../ui/AppTour").then(module => ({ default: module.AppTour })));
 
 type Props = {
   session: Session;
@@ -70,6 +76,7 @@ export function CollectionsPage({
   onUnsavedChanges,
   blockedNavigationAt,
 }: Props) {
+  const { restartTour } = useTour();
   const [screen, setScreen] = useState<Screen>("list");
   const [folders, setFolders] = useState<CollectionFolderSummary[]>([]);
   const [activeFolder, setActiveFolder] =
@@ -811,8 +818,30 @@ export function CollectionsPage({
     setPickerPage((current) => Math.min(current, totalPages));
   }, [pickerItems.length]);
 
+  const detailTourSteps = useMemo(() => {
+    const pageItems = visibleItems.slice(
+      (detailPage - 1) * COLLECTION_DETAIL_PAGE_SIZE,
+      detailPage * COLLECTION_DETAIL_PAGE_SIZE,
+    );
+    const hasPriceInput =
+      activeFolder?.isStore &&
+      pageItems.some((item) => item.folderItemId && !item.store?.isSold);
+
+    if (hasPriceInput) return COLLECTION_DETAIL_TOUR;
+
+    return COLLECTION_DETAIL_TOUR.filter(
+      (step) => step.target !== ".tour-card-price-input",
+    );
+  }, [activeFolder?.isStore, detailPage, visibleItems]);
+
   return (
     <div className="grid gap-5">
+      <Suspense fallback={null}>
+        {screen === "list" && <AppTour tourId="collections_list" steps={COLLECTIONS_LIST_TOUR} />}
+        {screen === "create" && <AppTour tourId="collections_create" steps={COLLECTION_CREATE_TOUR} />}
+        {screen === "detail" && <AppTour tourId="collections_detail_v2" steps={detailTourSteps} />}
+      </Suspense>
+
       {screen === "list" && (
         <CollectionsListScreen
           folders={folders}
@@ -828,6 +857,7 @@ export function CollectionsPage({
               void loadFolder(folderId);
             }
           }}
+          restartTour={restartTour}
         />
       )}
 
@@ -953,6 +983,7 @@ export function CollectionsPage({
           setSellingItem={setSellingItem}
           onManagePermissions={() => setShowPermissionsModal(true)}
           blockedNavigationAt={blockedNavigationAt}
+          restartTour={restartTour}
         />
       )}
 
@@ -1446,6 +1477,7 @@ function CollectionsListScreen({
   onCreate,
   onPageChange,
   onOpen,
+  restartTour,
 }: {
   folders: CollectionFolderSummary[];
   inventoryCount: number;
@@ -1454,6 +1486,7 @@ function CollectionsListScreen({
   onCreate: () => void;
   onPageChange: (page: number) => void;
   onOpen: (folderId: string) => void;
+  restartTour: (tourId: string) => void;
 }) {
   const paginatedFolders = useMemo(
     () =>
@@ -1467,13 +1500,23 @@ function CollectionsListScreen({
       <Panel>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h2 className="section-title">Colecoes</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="section-title">Colecoes</h2>
+              <button
+                type="button"
+                onClick={() => restartTour("collections_list")}
+                className="hidden md:flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-slate-500 hover:bg-brand/10 hover:text-brand transition-colors dark:bg-white/10"
+                title="Ver tutorial novamente"
+              >
+                <HelpCircle size={14} />
+              </button>
+            </div>
             <p className="section-copy mt-1">
               Organize seu inventario em pastas separadas.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <InfoPill label="Colecoes" value={folders.length.toString()} />
-              <InfoPill label="Inventario" value={`${inventoryCount} cartas`} />
+              <InfoPill label="Inventario" value={`${inventoryCount} cartas`} className="tour-inventory-info" />
             </div>
           </div>
           <Button
@@ -1481,6 +1524,7 @@ function CollectionsListScreen({
             variant="brand"
             icon={<FolderPlus size={16} />}
             onClick={onCreate}
+            className="tour-create-collection"
           >
             Nova coleção
           </Button>
@@ -1674,7 +1718,7 @@ function CollectionCreateScreen({
                 Nome da pasta
               </span>
               <input
-                className="premium-input"
+                className="tour-create-name premium-input"
                 value={name}
                 onChange={(event) => onNameChange(event.target.value)}
                 placeholder="Ex: Binder principal"
@@ -1684,7 +1728,7 @@ function CollectionCreateScreen({
               <span className="px-1 text-xs font-black uppercase tracking-[0.14em] text-slate-500">
                 Modo
               </span>
-              <div className="flex h-auto sm:h-[46px] sm:flex-row items-stretch sm:items-center gap-2 rounded-2xl border border-card-border bg-card p-2">
+              <div className="tour-create-mode flex h-auto sm:h-[46px] sm:flex-row items-stretch sm:items-center gap-2 rounded-2xl border border-card-border bg-card p-2">
                 <button
                   type="button"
                   onClick={() => onIsStoreChange(false)}
@@ -1735,7 +1779,7 @@ function CollectionCreateScreen({
               <button
               type="button"
               onClick={() =>onTogglePickerModal(true)}
-              className={`h-full w-full ${selectedItems.length === 0 ? "min-h-80" : ""} p-4 sm:p-0 flex flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-slate-500 dark:border-slate-600 border-line/60 bg-black/6 dark:bg-white/6 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group`}
+              className={`tour-create-add-cards h-full w-full ${selectedItems.length === 0 ? "min-h-80" : ""} p-4 sm:p-0 flex flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-slate-500 dark:border-slate-600 border-line/60 bg-black/6 dark:bg-white/6 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group`}
               >
                 <div className="grid h-12 w-12 place-items-center rounded-2xl group-hover:bg-brand/10 transition-colors shadow-sm">
                   <Plus size={30} />
@@ -1875,6 +1919,7 @@ function CollectionDetailScreen({
   onUndoSale,
   onManagePermissions,
   blockedNavigationAt,
+  restartTour,
 }: {
   activeName: string;
   hasChanges: boolean;
@@ -1945,6 +1990,7 @@ function CollectionDetailScreen({
   setSellingItem: (item: CollectionItem | null) => void;
   onManagePermissions: () => void;
   blockedNavigationAt?: number;
+  restartTour: (tourId: string) => void;
 }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -2004,7 +2050,7 @@ function CollectionDetailScreen({
               /> 
             )}
             
-            <label className="absolute right-6 bottom-6 cursor-pointer text-[10px] font-black text-slate-600 dark:text-white bg-slate-300 dark:bg-black/40 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 hover:bg-black/60 transition uppercase tracking-wider">
+            <label className="tour-banner-upload absolute right-6 bottom-6 cursor-pointer text-[10px] font-black text-slate-600 dark:text-white bg-slate-300 dark:bg-black/40 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 hover:bg-black/60 transition uppercase tracking-wider">
               {bannerUploading ? "Enviando..." : (bannerUrl ? <>Alterar Banner<Pencil size={12} className="ml-1 inline" /></> : <>Adicionar Banner<Plus className="text-brand ml-1 inline" size={16} /></>)} 
               <input
                 type="file"
@@ -2048,6 +2094,14 @@ function CollectionDetailScreen({
               </div>
 
               <div className="flex flex-wrap items-center justify-center gap-4">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); restartTour("collections_detail_v2"); }}
+                  className="hidden md:flex items-center gap-2 rounded-full border border-lilac/25 bg-lilac/10 px-3 py-1.5 text-xs font-black text-muted-foreground hover:bg-brand/10 hover:text-brand transition-colors"
+                  title="Ver tutorial novamente"
+                >
+                  <HelpCircle size={14} />
+                </button>
                 <div className="flex items-center gap-2 rounded-full border border-lilac/25 bg-lilac/10 px-4 py-1.5 text-xs font-black text-violet-900 dark:text-white/60">
                   <span>{unsoldCount} cartas</span>
                   <span className="h-1.5 w-1.5 rounded-full bg-violet-300" />
@@ -2088,7 +2142,7 @@ function CollectionDetailScreen({
                  ) : (
                    <div className="flex items-center justify-start gap-4 group">
                      <div 
-                       className="text-2xl font-black text-ink dark:text-white sm:text-5xl cursor-pointer hover:text-brand transition"
+                       className="tour-edit-name text-2xl font-black text-ink dark:text-white sm:text-5xl cursor-pointer hover:text-brand transition"
                        onClick={() => setIsEditingName(true)}
                      >
                        {activeName}
@@ -2100,40 +2154,43 @@ function CollectionDetailScreen({
                         <Pencil className="text-black dark:text-white" size={18} />
                      </button>
                    </div>
-                 )}
-               </div>
+                   )}
+                   </div>
 
-               <div className="flex flex-wrap gap-2 flex-col items-end sm:flex-row absolute top-4 right-4">
-                <Button
-                  type="button"
-                  variant="light"
-                  className={`w-16 md:w-auto md:px-6 p-0 gap-0 lg:gap-2 ${hasChanges ? "shadow-glow" : " pointer-events-none"}`}
-                  icon={<Save strokeWidth={2} size={20} />}
-                  onClick={onSave}
-                  disabled={!hasChanges}
-                  shake={shouldShake}
-                >
-                  <p className="hidden lg:flex">
-                    Salvar alterações
-                  </p>
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-16 p-0 gap-0 text-white hover:text-red-500 hover:bg-red-50 bg-red-500/80"
-                  icon={<Trash2 size={20} />}
-                  onClick={onRemoveFolder}
-                >
-                </Button>
-              </div>
+                   <div className="flex flex-wrap gap-2 flex-col items-end sm:flex-row absolute top-4 right-4">
+                   <Button
+                    type="button"
+                    variant="light"
+                    className={`tour-save-folder w-16 md:w-auto md:px-6 p-0 gap-0 lg:gap-2 ${hasChanges ? "shadow-glow" : " pointer-events-none"}`}
+                    icon={<Save strokeWidth={2} size={20} />}
+                    onClick={onSave}
+                    disabled={!hasChanges}
+                    shake={shouldShake}
+                   >
+                   <p className="hidden lg:flex">
+                     Salvar alterações
+                   </p>
+                   </Button>
+                   <Button
+                    type="button"
+                    variant="ghost"
+                    className="tour-delete-folder w-16 p-0 gap-0 text-white hover:text-red-500 hover:bg-red-50 bg-red-500/80"
+                    icon={<Trash2 size={20} />}
+                    onClick={onRemoveFolder}
+                   >
+                   </Button>
+                   </div>
+
             </div>
           </div>
 
 
 
-          <CollapsibleSection 
-            title="Compartilhar" 
+          <CollapsibleSection
+            title="Compartilhar"
+            className="tour-share-collection"
             defaultExpanded={false}
+
             action={
               <label className="inline-flex w-full flex-row justify-end cursor-pointer items-center gap-3 text-sm font-black text-slate-700 dark:text-slate-200" onClick={(e) => e.stopPropagation()}>
                 {/* <span className="hidden sm:inline"> <Lock size={14} /></span> */}
@@ -2220,6 +2277,7 @@ function CollectionDetailScreen({
 
           <CollapsibleSection 
             title="Vender" 
+            className="tour-visibility-settings"
             defaultExpanded={isStore?false:false}
             action={
               <label className={`${pendingOffersCount > 0 ? "justify-between" : "justify-end"} inline-flex w-full cursor-pointer items-center  gap-3 text-sm font-black  dark:text-slate-400`} onClick={(e) => e.stopPropagation()}>
@@ -2275,7 +2333,7 @@ function CollectionDetailScreen({
             </div>
           </CollapsibleSection>
 
-          <div className="flex flex-col items-center justify-between gap-4">
+          <div className="tour-collection-filters flex flex-col items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-3 w-full">
               <Button
                 type="button"
@@ -2394,7 +2452,7 @@ function CollectionDetailScreen({
             <button
               type="button"
               onClick={() => onTogglePickerModal(true)}
-              className={`h-full w-full ${paginatedVisibleItems.length === 0 ? "min-h-96" : ""} p-4 sm:p-0 flex flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-slate-500 dark:border-slate-600 border-line/60 bg-black/6 dark:bg-white/6 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group`}
+              className={`tour-add-cards h-full w-full ${paginatedVisibleItems.length === 0 ? "min-h-96" : ""} p-4 sm:p-0 flex flex-col items-center justify-center gap-3 rounded-[24px] border border-dashed border-slate-500 dark:border-slate-600 border-line/60 bg-black/6 dark:bg-white/6 text-muted-foreground transition-all hover:border-brand/40 hover:bg-brand/5 hover:text-brand group`}
             >
               <div className="grid h-12 w-12 place-items-center rounded-2xl group-hover:bg-brand/10 transition-colors shadow-sm">
                 <Plus size={30} />
@@ -2402,11 +2460,13 @@ function CollectionDetailScreen({
               <span className="text-[10px] font-black uppercase tracking-widest">Adicionar</span>
             </button>
 
-            {paginatedVisibleItems.map((item) => (
+            {paginatedVisibleItems.map((item, index) => (
               <CollectionItemCard
                 key={item.id}
                 item={item}
+                className={index === 0 ? "tour-card-item" : ""}
                 price={item.price ?? undefined}
+
                 onOpen={onOpenCard}
                 onPriceChange={
                   isStore && item.folderItemId
@@ -2751,6 +2811,7 @@ function ScreenHeader({
   onBack,
   action,
   notification,
+  tourId,
 }: {
   eyebrow: string;
   title: string;
@@ -2758,22 +2819,35 @@ function ScreenHeader({
   onBack: () => void;
   action?: ReactNode;
   notification?: boolean;
+  tourId?: string;
 }) {
+  const { restartTour } = useTour();
   return (
     <div className="flex flex-wrap items-center justify-between gap-4">
       <div className="flex min-w-0 items-center gap-3">
         <button
           type="button"
           onClick={onBack}
-          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-line/80 bg-white/80 text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/35"
+          className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl border border-line/80 bg-white/80 text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-brand/35 dark:bg-night dark:text-white"
           aria-label="Voltar"
         >
           <ArrowLeft size={18} />
         </button>
         <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
-            {eyebrow}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">
+              {eyebrow}
+            </p>
+            {tourId && (
+              <button
+                onClick={() => restartTour(tourId)}
+                className="hidden md:flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-slate-500 hover:bg-brand/10 hover:text-brand transition-colors"
+                title="Ver tutorial novamente"
+              >
+                <HelpCircle size={14} />
+              </button>
+            )}
+          </div>
           <div className="relative flex items-center gap-2">
             <h2 className="section-title truncate">{title}</h2>
             {notification && (
@@ -2869,9 +2943,9 @@ function publicCollectionUrl(shareToken: string): string {
   return `${baseUrl}/p/${encodeURIComponent(shareToken)}`;
 }
 
-function InfoPill({ label, value }: { label: string; value: string }) {
+function InfoPill({ label, value, className = "" }: { label: string; value: string; className?: string }) {
   return (
-    <span className="rounded-full border border-line/70 bg-white/70 dark:bg-slate-900 px-4 py-2 text-sm font-black text-slate-500 shadow-sm">
+    <span className={`rounded-full border border-line/70 bg-white/70 dark:bg-slate-900 px-4 py-2 text-sm font-black text-slate-500 shadow-sm ${className}`}>
       <span className="text-muted-foreground">{label}: </span>
       {value}
     </span>

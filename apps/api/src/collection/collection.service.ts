@@ -121,7 +121,19 @@ export class CollectionService {
       take: limit,
     });
 
-    return items.map((item) => this.mapItem(item));
+    return Promise.all(items.map(async (item) => {
+      // Se não carregou o preço mas temos o ID, buscar manualmente para garantir que não apareça zerado
+      if (!item.price && item.cardPriceId) {
+        const manualPrice = await this.prisma.cardPrice.findUnique({
+            where: { id: item.cardPriceId },
+            include: { history: { orderBy: { changedAt: "asc" } } }
+        });
+        if (manualPrice) {
+            (item as any).price = manualPrice;
+        }
+      }
+      return this.mapItem(item);
+    }));
   }
 
   async listFolders(userId: string): Promise<CollectionFolderSummary[]> {
@@ -133,6 +145,22 @@ export class CollectionService {
       },
       orderBy: { name: "asc" },
     });
+    
+    // Ensure all items in folders have prices populated
+    for (const folder of folders) {
+        for (const item of folder.items) {
+            if (!item.collectionItem.price && item.collectionItem.cardPriceId) {
+                const manualPrice = await this.prisma.cardPrice.findUnique({
+                    where: { id: item.collectionItem.cardPriceId },
+                    include: { history: { orderBy: { changedAt: "asc" } } }
+                });
+                if (manualPrice) {
+                    (item.collectionItem as any).price = manualPrice;
+                }
+            }
+        }
+    }
+
     return Promise.all(folders.map((folder) => this.mapFolderSummary(folder as any)));
   }
 

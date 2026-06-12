@@ -6,10 +6,12 @@ type Toast = {
   id: number;
   type: "error" | "success";
   message: string;
+  action?: { label: string; onClick: () => void };
+  ttl: number;
 };
 
 const LOADING_DELAY_MS = 350;
-const TOAST_TTL_MS = 5200;
+const DEFAULT_TOAST_TTL_MS = 5200;
 
 export function RequestFeedback() {
   const [pending, setPending] = useState(() => apiFeedback.getPendingCount());
@@ -25,7 +27,13 @@ export function RequestFeedback() {
 
       setToasts((current) => [
         ...current.filter((toast) => toast.message !== event.message).slice(-2),
-        { id: event.id, type: event.type, message: event.message },
+        { 
+          id: event.id, 
+          type: event.type, 
+          message: event.message,
+          action: event.action,
+          ttl: event.ttl || DEFAULT_TOAST_TTL_MS
+        },
       ]);
     });
   }, []);
@@ -49,7 +57,7 @@ export function RequestFeedback() {
     const timers = toasts.map((toast) =>
       window.setTimeout(() => {
         setToasts((current) => current.filter((item) => item.id !== toast.id));
-      }, TOAST_TTL_MS),
+      }, toast.ttl),
     );
 
     return () => timers.forEach((timer) => window.clearTimeout(timer));
@@ -87,7 +95,20 @@ export function RequestFeedback() {
             }`}>
               {toast.type === "error" ? <AlertCircle size={18} /> : <CheckCircle size={18} />}
             </span>
-            <p className="min-w-0 flex-1 leading-6 pt-1.5">{toast.message}</p>
+            <p className="min-w-0 flex-1 leading-6 pt-1.5">
+                {toast.message}
+                {toast.action && (
+                    <button
+                        onClick={() => {
+                            toast.action?.onClick();
+                            closeToast(toast.id);
+                        }}
+                        className="mt-2 block w-fit rounded-lg bg-foreground/10 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-foreground hover:bg-foreground/20 transition-colors"
+                    >
+                        {toast.action.label}
+                    </button>
+                )}
+            </p>
             <button
               type="button"
               onClick={() => closeToast(toast.id)}

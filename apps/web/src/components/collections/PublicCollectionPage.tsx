@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, lazy, Suspense } from "react";
 import { FolderOpen, Gavel, Lock, Plus, Search, ShoppingBag, X, CheckSquare, SlidersHorizontal } from "lucide-react";
 import { ProposalCart } from "../ProposalCart";
 import type {
@@ -20,6 +20,9 @@ import { ThemeToggle } from "../ui/ThemeToggle";
 import { FilterContainer, FilterSelect } from "../ui/Filters";
 import { SEO } from "../SEO";
 import { LoadingScreen } from "../ui/LoadingScreen";
+import { PUBLIC_COLLECTION_TOUR, PUBLIC_COLLECTION_CART_TOUR } from "./CollectionsTour";
+
+const AppTour = lazy(() => import("../ui/AppTour").then(module => ({ default: module.AppTour })));
 
 const PUBLIC_COLLECTION_PAGE_SIZE = 24;
 
@@ -68,6 +71,29 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
   const [showMyProposalsModal, setShowMyProposalsModal] = useState(false);
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [myProposals, setMyProposals] = useState<CollectionCartOffer[]>([]);
+  const [isCartExpanded, setIsCartExpanded] = useState(false);
+  const [windowWidth, setWindowWidth] = useState(typeof window !== 'undefined' ? window.innerWidth : 1200);
+
+  useEffect(() => {
+    const handleResize = () => setWindowWidth(window.innerWidth);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
+
+  const cartTourSteps = useMemo(() => {
+    const isLargeScreen = windowWidth >= 800;
+    return PUBLIC_COLLECTION_CART_TOUR.map((step, index) => {
+      if (index === 0) {
+        return {
+          ...step,
+          target: isLargeScreen ? ".tour-proposal-cart" : "body",
+          placement: (isLargeScreen ? "left" : "center") as any,
+        };
+      }
+      return step;
+    });
+  }, [windowWidth]);
+
 
   useEffect(() => {
     localStorage.setItem(`cart_${shareToken}`, JSON.stringify(cart));
@@ -209,8 +235,13 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
 
     if (!session.user.whatsapp) {
       const msg = "Você precisa cadastrar seu WhatsApp no seu perfil para enviar propostas.";
-      setMessage(msg);
-      apiFeedback.error(msg);
+      apiFeedback.error(msg, {
+        ttl: 7000,
+        action: {
+          label: "Completar Perfil",
+          onClick: () => onNavigate({ view: "profile" })
+        }
+      });
       return;
     }
 
@@ -259,6 +290,14 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
 
   return (
     <main className={hideHeader ? "" : "app-shell"}>
+      {collection?.isStore && !loading && (
+        <Suspense fallback={null}>
+          <AppTour tourId={`public_collection_${shareToken}`} steps={PUBLIC_COLLECTION_TOUR} />
+          {Object.keys(cart).length > 0 && isCartExpanded && (
+            <AppTour tourId="public_collection_cart_v1" steps={cartTourSteps}/>
+          )}
+        </Suspense>
+      )}
       {collection && (
         <SEO 
           title={collection.name} 
@@ -361,7 +400,7 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
               </div>
             )}
 
-            <Panel>
+            <Panel className="tour-public-header">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="min-w-0">
                   <p className="text-xs font-black uppercase tracking-[0.14em] text-muted-foreground">
@@ -416,7 +455,7 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
             </Panel>
 
             <Panel>
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center tour-public-filters">
                 <div className="relative flex-1">
                   <Search
                     className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
@@ -455,7 +494,7 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
               {visibleItems.length ? (
                 <>
                   <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                    {paginatedItems.map((item) => (
+                    {paginatedItems.map((item, index) => (
                       <CollectionItemCard
                         key={item.id}
                         item={item}
@@ -465,7 +504,7 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
                         {collection.isStore && !item.store?.isSold && (
                           <Button
                             variant="ghost"
-                            className={`w-full h-10 gap-2 text-xs font-black uppercase transition-all ${
+                            className={`w-full h-10 gap-2 text-xs font-black uppercase transition-all ${index === 0 ? "tour-add-to-cart" : ""} ${
                                 cart[item.id] 
                                     ? "!bg-emerald-500 !text-white !border-emerald-500 shadow-glow shadow-emerald-500/20" 
                                     : "bg-accent/40 border-card-border text-muted-foreground hover:text-foreground hover:border-brand/40 hover:bg-brand/10"
@@ -524,11 +563,14 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
           globalTotal={globalTotal}
           setGlobalTotal={setGlobalTotal}
           onSubmit={submitProposal}
+          onNavigate={onNavigate}
           isSubmitting={isSubmitting}
           folderName={collection.name}
           session={session}
           theme={theme}
+          onExpandedChange={setIsCartExpanded}
         />
+
       )}
 
       {showMyProposalsModal && (

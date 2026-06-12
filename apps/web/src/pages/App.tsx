@@ -1,5 +1,5 @@
 // Main application component
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
   BarChart3,
@@ -21,6 +21,7 @@ import {
   TrendingUp,
   User as UserIcon,
   X,
+  HelpCircle,
 } from "lucide-react";
 import { AudioRegistrationPanel } from "../components/AudioRegistrationPanel";
 import { CardSearch } from "../components/CardSearch";
@@ -54,6 +55,7 @@ import { RequestPasswordResetPanel } from "../components/RequestPasswordResetPan
 import { ResetPasswordPanel } from "../components/ResetPasswordPanel";
 import { ConfirmEmailPanel } from "../components/ConfirmEmailPanel";
 import { CartAreaPage } from "../components/CartAreaPage";
+import { TourProvider, useTour } from "../lib/TourContext";
 
 type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "expansion-detail" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email" | "carts";
 type ThemeMode = "light" | "dark";
@@ -71,6 +73,14 @@ export type AppRoute = {
 };
 
 export function App() {
+  return (
+    <TourProvider>
+      <AppContent />
+    </TourProvider>
+  );
+}
+
+function AppContent() {
   const [session, setSession] = useState<Session | null>(() => loadSession());
   const [refreshKey, setRefreshKey] = useState(0);
   const [route, setRoute] = useState<AppRoute>(() => parseRoute());
@@ -80,7 +90,20 @@ export function App() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [blockedNavigationAt, setBlockedNavigationAt] = useState(0);
 
+  const { restartTour } = useTour();
   const view = route.view;
+
+  const currentTourId = useMemo(() => {
+    if (route.publicCollection) return `public_collection_${route.publicCollection}`;
+    if (view === "collections") {
+      const params = new URLSearchParams(window.location.search);
+      const collectionId = params.get("collection");
+      if (collectionId === "new") return "collections_create";
+      if (collectionId) return "collections_detail_v2";
+      return "collections_list";
+    }
+    return null;
+  }, [route.publicCollection, view, window.location.search]);
 
   // Navigation Guard for Browser navigation (tab close, external link)
   useEffect(() => {
@@ -129,7 +152,7 @@ export function App() {
         window.history.replaceState(null, "", newUrl);
         
         // Handle external-like redirect
-        if (redirect.includes("/public/") || redirect.includes("/auctions/")) {
+        if (redirect.includes("/public/") || redirect.includes("/auctions/") || redirect.startsWith("/p/")) {
           window.location.href = redirect;
         } else {
           setRoute(parseRoute());
@@ -223,17 +246,40 @@ export function App() {
           {(session || isPublicView) && (
             <header className={`sticky top-0 z-20 flex h-20 items-center justify-between jus border-b border-white/5 bg-white/5 px-5 backdrop-blur-xl dark:bg-black/20 ${session ? 'md:hidden' : ''}`}>
               {/* Left: Sidebar Toggle (Mobile only) */}
-              <div className={`flex items-center justify-start md:hidden ${session ? '' : 'hidden'}`}>
-                <button
-                  type="button"
-                  onClick={() => setSidebarOpen(true)}
-                  className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 dark:bg-night text-night dark:text-white shadow-sm"
-                >
-                  <Menu size={22} />
-                </button>
+              <div className={`flex items-center justify-start gap-2 ${session ? 'md:hidden' : ''}`}>
+                {session && (
+                  <button
+                    type="button"
+                    onClick={() => setSidebarOpen(true)}
+                    className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 dark:bg-night text-night dark:text-white shadow-sm"
+                  >
+                    <Menu size={22} />
+                  </button>
+                )}
+                {session && currentTourId && (
+                  <button
+                    type="button"
+                    onClick={() => restartTour(currentTourId)}
+                    className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 dark:bg-night text-muted-foreground shadow-sm active:scale-95 transition-transform"
+                    title="Ver tutorial novamente"
+                  >
+                    <HelpCircle size={22} />
+                  </button>
+                )}
               </div>
-              <div className={`flex items-center justify-end ${session ? 'hidden' : ''}`}>
+
+              <div className={`flex items-center justify-end gap-2 ${session ? 'hidden' : ''}`}>
                 <ThemeToggle theme={theme} onToggle={toggleTheme} />
+                {currentTourId && (
+                  <button
+                    type="button"
+                    onClick={() => restartTour(currentTourId)}
+                    className="grid h-11 w-11 place-items-center rounded-2xl border border-line bg-white/80 dark:bg-night text-muted-foreground shadow-sm active:scale-95 transition-transform"
+                    title="Ver tutorial novamente"
+                  >
+                    <HelpCircle size={22} />
+                  </button>
+                )}
               </div>
 
               {/* Center: Logo */}
@@ -261,7 +307,10 @@ export function App() {
                   <Button
                     variant="brand"
                     className="h-9 px-4 text-xs sm:h-11 sm:px-5 sm:text-sm"
-                    onClick={() => navigate({ view: "home" })}
+                    onClick={() => {
+                       const returnTo = window.location.pathname + window.location.search;
+                       navigate({ view: "home", returnTo });
+                    }}
                   >
                     Entrar
                   </Button>
@@ -636,7 +685,7 @@ function routeToUrl(route: AppRoute): string {
   }
 
   if (route.returnTo) {
-    params.set("returnTo", route.returnTo);
+    params.set("redirect", route.returnTo);
   }
 
   const query = params.toString();

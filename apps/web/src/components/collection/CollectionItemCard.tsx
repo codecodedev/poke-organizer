@@ -24,6 +24,7 @@ type Props = {
   onPriceChange?: (amount: number | null) => void;
   onRemove?: (item: CollectionItem) => void;
   removeLabel?: string;
+  className?: string;
   children?: ReactNode;
 };
 
@@ -36,6 +37,7 @@ export function CollectionItemCard({
   onPriceChange,
   onRemove,
   removeLabel = "Remover carta",
+  className = "",
   children,
 }: Props) {
   const isSold = Boolean(item.store?.isSold);
@@ -71,7 +73,7 @@ export function CollectionItemCard({
         selected
           ? "border-cyan/50 bg-cyan/10 shadow-[0_0_20px_rgba(var(--color-cyan)/0.1)]"
           : "border-slate-800/20 dark:border-slate-600 bg-card/40 backdrop-blur-md"
-      } ${isSold ? "opacity-90" : ""}`}
+      } ${isSold ? "opacity-90" : ""} ${className}`}
     >
       {onToggleSelection && (
         <button
@@ -128,6 +130,23 @@ export function CollectionItemCard({
           className="aspect-[5/7] rounded-[20px] shadow-lg"
           imageClassName={`object-cover transition duration-300 group-hover:scale-[1.03] ${isSold ? "grayscale-[0.4]" : ""}`}
         />
+        {showPriceChange && (
+          <span
+            className={`absolute z-30 bottom-10 left-2 inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[9px] font-black ${
+              latestChange > 0
+                ? "border-leaf/30 bg-emerald-800/70 text-white"
+                : "border-magenta/30 bg-magenta/80 text-white/90"
+            }`}
+            title={latestChange > 0 ? "Valor subiu" : "Valor caiu"}
+          >
+            {latestChange > 0 ? (
+              <TrendingUp size={12} />
+            ) : (
+              <TrendingDown size={12} />
+            )}
+            {formatBrl(Math.abs(latestChange))}
+          </span>
+        )}
         <div className={`absolute z-30 flex flex-col gap-2 bottom-2 left-2`}>
           <span
             className="grid h-7 px-2 place-items-center rounded-xl border border-card-border/50 bg-card/80 text-xs shadow-sm backdrop-blur"
@@ -166,7 +185,7 @@ export function CollectionItemCard({
             <div className="flex flex-1 items-center" onClick={(e) => e.stopPropagation()}>
               <span className="text-sm font-black text-muted-foreground mr-1">R$</span>
               <input
-                className="w-full bg-input border border-card-border/50 p-1.5 pl-3 rounded-xl text-sm font-black text-foreground outline-none focus:ring-1 focus:ring-cyan/50 transition"
+                className="tour-card-price-input w-full bg-input border border-card-border/50 p-1.5 pl-3 rounded-xl text-sm font-black text-foreground outline-none focus:ring-1 focus:ring-cyan/50 transition"
                 type="number"
                 min={0}
                 step="0.01"
@@ -189,23 +208,6 @@ export function CollectionItemCard({
             </p>
           )}
 
-          {showPriceChange && (
-            <span
-              className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-black ${
-                latestChange > 0
-                  ? "border-leaf/30 bg-leaf/10 text-leaf"
-                  : "border-magenta/30 bg-magenta/10 text-magenta"
-              }`}
-              title={latestChange > 0 ? "Valor subiu" : "Valor caiu"}
-            >
-              {latestChange > 0 ? (
-                <TrendingUp size={12} />
-              ) : (
-                <TrendingDown size={12} />
-              )}
-              {formatBrl(Math.abs(latestChange))}
-            </span>
-          )}
         </div>
         <div className="flex items-center justify-between gap-2 overflow-auto">
           <div className="flex flex-row gap-1 truncate items-center text-muted-foreground justify-center">

@@ -32,6 +32,7 @@
     --color-amber: 244 179 95;
     --color-aqua: 105 205 231;
     --color-lilac: 168 145 245;
+    --tour-beacon-color: 255 255 255;
 
     color-scheme: dark;
   }
@@ -70,6 +71,7 @@
     --color-amber: 180 83 9;
     --color-aqua: 14 116 144;
     --color-lilac: 109 40 217;
+    --tour-beacon-color: 239 93 117;
 
     color-scheme: light;
   }
@@ -319,4 +321,8 @@
 
 .animate-shake {
   animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both;
+}
+
+body.is-app-tour-running [class*="tour-"] {
+  scroll-margin-top: 112px;
 }

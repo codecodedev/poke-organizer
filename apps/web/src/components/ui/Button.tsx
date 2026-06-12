@@ -29,9 +29,13 @@ export function Button({ variant = "ghost", icon, shake, classChildren, classNam
           {icon}
         </div>
       )}
-      <div className={`flex items-center gap-2 ${classChildren}`}>
-        {children}
-      </div>
+      {
+        children && (
+          <div className={`flex items-center gap-2 ${classChildren}`}>
+            {children}
+          </div>
+        )
+      }
     </button>
   );
 }

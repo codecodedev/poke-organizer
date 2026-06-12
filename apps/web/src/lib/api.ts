@@ -60,8 +60,13 @@ export class HttpError extends Error {
 type ApiFeedbackListener = (event: ApiFeedbackEvent) => void;
 type ApiFeedbackEvent =
   | { type: "pending"; pending: number }
-  | { type: "error"; id: number; message: string }
-  | { type: "success"; id: number; message: string };
+  | { 
+      type: "error" | "success"; 
+      id: number; 
+      message: string; 
+      action?: { label: string; onClick: () => void };
+      ttl?: number;
+    };
 
 let pendingRequests = 0;
 let feedbackEventId = 0;
@@ -78,13 +83,25 @@ export const apiFeedback = {
   getPendingCount() {
     return pendingRequests;
   },
-  success(message: string) {
+  success(message: string, options: { action?: { label: string; onClick: () => void }; ttl?: number } = {}) {
     const id = ++feedbackEventId;
-    feedbackListeners.forEach((listener) => listener({ type: "success", id, message }));
+    feedbackListeners.forEach((listener) => listener({ 
+      type: "success", 
+      id, 
+      message, 
+      action: options.action,
+      ttl: options.ttl 
+    }));
   },
-  error(message: string) {
+  error(message: string, options: { action?: { label: string; onClick: () => void }; ttl?: number } = {}) {
     const id = ++feedbackEventId;
-    feedbackListeners.forEach((listener) => listener({ type: "error", id, message }));
+    feedbackListeners.forEach((listener) => listener({ 
+      type: "error", 
+      id, 
+      message, 
+      action: options.action,
+      ttl: options.ttl 
+    }));
   },
 };
 

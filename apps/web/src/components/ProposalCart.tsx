@@ -18,10 +18,12 @@ type Props = {
   globalTotal: string;
   setGlobalTotal: (val: string) => void;
   onSubmit: (proposalItems: { folderItemId: string; amount: number; quantity: number }[], message: string, totalOffer?: number, isGlobalOffer?: boolean) => Promise<void>;
+  onNavigate: (route: any) => void;
   isSubmitting: boolean;
   folderName: string;
   session: any;
   theme?: "light" | "dark";
+  onExpandedChange?: (isExpanded: boolean) => void;
 };
 
 export function ProposalCart({ 
@@ -32,14 +34,22 @@ export function ProposalCart({
   globalTotal, 
   setGlobalTotal, 
   onSubmit, 
+  onNavigate,
   isSubmitting, 
   folderName, 
   session, 
-  theme 
+  theme,
+  onExpandedChange
 }: Props) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    onExpandedChange?.(isExpanded);
+  }, [isExpanded, onExpandedChange]);
+
+  const missingWhatsApp = session && !session.user.whatsapp;
 
   const [hasNewItems, setHasNewItems] = useState(false);
   const prevCartLength = useRef(Object.keys(cart).length);
@@ -144,7 +154,7 @@ export function ProposalCart({
         }
       `}>
         {/* Main Container */}
-        <div className={`relative flex flex-col w-full transition-all duration-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)]
+        <div className={`relative flex flex-col w-full transition-all duration-300 shadow-[0_20px_50px_rgba(0,0,0,0.3)] tour-proposal-cart
           ${isExpanded
             ? "h-[600px] max-h-[90vh] sm:max-h-[80vh] rounded-t-[32px] sm:rounded-[32px] bg-card backdrop-blur-xl border-t sm:border border-card-border/40 overflow-hidden"
             : "h-16 bg-card/95 backdrop-blur-md border-t sm:border border-card-border/40 sm:rounded-full sm:w-auto overflow-visible"
@@ -310,7 +320,7 @@ export function ProposalCart({
                     setIsGlobalMode(!isGlobalMode);
                     if (!isGlobalMode) setGlobalTotal(calculatedTotal.toFixed(2));
                   }}
-                  className={`flex w-full items-center gap-4 rounded-2xl border p-4 transition-all text-left ${
+                  className={`flex w-full items-center gap-4 rounded-2xl border p-4 transition-all text-left tour-global-mode ${
                     isGlobalMode 
                       ? "border-brand bg-brand/5 shadow-[0_0_20px_rgba(var(--color-brand),0.1)]" 
                       : "border-card-border/40 bg-muted/20 hover:border-card-border/60 hover:bg-muted/30"
@@ -373,10 +383,25 @@ export function ProposalCart({
               </span>
             </div>
             {error && <p className="mb-4 text-[10px] font-bold text-rose-500 text-center">{error}</p>}
+            
+            {missingWhatsApp && (
+                <div className="mb-4 rounded-2xl bg-amber/10 p-4 border border-amber/20">
+                    <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                        Adicione seu WhatsApp no perfil para enviar propostas.
+                    </p>
+                    <button 
+                        onClick={() => onNavigate({ view: "profile" })}
+                        className="mt-2 text-[10px] font-black uppercase tracking-wider text-amber-600 underline hover:text-amber-700"
+                    >
+                        Completar Perfil
+                    </button>
+                </div>
+            )}
+
             <Button 
-              className="w-full h-14 text-base shadow-glow"
+              className="w-full h-14 text-base shadow-glow tour-finalize-proposal"
               variant="brand"
-              disabled={isSubmitting || cartList.length === 0}
+              disabled={isSubmitting || cartList.length === 0 || missingWhatsApp}
               onClick={(e) => { e.stopPropagation(); handleFinalize(); }}
             >
               {isSubmitting ? "Enviando..." : (session ? "Finalizar Proposta" : "Fazer Login para Enviar")}
