@@ -1,84 +1,61 @@
-# Poke Organizer
+# Coleciona Cards (Poke Organizer)
 
-Monorepo para gerenciar colecoes de cartas Pokemon com React, NestJS, Prisma, Postgres e Docker.
+Monorepo para gerenciamento, exibição e negociação de cartas Pokémon. Uma plataforma completa que une colecionadores, jogadores e vendedores.
 
-## Rodando com Docker
+## 🚀 Funcionalidades Principais
 
-```bash
-cp .env.example .env
-docker compose up --build
-```
+- **Inventário Inteligente**: Cadastro de cartas via busca ou reconhecimento de áudio (Powered by AI).
+- **Gerenciamento de Coleções**: Organize suas cartas em pastas temáticas, decks ou lotes para venda.
+- **Mercado Público**: Transforme suas pastas em lojas públicas com links exclusivos (`/p/seu-token`).
+- **Sistema de Propostas**: Interessados podem enviar ofertas por cartas individuais ou lotes fechados (Modo Global).
+- **Carrinho Dinâmico**: Gerenciamento de propostas em tempo real com suporte a múltiplos itens.
+- **Leilões**: Crie e participe de leilões ativos da comunidade com lances em tempo real.
+- **Sincronização de Preços**: Integração com LigaPokemon e MyPCards para manter sua coleção valorizada.
+- **Tour Guiado Interativo**: Onboarding automático para novos usuários e suporte via botão de ajuda em todas as telas.
+- **Perfis Públicos**: Mostre sua reputação, coleções e leilões ativos em um slug personalizado.
 
-- Web: http://localhost:5173
-- API: http://localhost:3333
-- OpenAPI: http://localhost:3333/docs
+## 🛠️ Arquitetura
 
-## Comandos uteis
+O projeto é um monorepo (`pnpm`) composto por:
 
-```bash
-docker compose exec api pnpm prisma migrate dev
-docker compose exec api pnpm test
-docker compose exec web pnpm test
-docker compose down
-```
+- **`apps/api`**: Backend NestJS (Fastify) com Prisma ORM e PostgreSQL.
+- **`apps/web`**: Frontend React (Vite + TailwindCSS) com UI moderna e responsiva.
+- **`apps/pricing-service`**: Microserviço em Node.js especializado em web scraping e sincronização de preços brasileiros.
+- **`packages/shared`**: Tipagens e utilitários compartilhados entre frontend e backend.
 
-No ambiente atual do Codex, Docker e pnpm podem nao estar instalados no PATH. O projeto esta preparado para rodar quando Docker Desktop ou Colima estiver disponivel.
+## 📦 Como Rodar Localmente
 
-## Deploy
+1. **Pré-requisitos**: Node.js 20+, Docker e pnpm.
+2. **Configuração**:
+   ```bash
+   cp .env.example .env
+   # Preencha as chaves de API necessárias (PokemonTCG, OpenAI/Gemini, Resend)
+   ```
+3. **Subir Infra (Database)**:
+   ```bash
+   docker compose up -d postgres
+   ```
+4. **Instalar Dependências**:
+   ```bash
+   pnpm install
+   ```
+5. **Rodar Aplicação**:
+   ```bash
+   pnpm dev
+   ```
 
-Estrategia recomendada:
+- **Web**: http://localhost:5173
+- **API**: http://localhost:3333
+- **Swagger Docs**: http://localhost:3333/docs
 
-- Frontend: Vercel, app Vite estatico em `apps/web`.
-- API: Render Web Service usando `apps/api/Dockerfile`.
-- Banco: Render Postgres compartilhado pela API e pelo pricing-service local.
-- Pricing-service: roda localmente apontando para o banco de producao no schema `pricing`.
+## 📖 Documentação Detalhada
 
-### API no Render
+- [Arquitetura de AI](./docs/ai/architecture.md)
+- [Variáveis de Ambiente](./.env.example) (Consulte os comentários no arquivo)
 
-O arquivo `render.yaml` cria:
+## 🚢 Deploy
 
-- `poke-organizer-api`
-- `poke-organizer-db`
-
-Configure estes secrets/envs no Render:
-
-```bash
-WEB_ORIGIN=https://SEU_FRONT.vercel.app
-POKEMON_TCG_API_KEY=
-```
-
-`JWT_ACCESS_SECRET` e `JWT_REFRESH_SECRET` podem ser gerados pelo Render via blueprint.
-
-O container da API executa `prisma migrate deploy` antes de iniciar `node dist/main.js`.
-
-### Web na Vercel
-
-Configure o projeto com root directory `apps/web`.
-
-Env de producao:
-
-```bash
-VITE_API_URL=https://SUA_API.onrender.com
-```
-
-O `apps/web/vercel.json` define install/build/output para o monorepo.
-
-### Pricing-service local com banco de producao
-
-Crie `apps/pricing-service/.env.local` apontando para a URL externa do banco:
-
-```bash
-PRICING_DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DB?schema=pricing&sslmode=require
-PRICING_SERVICE_PORT=3344
-PRICING_SERVICE_HOST=127.0.0.1
-LIGA_SYNC_HEADLESS=false
-```
-
-Depois rode:
-
-```bash
-pnpm dev:pricing:local
-```
-
-O schema `pricing` e as tabelas usadas pelo pricing-service sao criados pela migration da API.
-O pricing-service local nao roda `db push`; ele apenas gera client, compila e grava precos nas tabelas ja migradas.
+A aplicação está configurada para deploy automático:
+- **API/Database**: Render (via `render.yaml`)
+- **Web**: Vercel (via `apps/web/vercel.json`)
+- **Pricing Service**: Recomendado rodar localmente ou via cron job em servidor com suporte a Chromium/Puppeteer.

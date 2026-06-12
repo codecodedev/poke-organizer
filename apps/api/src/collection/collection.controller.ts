@@ -1,6 +1,6 @@
 import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, Req, Res, UseGuards } from "@nestjs/common";
 import { FastifyReply, FastifyRequest } from "fastify";
-import { ApiBearerAuth, ApiTags } from "@nestjs/swagger";
+import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser, RequestUser } from "../common/current-user.decorator";
 import { JwtAuthGuard, OptionalJwtAuthGuard } from "../common/jwt-auth.guard";
 import { CollectionService } from "./collection.service";
@@ -21,7 +21,7 @@ import {
   UndoFolderItemSaleDto,
   } from "./dto";
 
-@ApiTags("collection")
+@ApiTags("Coleções")
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard)
 @Controller("collection")
@@ -29,28 +29,39 @@ export class CollectionController {
   constructor(private readonly collection: CollectionService) {}
 
   @Get("summary")
+  @ApiOperation({ summary: "Resumo da home", description: "Retorna estatísticas, coleções em alta e propostas recentes para o usuário logado." })
   getSummary(@CurrentUser() user: RequestUser) {
     return this.collection.getHomeSummary(user.id);
   }
 
   @Delete("clear")
+  @ApiOperation({ summary: "Limpar inventário", description: "Remove todas as cartas do inventário do usuário." })
   clear(@CurrentUser() user: RequestUser, @Body() dto: ClearCollectionDto) {
     return this.collection.clearCollection(user.id, dto);
   }
 
   @Get()
+  @ApiOperation({ summary: "Listar cartas", description: "Lista todas as cartas do inventário global do usuário." })
   list(@CurrentUser() user: RequestUser, @Query() query: ListCollectionQueryDto) {
     return this.collection.list(user.id, query.limit);
   }
 
   @Post()
+  @ApiOperation({ summary: "Adicionar carta", description: "Adiciona uma nova carta ao inventário do usuário." })
   add(@CurrentUser() user: RequestUser, @Body() dto: AddCollectionItemDto) {
     return this.collection.add(user.id, dto);
   }
 
   @Get("folders")
-  listFolders(@CurrentUser() user: RequestUser) {
-    return this.collection.listFolders(user.id);
+  @ApiOperation({ summary: "Listar pastas", description: "Retorna a lista de pastas/coleções do usuário." })
+  listFolders(@CurrentUser() user: RequestUser, @Query() query: CollectionFolderQueryDto) {
+    return this.collection.listFolders(user.id, query);
+  }
+
+  @Post("folders")
+  @ApiOperation({ summary: "Criar pasta", description: "Cria uma nova pasta ou loja pública." })
+  createFolder(@CurrentUser() user: RequestUser, @Body() dto: CreateCollectionFolderDto) {
+    return this.collection.createFolder(user.id, dto);
   }
 
   @Get("my-proposals")
