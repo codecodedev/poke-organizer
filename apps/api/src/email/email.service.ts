@@ -224,7 +224,7 @@ export class EmailService {
 
   async sendNewProposalEmail(email: string, buyerName: string, folderName: string, total: number, folderId: string, items: any[] = [], offerId?: string) {
     const baseUrl = this.getBaseUrl();
-    const proposalUrl = `${baseUrl}/?page=proposals` + (offerId ? `&proposalId=${offerId}&subTab=received` : "");
+    const proposalUrl = `${baseUrl}/?page=negotiations` + (offerId ? `&negotiation=proposal:${offerId}` : "");
 
     const itemsHtml = this.renderItemsTable(items);
 
@@ -266,7 +266,7 @@ export class EmailService {
   async sendProposalDecisionEmail(email: string, sellerName: string, folderName: string, status: "accepted" | "rejected", offerId?: string) {
     const isAccepted = status === "accepted";
     const baseUrl = this.getBaseUrl();
-    const targetUrl = isAccepted ? `${baseUrl}/?page=orders&tab=purchases` : `${baseUrl}/?page=proposals` + (offerId ? `&proposalId=${offerId}&subTab=sent` : "");
+    const targetUrl = `${baseUrl}/?page=negotiations` + (offerId ? `&negotiation=proposal:${offerId}` : "");
     
     const html = this.wrapHtml(`
       <h1>Sua proposta foi ${isAccepted ? "aceita" : "recusada"}</h1>
@@ -302,9 +302,9 @@ export class EmailService {
     }
   }
 
-  async sendAuctionWinnerEmail(email: string, sellerName: string, auctionTitle: string, amount: number) {
+  async sendAuctionWinnerEmail(email: string, sellerName: string, auctionTitle: string, amount: number, orderId?: string) {
     const baseUrl = this.getBaseUrl();
-    const ordersUrl = `${baseUrl}/?page=orders&tab=purchases`;
+    const ordersUrl = `${baseUrl}/?page=negotiations${orderId ? `&negotiation=auction:${encodeURIComponent(orderId)}` : ""}`;
 
     const html = this.wrapHtml(`
       <h1>Você fez a maior oferta!</h1>
@@ -315,7 +315,7 @@ export class EmailService {
       </div>
       <p>Use a conversa do pedido dentro da plataforma para combinar os detalhes finais com <strong>${sellerName}</strong>.</p>
       <div style="text-align: center;">
-        <a href="${ordersUrl}" class="button">Ver meu Pedido</a>
+        <a href="${ordersUrl}" class="button">Ver negociação</a>
       </div>
     `, `Parabéns! Você fez a maior oferta em "${auctionTitle}"!`);
 
@@ -349,7 +349,7 @@ export class EmailService {
         <p style="margin: 0;">Você pode acompanhar todos os seus pedidos e conversar com os vendedores diretamente na plataforma.</p>
       </div>
       <div style="text-align: center;">
-        <a href="${baseUrl}/?page=orders" class="button">Ver Meus Pedidos</a>
+        <a href="${baseUrl}/?page=negotiations&negotiation=order:${encodeURIComponent(orderId)}" class="button">Ver negociação</a>
       </div>
     `, `Seu pedido #${orderId.slice(-6).toUpperCase()} foi ${statusText.toLowerCase()}`);
 
@@ -373,7 +373,7 @@ export class EmailService {
 
   async sendOrderMessageEmail(email: string, orderId: string, senderName: string) {
     const baseUrl = this.getBaseUrl();
-    const orderUrl = `${baseUrl}/?page=orders&order=${encodeURIComponent(orderId)}`;
+    const orderUrl = `${baseUrl}/?page=negotiations&negotiation=order:${encodeURIComponent(orderId)}`;
     const orderCode = orderId.slice(-6).toUpperCase();
 
     const html = this.wrapHtml(`

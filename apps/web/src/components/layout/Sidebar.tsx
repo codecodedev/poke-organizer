@@ -16,14 +16,13 @@ import {
   ExternalLink,
   User as UserIcon,
   Gavel,
-  Package,
   Layers3,
 } from "lucide-react";
 import { Button } from "../ui/Button";
 import { NotificationBell } from "../ui/NotificationBell";
 import type { Session } from "../../lib/api";
 
-type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "proposals" | "profile" | "my-auctions" | "orders" | "carts";
+type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "negotiations" | "proposals" | "profile" | "my-auctions" | "orders" | "carts";
 
 type NavItem = {
   id: View;
@@ -36,11 +35,10 @@ const navItems: NavItem[] = [
   { id: "buy", label: "Comprar", icon: <ShoppingBag size={20} /> },
   { id: "expansions", label: "Expansões", icon: <Layers3 size={20} /> },
   { id: "my-auctions", label: "Meus Leilões", icon: <Gavel size={20} /> },
-  { id: "orders", label: "Pedidos", icon: <Package size={20} /> },
+  { id: "negotiations", label: "Negociações", icon: <MessageSquare size={20} /> },
   { id: "cards", label: "Minhas Cartas", icon: <LibraryBig size={20} /> },
   { id: "collections", label: "Coleções", icon: <FolderOpen size={20} /> },
   // { id: "decks", label: "Decks", icon: <Swords size={20} /> },
-  { id: "proposals", label: "Propostas", icon: <MessageSquare size={20} /> },
   { id: "profile", label: "Perfil", icon: <UserIcon size={20} /> },
 ];
 
@@ -194,8 +192,7 @@ export function Sidebar({
                  onUnauthorized={onUnauthorized}
                  onNavigate={(link) => {
                    const url = new URL(link, window.location.origin);
-                   const tab = url.searchParams.get("tab");
-                   onNavigate("proposals");
+                   window.location.href = `${url.pathname}${url.search}`;
                  }}
                />
                 {effectiveOpen && <span className="text-sm font-bold text-muted-foreground">Notificações</span>}

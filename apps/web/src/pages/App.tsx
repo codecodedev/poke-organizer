@@ -46,6 +46,7 @@ import { NotificationBell } from "../components/ui/NotificationBell";
 import { ProfilePage } from "../components/ProfilePage";
 import { BuyPage } from "../components/BuyPage";
 import { OrdersPage } from "../components/OrdersPage";
+import { NegotiationsPage } from "../components/NegotiationsPage";
 import { MyAuctionsPage } from "../components/MyAuctionsPage";
 import { Sidebar } from "../components/layout/Sidebar";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
@@ -58,7 +59,7 @@ import { CartAreaPage } from "../components/CartAreaPage";
 import { TourProvider, useTour } from "../lib/TourContext";
 import { LegalPage } from "../components/LegalPage";
 
-type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "expansion-detail" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email" | "carts" | "terms" | "privacy";
+type View = "home" | "cards" | "collections" | "decks" | "buy" | "expansions" | "expansion-detail" | "negotiations" | "proposals" | "profile" | "my-auctions" | "orders" | "request-password-reset" | "reset-password" | "confirm-email" | "carts" | "terms" | "privacy";
 type ThemeMode = "light" | "dark";
 export type AppRoute = {
   view: View;
@@ -68,6 +69,7 @@ export type AppRoute = {
   collection?: string | null;
   card?: string | null;
   order?: string | null;
+  negotiation?: string | null;
   token?: string | null;
   setId?: string | null;
   returnTo?: string | null;
@@ -494,15 +496,25 @@ function AppContent() {
               />
             )}
 
-            {!isPublicView && view === "proposals" && session && (
-              <ProfilePage
+            {!isPublicView && view === "negotiations" && session && (
+              <NegotiationsPage
                 session={session}
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
                 onBack={() => navigate({ view: "home" })}
-                initialTab="proposals"
-                onUnsavedChanges={setHasUnsavedChanges}
-                blockedNavigationAt={blockedNavigationAt}
+                initialNegotiationId={route.negotiation ?? null}
+                onNegotiationRouteChange={(negotiation) => navigate({ view: "negotiations", negotiation })}
+              />
+            )}
+
+            {!isPublicView && view === "proposals" && session && (
+              <NegotiationsPage
+                session={session}
+                onSession={handleSession}
+                onUnauthorized={handleUnauthorized}
+                onBack={() => navigate({ view: "home" })}
+                initialNegotiationId={route.negotiation ?? null}
+                onNegotiationRouteChange={(negotiation) => navigate({ view: "negotiations", negotiation })}
               />
             )}
 
@@ -642,10 +654,15 @@ function parseRoute(): AppRoute {
 
   const params = new URLSearchParams(window.location.search);
   const page = params.get("page");
+  const normalizedPage = page === "proposals" || page === "orders" ? "negotiations" : page;
   const view: View =
-    (page === "cards" || page === "collections" || page === "decks" || page === "buy" || page === "expansions" || page === "expansion-detail" || page === "proposals" || page === "profile" || page === "my-auctions" || page === "orders" || page === "request-password-reset" || page === "carts" || page === "terms" || page === "privacy")
-      ? page as View
-      : (path.slice(1) || "home") as View;
+    (normalizedPage === "cards" || normalizedPage === "collections" || normalizedPage === "decks" || normalizedPage === "buy" || normalizedPage === "expansions" || normalizedPage === "expansion-detail" || normalizedPage === "negotiations" || normalizedPage === "proposals" || normalizedPage === "profile" || normalizedPage === "my-auctions" || normalizedPage === "orders" || normalizedPage === "request-password-reset" || normalizedPage === "carts" || normalizedPage === "terms" || normalizedPage === "privacy")
+      ? normalizedPage as View
+      : ((path === "/orders" || path === "/proposals") ? "negotiations" : (path.slice(1) || "home") as View);
+
+  const proposalId = params.get("proposalId");
+  const orderId = params.get("order");
+  const negotiation = params.get("negotiation") ?? (proposalId ? `proposal:${proposalId}` : orderId ? `order:${orderId}` : null);
 
   return {
     view,
@@ -655,6 +672,7 @@ function parseRoute(): AppRoute {
     collection: (view === "collections" || view === "profile" || view === "proposals" || view === "carts") ? params.get("collection") : null,
     card: params.get("card"),
     order: view === "orders" ? params.get("order") : null,
+    negotiation: view === "negotiations" ? negotiation : null,
     token: search.get("token"),
     setId: params.get("setId"),
     returnTo: search.get("returnTo"),
@@ -695,6 +713,10 @@ function routeToUrl(route: AppRoute): string {
 
   if ((route.view === "collections" || route.view === "profile" || route.view === "proposals" || route.view === "carts") && route.collection) {
     params.set("collection", route.collection);
+  }
+
+  if (route.view === "negotiations" && route.negotiation) {
+    params.set("negotiation", route.negotiation);
   }
 
   if (route.view === "expansion-detail" && route.setId) {
@@ -975,17 +997,22 @@ function HomeView({
           ) : (
             <div className="flex flex-col gap-3">
               {summary?.recentProposals?.map((offer) => (
-                <div key={offer.id} className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3">
+                <button
+                  key={offer.id}
+                  type="button"
+                  onClick={() => navigate({ view: "negotiations", negotiation: `proposal:${offer.id}` })}
+                  className="flex items-center justify-between rounded-xl border border-white/5 bg-white/5 p-3 text-left transition hover:border-brand/30 hover:bg-white/10"
+                >
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Proposta em {offer.folderName || 'Loja'}</p>
                     <p className="font-bold text-white">{formatBrl(offer.totalOffer)}</p>
                   </div>
                   <div className="text-right">
-                    <span className={`text-[10px] font-bold uppercase ${offer.status === 'accepted' ? 'text-emerald-400' : offer.status === 'rejected' ? 'text-rose-400' : 'text-amber'}`}>
-                      {offer.status === 'accepted' ? 'Aceita' : offer.status === 'rejected' ? 'Recusada' : 'Pendente'}
+                    <span className={`text-[10px] font-bold uppercase ${offer.status === 'accepted' ? 'text-emerald-400' : offer.status === 'rejected' ? 'text-rose-400' : offer.status === 'countered' ? 'text-cyan-300' : 'text-amber'}`}>
+                      {offer.status === 'accepted' ? 'Aceita' : offer.status === 'rejected' ? 'Recusada' : offer.status === 'countered' ? 'Contraproposta' : offer.status === 'buyer_accepted' ? 'Aguardando vendedor' : 'Pendente'}
                     </span>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}

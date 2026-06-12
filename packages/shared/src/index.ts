@@ -232,7 +232,15 @@ export type UserPublicProfile = {
   auctions: AuctionSummary[];
 };
 
-export type CollectionOfferStatus = "pending" | "accepted" | "rejected";
+export type CollectionOfferStatus = "pending" | "countered" | "buyer_accepted" | "accepted" | "rejected";
+
+export type CollectionOfferEventType =
+  | "message"
+  | "initial_offer"
+  | "counter_offer"
+  | "buyer_accepted"
+  | "seller_accepted"
+  | "rejected";
 
 export type CollectionCartOfferItem = {
   id: string;
@@ -240,6 +248,17 @@ export type CollectionCartOfferItem = {
   quantity: number;
   amount: number;
   item: CollectionItem;
+};
+
+export type CollectionCartOfferEvent = {
+  id: string;
+  offerId: string;
+  senderId: string;
+  senderName: string;
+  type: CollectionOfferEventType;
+  message?: string | null;
+  proposedTotal?: number | null;
+  createdAt: string;
 };
 
 export type CollectionCartOffer = {
@@ -257,6 +276,7 @@ export type CollectionCartOffer = {
   createdAt: string;
   updatedAt: string;
   items: CollectionCartOfferItem[];
+  events: CollectionCartOfferEvent[];
 };
 
 export type PriceLookupCard = {
@@ -461,6 +481,64 @@ export type OrderSummary = {
 
 export type OrderDetail = OrderSummary & {
   messages: OrderMessage[];
+};
+
+export type NegotiationOrigin = "proposal" | "auction";
+export type NegotiationRole = "seller" | "buyer";
+export type NegotiationStatus =
+  | "pending"
+  | "countered"
+  | "buyer_accepted"
+  | "accepted"
+  | "rejected"
+  | "delivered"
+  | "cancelled";
+
+export type NegotiationMessageType = CollectionOfferEventType | "order_message";
+
+export type NegotiationMessage = {
+  id: string;
+  senderId: string;
+  senderName: string;
+  type: NegotiationMessageType;
+  message?: string | null;
+  proposedTotal?: number | null;
+  createdAt: string;
+};
+
+export type NegotiationSummary = {
+  id: string;
+  origin: NegotiationOrigin;
+  role: NegotiationRole;
+  proposalId?: string | null;
+  orderId?: string | null;
+  auctionId?: string | null;
+  sellerId: string;
+  sellerName: string;
+  buyerId: string;
+  buyerName: string;
+  title: string;
+  status: NegotiationStatus;
+  proposalStatus?: CollectionOfferStatus | null;
+  orderStatus?: OrderStatus | null;
+  totalAmount: number;
+  createdAt: string;
+  updatedAt: string;
+  items: OrderItem[];
+};
+
+export type NegotiationDetail = NegotiationSummary & {
+  messages: NegotiationMessage[];
+  folderId?: string | null;
+  folderName?: string | null;
+  folderShareToken?: string | null;
+  isGlobalOffer?: boolean;
+  canChat: boolean;
+  canSendCounterOffer: boolean;
+  canRespondCounterOffer: boolean;
+  canAcceptProposal: boolean;
+  canRejectProposal: boolean;
+  canUpdateOrderStatus: boolean;
 };
 
 export const LEGAL_TERMS_VERSION = "2026-06-12";

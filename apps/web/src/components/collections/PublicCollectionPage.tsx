@@ -409,7 +409,7 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
                       variant="primary"
                       className="border-brand/40 bg-brand/5 text-brand"
                       icon={<ShoppingBag size={18} />}
-                      onClick={() => onNavigate({ view: "proposals", collection: collection.id })}
+                      onClick={() => onNavigate({ view: "negotiations" })}
                     >
                       Minhas propostas
                     </Button>

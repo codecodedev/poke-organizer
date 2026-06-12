@@ -11,6 +11,7 @@ import {
   AlertCircle,
   Loader2,
   RotateCw,
+  Send,
 } from "lucide-react";
 import { api, apiFeedback, type Session } from "../lib/api";
 import { withAuthRetry } from "../lib/authRetry";
@@ -19,6 +20,31 @@ import { Panel } from "./ui/Panel";
 import { Modal } from "./ui/Modal";
 import { formatBrl } from "../lib/format";
 import type { CollectionCartOffer } from "@poke-organizer/shared";
+
+function offerStatusLabel(status: CollectionCartOffer["status"]) {
+  if (status === "accepted") return "Aceita";
+  if (status === "rejected") return "Recusada";
+  if (status === "countered") return "Contraproposta";
+  if (status === "buyer_accepted") return "Aguardando confirmação";
+  return "Pendente";
+}
+
+function offerStatusClass(status: CollectionCartOffer["status"]) {
+  if (status === "accepted") return "bg-leaf text-white";
+  if (status === "rejected") return "bg-magenta text-white";
+  if (status === "countered") return "bg-cyan/15 text-cyan";
+  if (status === "buyer_accepted") return "bg-brand/15 text-brand";
+  return "bg-amber/20 text-amber";
+}
+
+function eventLabel(type: CollectionCartOffer["events"][number]["type"]) {
+  if (type === "initial_offer") return "Proposta inicial";
+  if (type === "counter_offer") return "Contraproposta";
+  if (type === "buyer_accepted") return "Comprador aceitou";
+  if (type === "seller_accepted") return "Vendedor confirmou";
+  if (type === "rejected") return "Negociação encerrada";
+  return "Mensagem";
+}
 
 type Props = {
   session: Session;
@@ -99,6 +125,27 @@ function DetailedProposalModal({ offer, onClose }: { offer: CollectionCartOffer;
             <p className="text-sm italic text-foreground">"{offer.message}"</p>
           </div>
         )}
+
+        <div className="rounded-2xl bg-muted/20 p-4 border border-card-border/30">
+          <p className="text-xs font-black text-muted-foreground uppercase tracking-widest mb-3">Histórico da negociação</p>
+          <div className="space-y-3">
+            {(offer.events?.length ? offer.events : []).map((event) => (
+              <div key={event.id} className="rounded-xl border border-card-border/30 bg-card/70 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-black text-foreground">{eventLabel(event.type)} • {event.senderName}</p>
+                  <p className="text-[10px] font-bold text-muted-foreground">{new Date(event.createdAt).toLocaleString()}</p>
+                </div>
+                {event.proposedTotal !== null && event.proposedTotal !== undefined && (
+                  <p className="mt-1 text-sm font-black text-brand">{formatBrl(event.proposedTotal)}</p>
+                )}
+                {event.message && <p className="mt-2 text-sm text-muted-foreground">{event.message}</p>}
+              </div>
+            ))}
+            {!offer.events?.length && (
+              <p className="text-sm font-semibold text-muted-foreground">Sem eventos registrados para esta proposta antiga.</p>
+            )}
+          </div>
+        </div>
       </div>
       
       <div className="sticky bottom-0 border-t border-card-border/50 bg-card p-6 flex items-center justify-between">
@@ -112,6 +159,63 @@ function DetailedProposalModal({ offer, onClose }: { offer: CollectionCartOffer;
   );
 }
 
+function CounterProposalModal({
+  offer,
+  submitting,
+  onClose,
+  onSubmit,
+}: {
+  offer: CollectionCartOffer;
+  submitting: boolean;
+  onClose: () => void;
+  onSubmit: (totalOffer: number, message?: string) => void;
+}) {
+  const [amount, setAmount] = useState(String(offer.totalOffer));
+  const [message, setMessage] = useState("");
+
+  return (
+    <Modal
+      title="Enviar contraproposta"
+      subtitle={`Proposta atual: ${formatBrl(offer.totalOffer)}`}
+      icon={<Send size={20} />}
+      onClose={onClose}
+      maxWidthClass="max-w-lg"
+    >
+      <div className="space-y-5 p-6">
+        <div className="space-y-2">
+          <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Novo valor total</label>
+          <input
+            className="premium-input w-full text-lg font-black"
+            inputMode="decimal"
+            value={amount}
+            onChange={(event) => setAmount(event.target.value)}
+          />
+        </div>
+        <div className="space-y-2">
+          <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Mensagem para o comprador</label>
+          <textarea
+            className="premium-input min-h-[110px] w-full resize-none"
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            placeholder="Explique o ajuste de valor ou combine detalhes da negociação."
+          />
+        </div>
+      </div>
+      <div className="flex justify-end gap-3 border-t border-card-border/40 p-5">
+        <Button variant="outline" onClick={onClose} disabled={submitting}>Cancelar</Button>
+        <Button
+          variant="brand"
+          icon={submitting ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+          onClick={() => onSubmit(Number(amount.replace(",", ".")), message)}
+          disabled={submitting}
+        >
+          Enviar
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
 export function ProfilePage({ session, onSession, onUnauthorized, onBack, initialTab, onUnsavedChanges, blockedNavigationAt }: Props) {
   const urlParams = new URLSearchParams(window.location.search);
   const initialSubTab = urlParams.get("subTab") as "sent" | "received" | null;
@@ -120,6 +224,8 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
 
   const [tab, setTab] = useState<"proposals" | "settings">(initialTab === "settings" ? "settings" : "proposals");
   const [selectedOffer, setSelectedOffer] = useState<CollectionCartOffer | null>(null);
+  const [counterOffer, setCounterOffer] = useState<CollectionCartOffer | null>(null);
+  const [submittingOfferAction, setSubmittingOfferAction] = useState(false);
   
   const [shouldShake, setShouldShake] = useState(false);
 
@@ -250,14 +356,55 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
   }, [session, onSession, onUnauthorized]);
 
   async function handleDecideOffer(offer: CollectionCartOffer, status: "accepted" | "rejected") {
+    setSubmittingOfferAction(true);
     try {
       await withAuthRetry(session, onSession, onUnauthorized, (token) =>
         api.decideCollectionOffer(token, offer.folderId, offer.id, status)
       );
-      apiFeedback.success(status === "accepted" ? "Proposta aceita!" : "Proposta recusada.");
+      apiFeedback.success(status === "accepted" ? "Proposta aceita e pedido aberto!" : "Proposta recusada.");
       void loadProposals();
     } catch (err) {
       apiFeedback.error(err instanceof Error ? err.message : "Erro ao decidir proposta");
+    } finally {
+      setSubmittingOfferAction(false);
+    }
+  }
+
+  async function handleCounterOffer(offer: CollectionCartOffer, totalOffer: number, message?: string) {
+    if (!Number.isFinite(totalOffer) || totalOffer <= 0) {
+      apiFeedback.error("Informe um valor maior que zero.");
+      return;
+    }
+    setSubmittingOfferAction(true);
+    try {
+      await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.counterCollectionOffer(token, offer.folderId, offer.id, {
+          totalOffer,
+          message: message?.trim() || undefined,
+        })
+      );
+      setCounterOffer(null);
+      apiFeedback.success("Contraproposta enviada.");
+      void loadProposals();
+    } catch (err) {
+      apiFeedback.error(err instanceof Error ? err.message : "Erro ao enviar contraproposta");
+    } finally {
+      setSubmittingOfferAction(false);
+    }
+  }
+
+  async function handleRespondCounterOffer(offer: CollectionCartOffer, status: "accepted" | "rejected") {
+    setSubmittingOfferAction(true);
+    try {
+      await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.respondCollectionCounterOffer(token, offer.folderId, offer.id, status)
+      );
+      apiFeedback.success(status === "accepted" ? "Contraproposta aceita. Aguardando confirmação do vendedor." : "Contraproposta recusada.");
+      void loadProposals();
+    } catch (err) {
+      apiFeedback.error(err instanceof Error ? err.message : "Erro ao responder contraproposta");
+    } finally {
+      setSubmittingOfferAction(false);
     }
   }
 
@@ -316,6 +463,14 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
         <DetailedProposalModal 
           offer={selectedOffer} 
           onClose={() => setSelectedOffer(null)} 
+        />
+      )}
+      {counterOffer && (
+        <CounterProposalModal
+          offer={counterOffer}
+          submitting={submittingOfferAction}
+          onClose={() => setCounterOffer(null)}
+          onSubmit={(totalOffer, message) => handleCounterOffer(counterOffer, totalOffer, message)}
         />
       )}
       <div className="flex items-center justify-between">
@@ -407,12 +562,8 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-3">
                             <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Proposta</span>
-                            <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ${
-                              offer.status === "accepted" ? "bg-leaf text-white" :
-                              offer.status === "rejected" ? "bg-magenta text-white" :
-                              "bg-amber/20 text-amber"
-                            }`}>
-                              {offer.status === "accepted" ? "Aceita" : offer.status === "rejected" ? "Recusada" : "Pendente"}
+                            <span className={`rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-wider ${offerStatusClass(offer.status)}`}>
+                              {offerStatusLabel(offer.status)}
                             </span>
                             {offer.isGlobalOffer && (
                                 <span className="rounded-lg bg-brand px-2 py-1 text-[10px] font-black text-white uppercase tracking-tighter">
@@ -456,23 +607,66 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                         </div>
                         
                         <div className="flex flex-col gap-2 shrink-0 w-full md:w-auto">
-                            {proposalsSubTab === "received" && offer.status === "pending" && (
+                            {proposalsSubTab === "received" && (offer.status === "pending" || offer.status === "buyer_accepted") && (
                                 <div className="flex gap-2 w-full">
                                     <Button
                                         variant="brand"
                                         className="h-11 flex-1 md:px-6 bg-leaf hover:bg-emerald-600 text-white border-none shadow-sm"
                                         onClick={() => handleDecideOffer(offer, "accepted")}
+                                        disabled={submittingOfferAction}
                                     >
-                                        Aceitar
+                                        {offer.status === "buyer_accepted" ? "Confirmar pedido" : "Aceitar"}
                                     </Button>
                                     <Button
                                         variant="outline"
                                         className="h-11 flex-1 md:px-6 text-magenta border-magenta/20 hover:bg-magenta/5"
                                         onClick={() => handleDecideOffer(offer, "rejected")}
+                                        disabled={submittingOfferAction}
                                     >
                                         Recusar
                                     </Button>
                                 </div>
+                            )}
+                            {proposalsSubTab === "received" && (offer.status === "pending" || offer.status === "countered") && (
+                              <Button
+                                variant="outline"
+                                className="h-11 px-6 text-sm w-full md:w-auto border-cyan/30 text-cyan hover:bg-cyan/5"
+                                icon={<Send size={16} />}
+                                onClick={() => setCounterOffer(offer)}
+                                disabled={submittingOfferAction}
+                              >
+                                {offer.status === "countered" ? "Ajustar contraproposta" : "Contrapropor"}
+                              </Button>
+                            )}
+                            {proposalsSubTab === "received" && offer.status === "countered" && (
+                              <Button
+                                variant="outline"
+                                className="h-11 px-6 text-sm w-full md:w-auto text-magenta border-magenta/20 hover:bg-magenta/5"
+                                onClick={() => handleDecideOffer(offer, "rejected")}
+                                disabled={submittingOfferAction}
+                              >
+                                Encerrar
+                              </Button>
+                            )}
+                            {proposalsSubTab === "sent" && offer.status === "countered" && (
+                              <div className="flex gap-2 w-full">
+                                <Button
+                                  variant="brand"
+                                  className="h-11 flex-1 md:px-6 bg-leaf hover:bg-emerald-600 text-white border-none shadow-sm"
+                                  onClick={() => handleRespondCounterOffer(offer, "accepted")}
+                                  disabled={submittingOfferAction}
+                                >
+                                  Aceitar contraproposta
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  className="h-11 flex-1 md:px-6 text-magenta border-magenta/20 hover:bg-magenta/5"
+                                  onClick={() => handleRespondCounterOffer(offer, "rejected")}
+                                  disabled={submittingOfferAction}
+                                >
+                                  Recusar
+                                </Button>
+                              </div>
                             )}
                             <Button
                                 variant="outline"

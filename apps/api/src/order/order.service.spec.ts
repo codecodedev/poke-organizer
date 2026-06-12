@@ -80,7 +80,7 @@ describe("OrderService", () => {
         userId: buyer.id,
         title: "Nova mensagem no pedido",
         message: "Vendedor enviou uma mensagem sobre o pedido #ABCDEF.",
-        link: `/?page=orders&order=${baseOrder.id}`,
+        link: `/?page=negotiations&negotiation=order:${baseOrder.id}`,
       },
     });
     expect(emailService.sendOrderMessageEmail).toHaveBeenCalledWith(

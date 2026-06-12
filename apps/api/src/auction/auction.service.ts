@@ -85,11 +85,13 @@ export class AuctionService {
     return this.mapDetail(auction);
   }
 
-  async placeBid(userId: string, id: string, dto: PlaceAuctionBidDto): Promise<AuctionDetail> {
+  async placeBid(userId: string, idOrToken: string, dto: PlaceAuctionBidDto): Promise<AuctionDetail> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     
-    const auction = await this.prisma.auction.findUnique({
-      where: { id },
+    const auction = await this.prisma.auction.findFirst({
+      where: {
+        OR: [{ id: idOrToken }, { shareToken: idOrToken }]
+      },
       include: { bids: { take: 1, orderBy: { amountBrl: "desc" } } },
     });
 
@@ -112,13 +114,13 @@ export class AuctionService {
     await this.prisma.$transaction([
       this.prisma.auctionBid.create({
         data: {
-          auctionId: id,
+          auctionId: auction.id,
           bidderId: userId,
           amountBrl: dto.amountBrl,
         },
       }),
       this.prisma.auction.update({
-        where: { id },
+        where: { id: auction.id },
         data: { currentBidBrl: dto.amountBrl },
       }),
       this.prisma.notification.create({
@@ -138,17 +140,20 @@ export class AuctionService {
         .catch(err => console.error("Failed to send bid email", err));
     }
 
-    return this.getById(id);
+    return this.getById(auction.id);
   }
 
-  async close(userId: string, id: string): Promise<AuctionDetail> {
+  async close(userId: string, idOrToken: string): Promise<AuctionDetail> {
     const auction = await this.prisma.auction.findFirst({
-      where: { id, sellerId: userId },
+      where: { 
+        OR: [{ id: idOrToken }, { shareToken: idOrToken }],
+        sellerId: userId 
+      },
     });
     if (!auction) throw new NotFoundException("Negociação por lances não encontrada");
 
     const updated = await this.prisma.auction.update({
-      where: { id },
+      where: { id: auction.id },
       data: { status: "CLOSED" },
       include: auctionInclude,
     });
@@ -156,20 +161,23 @@ export class AuctionService {
     return this.mapDetail(updated);
   }
 
-  async selectWinner(userId: string, id: string, bidId: string): Promise<AuctionDetail> {
+  async selectWinner(userId: string, idOrToken: string, bidId: string): Promise<AuctionDetail> {
     const auction = await this.prisma.auction.findFirst({
-      where: { id, sellerId: userId },
+      where: { 
+        OR: [{ id: idOrToken }, { shareToken: idOrToken }],
+        sellerId: userId 
+      },
       include: { bids: true, collectionItem: { include: { card: true } } },
     });
 
     if (!auction) throw new NotFoundException("Negociação por lances não encontrada");
-    
+
     const bid = auction.bids.find(b => b.id === bidId);
     if (!bid) throw new NotFoundException("Lance não encontrado");
 
-    const updated = await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const auctionUpdated = await tx.auction.update({
-        where: { id },
+        where: { id: auction.id },
         data: { 
           winningBidId: bidId,
           status: "CLOSED" 
@@ -178,13 +186,13 @@ export class AuctionService {
       });
 
       // Create Order
-      await tx.order.create({
+      const order = await tx.order.create({
         data: {
           sellerId: userId,
           buyerId: bid.bidderId,
           status: "PENDING",
           totalAmountBrl: bid.amountBrl,
-          auctionId: id,
+          auctionId: auction.id,
           items: {
             create: {
               name: auction.collectionItem.card.name,
@@ -196,13 +204,13 @@ export class AuctionService {
               cardNumber: auction.collectionItem.card.number,
               cardTotal: auction.collectionItem.card.printedTotal,
               }
-
           }
         }
       });
 
-      return auctionUpdated;
+      return { auctionUpdated, orderId: order.id };
     });
+    const updated = result.auctionUpdated;
 
     // Notify winner
     const bidder = await this.prisma.user.findUnique({ where: { id: bid.bidderId } });
@@ -212,7 +220,7 @@ export class AuctionService {
           userId: bid.bidderId,
           title: "Seu lance venceu!",
           message: `Parabéns! Seu lance de R$ ${Number(bid.amountBrl).toFixed(2)} na negociação "${auction.title || 'Carta Pokémon'}" foi o maior.`,
-          link: `/orders?tab=purchases`,
+          link: `/?page=negotiations&negotiation=auction:${result.orderId}`,
         },
       });
 
@@ -220,22 +228,26 @@ export class AuctionService {
         bidder.email, 
         updated.seller.name || updated.seller.email, 
         auction.title || "Negociação por lances", 
-        Number(bid.amountBrl)
+        Number(bid.amountBrl),
+        result.orderId,
       ).catch(err => console.error("Failed to send bid winner email", err));
     }
 
     return this.mapDetail(updated);
   }
 
-  async deleteBid(userId: string, id: string, bidId: string): Promise<AuctionDetail> {
+  async deleteBid(userId: string, idOrToken: string, bidId: string): Promise<AuctionDetail> {
     const auction = await this.prisma.auction.findFirst({
-      where: { id, sellerId: userId },
+      where: { 
+        OR: [{ id: idOrToken }, { shareToken: idOrToken }],
+        sellerId: userId 
+      },
     });
 
     if (!auction) throw new NotFoundException("Negociação por lances não encontrada");
 
     const bid = await this.prisma.auctionBid.findFirst({
-      where: { id: bidId, auctionId: id }
+      where: { id: bidId, auctionId: auction.id }
     });
 
     if (!bid) throw new NotFoundException("Lance não encontrado");
@@ -244,16 +256,16 @@ export class AuctionService {
 
     // Recalculate current bid
     const highestBid = await this.prisma.auctionBid.findFirst({
-      where: { auctionId: id },
+      where: { auctionId: auction.id },
       orderBy: { amountBrl: "desc" }
     });
 
     await this.prisma.auction.update({
-      where: { id },
+      where: { id: auction.id },
       data: { currentBidBrl: highestBid ? highestBid.amountBrl : null }
     });
 
-    return this.getById(id);
+    return this.getById(auction.id);
   }
 
   private mapSummary(a: AuctionWithRelations): AuctionSummary {

@@ -22,8 +22,18 @@ type Props = {
 export function NotificationBell({ session, onSession, onUnauthorized, onNavigate }: Props) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [open, setOpen] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const unreadCount = notifications.filter(n => !n.isRead).length;
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
 
   async function load() {
     try {
@@ -96,39 +106,57 @@ export function NotificationBell({ session, onSession, onUnauthorized, onNavigat
       </button>
 
       {open && (
-        <div className="absolute left-0 bottom-12 z-[100] w-[calc(100vw-2rem)] max-w-80 animate-soft-pop overflow-hidden rounded-[26px] border border-white/80 bg-white shadow-card backdrop-blur-md md:left-full h-auto md:ml-4 md:bottom-0">
-          <div className="flex items-center justify-between border-b border-line/70 px-5 py-4">
-            <h2 className="text-sm font-black text-ink">Notificações</h2>
-            <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-slate-600">
-              <X size={16} />
-            </button>
-          </div>
+        <>
+          {/* Overlay para mobile para bloquear o fundo */}
+          {isMobile && (
+            <div 
+              className="fixed inset-0 z-[90] bg-slate-900/60 backdrop-blur-sm animate-fade-in" 
+              onClick={() => setOpen(false)}
+            />
+          )}
+          
+          <div className={`${
+            isMobile 
+              ? "fixed inset-x-4 top-20 bottom-20 z-[100] w-auto max-w-none animate-mobile-slide-up flex flex-col h-auto max-h-[70vh]" 
+              : "absolute left-0 bottom-12 z-[100] w-[calc(100vw-2rem)] max-w-80 animate-soft-pop overflow-hidden md:left-full md:ml-4 md:bottom-0"
+            } rounded-[26px] border border-white/80 bg-white shadow-card backdrop-blur-md overflow-hidden`}>
+            
+            <div className="flex items-center justify-between border-b border-line/70 px-6 py-5">
+              <h2 className="text-base font-black text-ink">Notificações</h2>
+              <button 
+                onClick={() => setOpen(false)} 
+                className="grid h-8 w-8 place-items-center rounded-full bg-field text-slate-400 transition hover:text-slate-600"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-          <div className="max-h-[400px] overflow-auto">
-            {notifications.length === 0 ? (
-              <div className="py-10 text-center text-xs font-bold text-slate-400">Nenhuma notificação por aqui.</div>
-            ) : (
-              notifications.map(n => (
-                <button
-                  key={n.id}
-                  onClick={() => markAsRead(n.id, n.link)}
-                  className={`flex w-full flex-col gap-1 border-b border-line/40 px-5 py-4 text-left transition hover:bg-field/50 ${!n.isRead ? "bg-brand/5" : ""}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className={`text-[11px] font-black uppercase tracking-wider ${!n.isRead ? "text-brand" : "text-slate-400"}`}>
-                      {n.title}
+            <div className={`overflow-auto flex-1 ${isMobile ? "max-h-none" : "max-h-[400px]"}`}>
+              {notifications.length === 0 ? (
+                <div className="py-12 text-center text-sm font-bold text-slate-400">Nenhuma notificação por aqui.</div>
+              ) : (
+                notifications.map(n => (
+                  <button
+                    key={n.id}
+                    onClick={() => markAsRead(n.id, n.link)}
+                    className={`flex w-full flex-col gap-1.5 border-b border-line/40 px-6 py-5 text-left transition hover:bg-field/50 ${!n.isRead ? "bg-brand/5" : ""}`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={`text-xs font-black uppercase tracking-wider ${!n.isRead ? "text-brand" : "text-slate-400"}`}>
+                        {n.title}
+                      </span>
+                      {!n.isRead && <div className="h-2.5 w-2.5 rounded-full bg-brand" />}
+                    </div>
+                    <p className="text-sm font-semibold text-slate-600 leading-relaxed">{n.message}</p>
+                    <span className="mt-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                      {new Date(n.createdAt).toLocaleDateString()}
                     </span>
-                    {!n.isRead && <div className="h-2 w-2 rounded-full bg-brand" />}
-                  </div>
-                  <p className="text-xs font-semibold text-slate-600 leading-relaxed">{n.message}</p>
-                  <span className="mt-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
-                    {new Date(n.createdAt).toLocaleDateString()}
-                  </span>
-                </button>
-              ))
-            )}
+                  </button>
+                ))
+              )}
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

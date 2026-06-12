@@ -10,8 +10,11 @@ import {
   CollectionFolderQueryDto,
   CreateCollectionCartOfferDto,
   CreateCollectionFolderDto,
+  AddCollectionOfferMessageDto,
+  CounterCollectionCartOfferDto,
   DecideCollectionCartOfferDto,
   ListCollectionQueryDto,
+  RespondCollectionCounterOfferDto,
   UpdateCollectionFolderDto,
   UpdateCollectionItemDto,
   UpdateCollectionSharingDto,
@@ -143,6 +146,36 @@ export class CollectionController {
     @Body() dto: DecideCollectionCartOfferDto
   ) {
     return this.collection.decideCartOffer(user.id, id, offerId, dto);
+  }
+
+  @Post("folders/:id/offers/:offerId/counter")
+  counterFolderOffer(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Param("offerId") offerId: string,
+    @Body() dto: CounterCollectionCartOfferDto
+  ) {
+    return this.collection.counterCartOffer(user.id, id, offerId, dto);
+  }
+
+  @Post("folders/:id/offers/:offerId/respond-counter")
+  respondFolderCounterOffer(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Param("offerId") offerId: string,
+    @Body() dto: RespondCollectionCounterOfferDto
+  ) {
+    return this.collection.respondToCounterOffer(user.id, id, offerId, dto);
+  }
+
+  @Post("folders/:id/offers/:offerId/messages")
+  addFolderOfferMessage(
+    @CurrentUser() user: RequestUser,
+    @Param("id") id: string,
+    @Param("offerId") offerId: string,
+    @Body() dto: AddCollectionOfferMessageDto
+  ) {
+    return this.collection.addCartOfferMessage(user.id, id, offerId, dto);
   }
 
   @Get("folders/:id/permissions")

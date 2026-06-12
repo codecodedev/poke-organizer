@@ -85,6 +85,9 @@ export class OrderService {
     });
 
     if (!order) throw new NotFoundException("Pedido não encontrado");
+    if (order.status !== "PENDING") {
+      throw new BadRequestException("Este pedido já foi finalizado ou cancelado");
+    }
 
     const isFirstMessage = order.messages.length === 0;
     const recipient = userId === order.sellerId ? order.buyer : order.seller;
@@ -105,7 +108,7 @@ export class OrderService {
           userId: recipient.id,
           title: "Nova mensagem no pedido",
           message: `${sender.name || sender.email} enviou uma mensagem sobre o pedido #${orderCode}.`,
-          link: `/?page=orders&order=${orderId}`,
+          link: `/?page=negotiations&negotiation=order:${orderId}`,
         },
       });
 

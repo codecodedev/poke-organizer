@@ -61,7 +61,20 @@ enum DeckCardSource {
 
 enum CollectionOfferStatus {
   PENDING
+  COUNTERED
+  BUYER_ACCEPTED
   ACCEPTED
+  REJECTED
+
+  @@schema("public")
+}
+
+enum CollectionOfferEventType {
+  MESSAGE
+  INITIAL_OFFER
+  COUNTER_OFFER
+  BUYER_ACCEPTED
+  SELLER_ACCEPTED
   REJECTED
 
   @@schema("public")
@@ -126,6 +139,7 @@ model User {
   auctions       Auction[]        @relation("UserAuctions")
   auctionBids    AuctionBid[]
   collectionOffers CollectionCartOffer[]
+  collectionOfferEvents CollectionCartOfferEvent[]
   sellerOrders   Order[]          @relation("SellerOrders")
   buyerOrders    Order[]          @relation("BuyerOrders")
   orderMessages  OrderMessage[]
@@ -366,10 +380,28 @@ model CollectionCartOffer {
   folder      CollectionFolder          @relation(fields: [folderId], references: [id], onDelete: Cascade)
   buyer       User                      @relation(fields: [buyerId], references: [id], onDelete: Cascade)
   items       CollectionCartOfferItem[]
+  events      CollectionCartOfferEvent[]
   order       Order?
 
   @@index([folderId, status])
   @@index([buyerId])
+  @@schema("public")
+}
+
+model CollectionCartOfferEvent {
+  id               String                   @id @default(cuid())
+  offerId          String
+  senderId         String
+  type             CollectionOfferEventType @default(MESSAGE)
+  message          String?
+  proposedTotalBrl Decimal?                 @db.Decimal(10, 2)
+  createdAt        DateTime                 @default(now())
+
+  offer            CollectionCartOffer      @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  sender           User                     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([offerId, createdAt])
+  @@index([senderId])
   @@schema("public")
 }
 

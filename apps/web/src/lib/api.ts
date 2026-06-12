@@ -21,6 +21,8 @@ import type {
   DeckSummary,
   DeckValidationSnapshot,
   HomeSummary,
+  NegotiationDetail,
+  NegotiationSummary,
   PriceEstimate,
   PublicCollectionDetail,
   RecognitionCandidate,
@@ -570,6 +572,107 @@ export const api = {
       `/collection/folders/${encodeURIComponent(folderId)}/offers/${encodeURIComponent(offerId)}`,
       {
         method: "PATCH",
+        token,
+        body: JSON.stringify({ status }),
+      },
+    );
+  },
+  counterCollectionOffer(
+    token: string,
+    folderId: string,
+    offerId: string,
+    payload: { totalOffer: number; message?: string },
+  ) {
+    return request<CollectionCartOffer>(
+      `/collection/folders/${encodeURIComponent(folderId)}/offers/${encodeURIComponent(offerId)}/counter`,
+      {
+        method: "POST",
+        token,
+        body: JSON.stringify(payload),
+      },
+    );
+  },
+  respondCollectionCounterOffer(
+    token: string,
+    folderId: string,
+    offerId: string,
+    status: "accepted" | "rejected",
+    message?: string,
+  ) {
+    return request<CollectionCartOffer>(
+      `/collection/folders/${encodeURIComponent(folderId)}/offers/${encodeURIComponent(offerId)}/respond-counter`,
+      {
+        method: "POST",
+        token,
+        body: JSON.stringify({ status, message }),
+      },
+    );
+  },
+  addCollectionOfferMessage(
+    token: string,
+    folderId: string,
+    offerId: string,
+    message: string,
+  ) {
+    return request<CollectionCartOffer>(
+      `/collection/folders/${encodeURIComponent(folderId)}/offers/${encodeURIComponent(offerId)}/messages`,
+      {
+        method: "POST",
+        token,
+        body: JSON.stringify({ message }),
+      },
+    );
+  },
+  listNegotiations(token: string, tab: "sales" | "purchases") {
+    return request<NegotiationSummary[]>(`/negotiations?tab=${encodeURIComponent(tab)}`, { token });
+  },
+  getNegotiation(token: string, key: string) {
+    const [origin, id] = key.split(":");
+    if (origin === "proposal") {
+      return request<NegotiationDetail>(`/negotiations/proposal/${encodeURIComponent(id)}`, { token });
+    }
+    if (origin === "auction") {
+      return request<NegotiationDetail>(`/negotiations/auction/${encodeURIComponent(id)}`, { token });
+    }
+    return request<NegotiationDetail>(`/negotiations/order/${encodeURIComponent(id)}`, { token });
+  },
+  sendNegotiationMessage(token: string, key: string, message: string) {
+    const [origin, id] = key.split(":");
+    const path = origin === "proposal"
+      ? `/negotiations/proposal/${encodeURIComponent(id)}/messages`
+      : `/negotiations/auction/${encodeURIComponent(id)}/messages`;
+    return request<NegotiationDetail>(path, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ message }),
+    });
+  },
+  counterNegotiationProposal(token: string, offerId: string, payload: { totalOffer: number; message?: string }) {
+    return request<NegotiationDetail>(`/negotiations/proposal/${encodeURIComponent(offerId)}/counter`, {
+      method: "POST",
+      token,
+      body: JSON.stringify(payload),
+    });
+  },
+  respondNegotiationCounter(token: string, offerId: string, status: "accepted" | "rejected", message?: string) {
+    return request<NegotiationDetail>(`/negotiations/proposal/${encodeURIComponent(offerId)}/respond-counter`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ status, message }),
+    });
+  },
+  decideNegotiationProposal(token: string, offerId: string, status: "accepted" | "rejected") {
+    return request<NegotiationDetail>(`/negotiations/proposal/${encodeURIComponent(offerId)}/decide`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({ status }),
+    });
+  },
+  updateNegotiationOrderStatus(token: string, origin: string, id: string, status: "delivered" | "cancelled") {
+    return request<NegotiationDetail>(
+      `/negotiations/${encodeURIComponent(origin)}/${encodeURIComponent(id)}/order-status`,
+      {
+        method: "POST",
         token,
         body: JSON.stringify({ status }),
       },

@@ -14,6 +14,7 @@ import { UserModule } from "./user/user.module";
 import { EmailModule } from "./email/email.module";
 import { OrderModule } from "./order/order.module";
 import { StorageModule } from "./storage/storage.module";
+import { NegotiationModule } from "./negotiation/negotiation.module";
 
 @Module({
   imports: [
@@ -30,7 +31,8 @@ import { StorageModule } from "./storage/storage.module";
     NotificationModule,
     AuctionModule,
     UserModule,
-    OrderModule
+    OrderModule,
+    NegotiationModule
   ],
   controllers: [HealthController]
 })

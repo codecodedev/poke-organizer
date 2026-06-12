@@ -42,6 +42,9 @@ import {
   UpdateFolderItemSaleDto,
   CreateCollectionCartOfferDto,
   DecideCollectionCartOfferDto,
+  CounterCollectionCartOfferDto,
+  RespondCollectionCounterOfferDto,
+  AddCollectionOfferMessageDto,
   ClearCollectionDto,
   AddFolderPermissionDto,
   UndoFolderItemSaleDto,
@@ -65,6 +68,16 @@ const auctionInclude = {
   bids: { orderBy: { amountBrl: "desc" as const }, take: 1 },
 } satisfies Prisma.AuctionInclude;
 
+const cartOfferInclude = {
+  buyer: true,
+  folder: { include: { user: true } },
+  items: { include: { folderItem: { include: folderItemInclude } } },
+  events: {
+    include: { sender: true },
+    orderBy: { createdAt: "asc" as const },
+  },
+} satisfies Prisma.CollectionCartOfferInclude;
+
 type CollectionItemWithCard = Prisma.CollectionItemGetPayload<{
   include: typeof collectionItemInclude;
 }>;
@@ -83,11 +96,7 @@ type FolderItemWithStore = Prisma.CollectionFolderItemGetPayload<{
 }>;
 
 type CartOfferWithItems = Prisma.CollectionCartOfferGetPayload<{
-  include: {
-    buyer: true;
-    folder: { include: { user: true } };
-    items: { include: { folderItem: { include: typeof folderItemInclude } } };
-  };
+  include: typeof cartOfferInclude;
 }>;
 
 @Injectable()
@@ -168,11 +177,7 @@ export class CollectionService {
   async listMyProposals(userId: string): Promise<CollectionCartOffer[]> {
     const offers = await this.prisma.collectionCartOffer.findMany({
       where: { buyerId: userId },
-      include: {
-        buyer: true,
-        folder: { include: { user: true } },
-        items: { include: { folderItem: { include: folderItemInclude } } },
-      },
+      include: cartOfferInclude,
       orderBy: { createdAt: "desc" },
     });
     return offers.map((offer) => this.mapCartOffer(offer));
@@ -181,11 +186,7 @@ export class CollectionService {
   async listMyReceivedProposals(userId: string): Promise<CollectionCartOffer[]> {
     const offers = await this.prisma.collectionCartOffer.findMany({
       where: { folder: { userId } },
-      include: {
-        buyer: true,
-        folder: { include: { user: true } },
-        items: { include: { folderItem: { include: folderItemInclude } } },
-      },
+      include: cartOfferInclude,
       orderBy: { createdAt: "desc" },
     });
     return offers.map((offer) => this.mapCartOffer(offer));
@@ -531,12 +532,16 @@ export class CollectionService {
             };
           }),
         },
+        events: {
+          create: {
+            senderId: userId,
+            type: "INITIAL_OFFER",
+            message: dto.message?.trim() || null,
+            proposedTotalBrl: totalOfferBrl,
+          },
+        },
       },
-      include: {
-        buyer: true,
-        folder: { include: { user: true } },
-        items: { include: { folderItem: { include: folderItemInclude } } },
-      },
+      include: cartOfferInclude,
     });
 
     await this.prisma.notification.create({
@@ -544,7 +549,7 @@ export class CollectionService {
         userId: folder.userId,
         title: "Nova Proposta Recebida!",
         message: `${offer.buyer.name || offer.buyer.email} enviou uma proposta na coleção "${folder.name}".`,
-        link: `/?page=proposals&proposalId=${offer.id}&subTab=received`,
+        link: `/?page=negotiations&negotiation=proposal:${offer.id}`,
       },
     });
 
@@ -562,11 +567,7 @@ export class CollectionService {
     await this.assertOwnsFolder(userId, folderId);
     const offers = await this.prisma.collectionCartOffer.findMany({
       where: { folderId },
-      include: {
-        buyer: true,
-        folder: { include: { user: true } },
-        items: { include: { folderItem: { include: folderItemInclude } } },
-      },
+      include: cartOfferInclude,
       orderBy: { createdAt: "desc" },
     });
     return offers.map((offer) => this.mapCartOffer(offer));
@@ -581,17 +582,16 @@ export class CollectionService {
     await this.assertOwnsFolder(userId, folderId);
     const offer = await this.prisma.collectionCartOffer.findFirst({
       where: { id: offerId, folderId },
-      include: {
-        buyer: true,
-        folder: { include: { user: true } },
-        items: { include: { folderItem: { include: folderItemInclude } } },
-      },
+      include: cartOfferInclude,
     });
     if (!offer) {
       throw new NotFoundException("Proposta nao encontrada");
     }
-    if (offer.status !== "PENDING") {
+    if (offer.status === "ACCEPTED" || offer.status === "REJECTED") {
       throw new BadRequestException("Esta proposta ja foi decidida");
+    }
+    if (dto.status === "accepted" && offer.status === "COUNTERED") {
+      throw new BadRequestException("Aguarde o comprador responder a contraproposta");
     }
 
     const status = dto.status === "accepted" ? "ACCEPTED" : "REJECTED";
@@ -599,10 +599,14 @@ export class CollectionService {
       const decided = await tx.collectionCartOffer.update({
         where: { id: offerId },
         data: { status, decidedAt: new Date() },
-        include: {
-          buyer: true,
-          folder: { include: { user: true } },
-          items: { include: { folderItem: { include: folderItemInclude } } },
+        include: cartOfferInclude,
+      });
+      await tx.collectionCartOfferEvent.create({
+        data: {
+          offerId,
+          senderId: userId,
+          type: status === "ACCEPTED" ? "SELLER_ACCEPTED" : "REJECTED",
+          proposedTotalBrl: status === "ACCEPTED" ? offer.totalOfferBrl : null,
         },
       });
       if (status === "ACCEPTED") {
@@ -659,7 +663,7 @@ export class CollectionService {
             userId: offer.buyerId,
             title: "Proposta Aceita!",
             message: `Sua proposta na coleção "${offer.folder.name}" foi aceita! Um novo pedido foi aberto em sua conta.`,
-            link: `/?page=orders&tab=purchases`,
+            link: `/?page=negotiations&negotiation=proposal:${offerId}`,
           },
         });
 
@@ -673,7 +677,7 @@ export class CollectionService {
             userId: offer.buyerId,
             title: "Proposta Recusada",
             message: `Sua proposta na coleção "${offer.folder.name}" foi recusada pelo vendedor.`,
-            link: `/?page=proposals&proposalId=${offerId}&subTab=sent`,
+            link: `/?page=negotiations&negotiation=proposal:${offerId}`,
           },
         });
 
@@ -684,6 +688,169 @@ export class CollectionService {
       return decided;
     });
 
+    const refreshed = await this.prisma.collectionCartOffer.findFirstOrThrow({
+      where: { id: updated.id },
+      include: cartOfferInclude,
+    });
+    return this.mapCartOffer(refreshed);
+  }
+
+  async counterCartOffer(
+    userId: string,
+    folderId: string,
+    offerId: string,
+    dto: CounterCollectionCartOfferDto,
+  ): Promise<CollectionCartOffer> {
+    await this.assertOwnsFolder(userId, folderId);
+    const offer = await this.prisma.collectionCartOffer.findFirst({
+      where: { id: offerId, folderId },
+      include: cartOfferInclude,
+    });
+    if (!offer) {
+      throw new NotFoundException("Proposta nao encontrada");
+    }
+    if (offer.status === "ACCEPTED" || offer.status === "REJECTED") {
+      throw new BadRequestException("Esta proposta ja foi decidida");
+    }
+
+    const totalOfferBrl = this.assertPositiveMoney(dto.totalOffer);
+    const message = dto.message?.trim() || null;
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.collectionCartOfferEvent.create({
+        data: {
+          offerId,
+          senderId: userId,
+          type: "COUNTER_OFFER",
+          message,
+          proposedTotalBrl: totalOfferBrl,
+        },
+      });
+      const next = await tx.collectionCartOffer.update({
+        where: { id: offerId },
+        data: {
+          status: "COUNTERED",
+          totalOfferBrl,
+          decidedAt: null,
+        },
+        include: cartOfferInclude,
+      });
+      await tx.notification.create({
+        data: {
+          userId: offer.buyerId,
+          title: "Contraproposta recebida",
+          message: `${offer.folder.user.name || offer.folder.user.email} enviou uma contraproposta de R$ ${totalOfferBrl.toFixed(2)}.`,
+          link: `/?page=negotiations&negotiation=proposal:${offerId}`,
+        },
+      });
+      return next;
+    });
+
+    return this.mapCartOffer(updated);
+  }
+
+  async respondToCounterOffer(
+    userId: string,
+    folderId: string,
+    offerId: string,
+    dto: RespondCollectionCounterOfferDto,
+  ): Promise<CollectionCartOffer> {
+    const offer = await this.prisma.collectionCartOffer.findFirst({
+      where: { id: offerId, folderId, buyerId: userId },
+      include: cartOfferInclude,
+    });
+    if (!offer) {
+      throw new NotFoundException("Proposta nao encontrada");
+    }
+    if (offer.status !== "COUNTERED") {
+      throw new BadRequestException("Esta proposta nao possui contraproposta pendente");
+    }
+
+    const accepted = dto.status === "accepted";
+    const message = dto.message?.trim() || null;
+    const updated = await this.prisma.$transaction(async (tx) => {
+      await tx.collectionCartOfferEvent.create({
+        data: {
+          offerId,
+          senderId: userId,
+          type: accepted ? "BUYER_ACCEPTED" : "REJECTED",
+          message,
+          proposedTotalBrl: accepted ? offer.totalOfferBrl : null,
+        },
+      });
+      const next = await tx.collectionCartOffer.update({
+        where: { id: offerId },
+        data: {
+          status: accepted ? "BUYER_ACCEPTED" : "REJECTED",
+          decidedAt: accepted ? null : new Date(),
+        },
+        include: cartOfferInclude,
+      });
+      await tx.notification.create({
+        data: {
+          userId: offer.folder.userId,
+          title: accepted ? "Contraproposta aceita" : "Contraproposta recusada",
+          message: accepted
+            ? `${offer.buyer.name || offer.buyer.email} aceitou sua contraproposta. Confirme para abrir o pedido.`
+            : `${offer.buyer.name || offer.buyer.email} recusou sua contraproposta.`,
+          link: `/?page=negotiations&negotiation=proposal:${offerId}`,
+        },
+      });
+      return next;
+    });
+
+    return this.mapCartOffer(updated);
+  }
+
+  async addCartOfferMessage(
+    userId: string,
+    folderId: string,
+    offerId: string,
+    dto: AddCollectionOfferMessageDto,
+  ): Promise<CollectionCartOffer> {
+    const message = dto.message.trim();
+    if (!message) {
+      throw new BadRequestException("Mensagem e obrigatoria");
+    }
+
+    const offer = await this.prisma.collectionCartOffer.findFirst({
+      where: {
+        id: offerId,
+        folderId,
+        OR: [{ buyerId: userId }, { folder: { userId } }],
+      },
+      include: cartOfferInclude,
+    });
+    if (!offer) {
+      throw new NotFoundException("Proposta nao encontrada");
+    }
+    if (offer.status === "ACCEPTED" || offer.status === "REJECTED") {
+      throw new BadRequestException("Esta proposta ja foi encerrada");
+    }
+
+    const recipientId = userId === offer.buyerId ? offer.folder.userId : offer.buyerId;
+    await this.prisma.$transaction(async (tx) => {
+      await tx.collectionCartOfferEvent.create({
+        data: {
+          offerId,
+          senderId: userId,
+          type: "MESSAGE",
+          message,
+        },
+      });
+      await tx.notification.create({
+        data: {
+          userId: recipientId,
+          title: "Nova mensagem na proposta",
+          message: `${userId === offer.buyerId ? offer.buyer.name || offer.buyer.email : offer.folder.user.name || offer.folder.user.email} enviou uma mensagem na negociação.`,
+          link: `/?page=negotiations&negotiation=proposal:${offerId}`,
+        },
+      });
+    });
+
+    const updated = await this.prisma.collectionCartOffer.findFirstOrThrow({
+      where: { id: offerId },
+      include: cartOfferInclude,
+    });
     return this.mapCartOffer(updated);
   }
 
@@ -1467,6 +1634,22 @@ export class CollectionService {
   }
 
   private mapCartOffer(offer: CartOfferWithItems): CollectionCartOffer {
+    const mapStatus = (status: string): CollectionCartOffer["status"] => {
+      if (status === "ACCEPTED") return "accepted";
+      if (status === "REJECTED") return "rejected";
+      if (status === "COUNTERED") return "countered";
+      if (status === "BUYER_ACCEPTED") return "buyer_accepted";
+      return "pending";
+    };
+    const mapEventType = (type: string) => {
+      if (type === "INITIAL_OFFER") return "initial_offer" as const;
+      if (type === "COUNTER_OFFER") return "counter_offer" as const;
+      if (type === "BUYER_ACCEPTED") return "buyer_accepted" as const;
+      if (type === "SELLER_ACCEPTED") return "seller_accepted" as const;
+      if (type === "REJECTED") return "rejected" as const;
+      return "message" as const;
+    };
+
     return {
       id: offer.id,
       folderId: offer.folderId,
@@ -1474,7 +1657,7 @@ export class CollectionService {
       folderShareToken: offer.folder.shareToken,
       buyerId: offer.buyerId,
       buyerName: offer.buyer.name?.trim() || offer.buyer.email,
-      status: offer.status === "ACCEPTED" ? "accepted" : offer.status === "REJECTED" ? "rejected" : "pending",
+      status: mapStatus(offer.status),
       message: offer.message ?? undefined,
       totalOffer: Number(offer.totalOfferBrl),
       isGlobalOffer: offer.isGlobalOffer,
@@ -1487,6 +1670,18 @@ export class CollectionService {
         quantity: item.quantity,
         amount: Number(item.amountBrl),
         item: this.mapItem(item.folderItem.collectionItem, item.folderItem),
+      })),
+      events: (offer.events ?? []).map((event) => ({
+        id: event.id,
+        offerId: event.offerId,
+        senderId: event.senderId,
+        senderName: event.sender.name?.trim() || event.sender.email,
+        type: mapEventType(event.type),
+        message: event.message,
+        proposedTotal: event.proposedTotalBrl === null || event.proposedTotalBrl === undefined
+          ? null
+          : Number(event.proposedTotalBrl),
+        createdAt: event.createdAt.toISOString(),
       })),
     };
   }

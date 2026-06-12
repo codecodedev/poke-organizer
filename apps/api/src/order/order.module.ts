@@ -11,5 +11,6 @@ import { OrderRealtimeService } from "./order-realtime.service";
   imports: [PrismaModule, EmailModule, JwtModule.register({})],
   controllers: [OrderController],
   providers: [OrderService, OrderGateway, OrderRealtimeService],
+  exports: [OrderService],
 })
 export class OrderModule {}

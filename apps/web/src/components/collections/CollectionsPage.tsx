@@ -14,6 +14,7 @@ import {
   Plus,
   Save,
   Search,
+  Send,
   Share2,
   ShoppingBag,
   Trash2,
@@ -494,6 +495,15 @@ export function CollectionsPage({
     setMessage(status === "accepted" ? "Proposta aceita e cartas marcadas como vendidas." : "Proposta rejeitada.");
   }
 
+  async function counterOffer(offerId: string, totalOffer: number, message?: string) {
+    if (!activeFolder) return;
+    await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+      api.counterCollectionOffer(token, activeFolder.id, offerId, { totalOffer, message }),
+    );
+    await refreshOffers(activeFolder.id);
+    setMessage("Contraproposta enviada.");
+  }
+
   async function refreshPermissions(folderId = activeFolder?.id) {
     if (!folderId) return;
     const nextPermissions = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
@@ -752,7 +762,7 @@ export function CollectionsPage({
     [selectedItems],
   );
   const pendingOffersCount = useMemo(
-    () => offers.filter((o) => o.status === "pending").length,
+    () => offers.filter((o) => !["accepted", "rejected"].includes(o.status)).length,
     [offers],
   );
 
@@ -1030,6 +1040,7 @@ export function CollectionsPage({
           offers={offers}
           onClose={() => setShowOffersModal(false)}
           onDecide={decideOffer}
+          onCounter={counterOffer}
           onRefresh={refreshOffers}
         />
       )}
@@ -1347,19 +1358,39 @@ function OffersModal({
   offers,
   onClose,
   onDecide,
+  onCounter,
   onRefresh,
 }: {
   offers: CollectionCartOffer[];
   onClose: () => void;
   onDecide: (offerId: string, status: "accepted" | "rejected") => void;
+  onCounter: (offerId: string, totalOffer: number, message?: string) => void;
   onRefresh: () => void;
 }) {
-  const [filter, setFilter] = useState<"pending" | "resolved">("pending");
+  const [filter, setFilter] = useState<"active" | "resolved">("active");
+  const [counterOfferId, setCounterOfferId] = useState<string | null>(null);
+  const [counterAmount, setCounterAmount] = useState("");
+  const [counterMessage, setCounterMessage] = useState("");
 
   const filteredOffers = useMemo(
-    () => offers.filter((o) => (filter === "pending" ? o.status === "pending" : o.status !== "pending")),
+    () => offers.filter((o) => (filter === "active" ? !["accepted", "rejected"].includes(o.status) : ["accepted", "rejected"].includes(o.status))),
     [filter, offers],
   );
+
+  function openCounter(offer: CollectionCartOffer) {
+    setCounterOfferId(offer.id);
+    setCounterAmount(String(offer.totalOffer));
+    setCounterMessage("");
+  }
+
+  function submitCounter(offer: CollectionCartOffer) {
+    const totalOffer = Number(counterAmount.replace(",", "."));
+    if (!Number.isFinite(totalOffer) || totalOffer <= 0) return;
+    onCounter(offer.id, totalOffer, counterMessage.trim() || undefined);
+    setCounterOfferId(null);
+    setCounterAmount("");
+    setCounterMessage("");
+  }
 
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-night/55 px-4 py-6 backdrop-blur-sm" onMouseDown={onClose}>
@@ -1384,10 +1415,10 @@ function OffersModal({
           <div className="flex items-center justify-between gap-4">
             <div className="flex gap-2 rounded-2xl bg-muted/30 p-1">
               <button
-                className={`rounded-xl px-4 py-2 text-xs font-black transition ${filter === "pending" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
-                onClick={() => setFilter("pending")}
+                className={`rounded-xl px-4 py-2 text-xs font-black transition ${filter === "active" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                onClick={() => setFilter("active")}
               >
-                Pendentes
+                Ativas
               </button>
               <button
                 className={`rounded-xl px-4 py-2 text-xs font-black transition ${filter === "resolved" ? "bg-card text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
@@ -1425,25 +1456,43 @@ function OffersModal({
                       </p>
                     )}
                   </div>
-                  {offer.status === "pending" && (
-                    <div className="flex flex-wrap gap-2">
-                      <Button
-                        type="button"
-                        className="h-9 bg-leaf text-white hover:bg-emerald-600 shadow-sm"
-                        onClick={() => onDecide(offer.id, "accepted")}
-                      >
-                        Aceitar
+                  <Button
+                    type="button"
+                    className="h-9"
+                    icon={<Send size={14} />}
+                    onClick={() => {
+                      window.location.href = `/?page=negotiations&negotiation=proposal:${offer.id}`;
+                    }}
+                  >
+                    Abrir negociação
+                  </Button>
+                </div>
+                {counterOfferId === offer.id && (
+                  <div className="mt-4 rounded-2xl border border-cyan/20 bg-cyan/5 p-4">
+                    <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
+                      <input
+                        className="premium-input h-11 w-full font-black"
+                        inputMode="decimal"
+                        value={counterAmount}
+                        onChange={(event) => setCounterAmount(event.target.value)}
+                      />
+                      <input
+                        className="premium-input h-11 w-full"
+                        value={counterMessage}
+                        onChange={(event) => setCounterMessage(event.target.value)}
+                        placeholder="Mensagem para o comprador"
+                      />
+                    </div>
+                    <div className="mt-3 flex justify-end gap-2">
+                      <Button type="button" variant="outline" className="h-9" onClick={() => setCounterOfferId(null)}>
+                        Cancelar
                       </Button>
-                      <Button
-                        type="button"
-                        className="h-9 bg-red-50 text-red-600 border-red-100 hover:bg-red-100 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/50"
-                        onClick={() => onDecide(offer.id, "rejected")}
-                      >
-                        Rejeitar
+                      <Button type="button" className="h-9" onClick={() => submitCounter(offer)}>
+                        Enviar contraproposta
                       </Button>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
                 <div className="mt-4 space-y-2 border-t border-card-border/30 pt-4">
                   <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-2">Itens da proposta</p>
                   {offer.items.map((entry) => (
@@ -2928,6 +2977,8 @@ function latestPriceChange(item: CollectionItem): number {
 function formatOfferStatus(status: string): string {
   if (status === "accepted") return "aceita";
   if (status === "rejected") return "rejeitada";
+  if (status === "countered") return "aguardando comprador";
+  if (status === "buyer_accepted") return "comprador aceitou, confirme o pedido";
   return "pendente";
 }
 

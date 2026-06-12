@@ -56,7 +56,7 @@ export function MyAuctionsPage({ session, onSession, onUnauthorized, onSelectAuc
           <p className="text-muted-foreground font-medium">Gerencie suas ofertas abertas</p>
         </div>
         <Button variant="brand" className="text-white dark:text-ink" icon={<Plus size={18} />} onClick={() => setShowWizard(true)}>
-          Nova negociação
+          Novo leilão
         </Button>
       </header>
 

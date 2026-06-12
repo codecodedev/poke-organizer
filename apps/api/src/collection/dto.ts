@@ -247,6 +247,36 @@ export class DecideCollectionCartOfferDto {
   status!: "accepted" | "rejected";
 }
 
+export class CounterCollectionCartOfferDto {
+  @ApiProperty()
+  @Transform(({ value }) => Number(value))
+  @IsNumber()
+  @Min(0.01)
+  totalOffer!: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  message?: string;
+}
+
+export class RespondCollectionCounterOfferDto {
+  @ApiProperty({ enum: ["accepted", "rejected"] })
+  @IsIn(["accepted", "rejected"])
+  status!: "accepted" | "rejected";
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  message?: string;
+}
+
+export class AddCollectionOfferMessageDto {
+  @ApiProperty()
+  @IsString()
+  message!: string;
+}
+
 export class UndoFolderItemSaleDto {
   @ApiPropertyOptional()
   @IsOptional()
