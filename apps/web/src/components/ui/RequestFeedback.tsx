@@ -70,7 +70,7 @@ export function RequestFeedback() {
   return (
     <>
       {showLoading && (
-        <div className="fixed bottom-6 right-6 z-[80] animate-in fade-in slide-in-from-bottom-4 duration-300">
+        <div className="fixed bottom-6 right-6 z-[110] animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="flex items-center gap-3 rounded-full border border-card-border bg-card/80 px-4 py-2.5 text-[13px] font-black text-foreground shadow-soft backdrop-blur-xl">
             <span className="relative flex h-3 w-3">
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand opacity-75"></span>
@@ -81,7 +81,7 @@ export function RequestFeedback() {
         </div>
       )}
 
-      <div className="fixed right-4 top-4 z-[90] grid w-[min(420px,calc(100vw-32px))] gap-3">
+      <div className="fixed right-4 top-4 z-[120] grid w-[min(420px,calc(100vw-32px))] gap-3">
         {toasts.map((toast) => (
           <div
             key={toast.id}

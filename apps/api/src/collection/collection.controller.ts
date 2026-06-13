@@ -45,10 +45,10 @@ export class CollectionController {
 
   @Get()
   @ApiOperation({ summary: "Listar cartas", description: "Lista todas as cartas do inventário global do usuário." })
+  @Get()
   list(@CurrentUser() user: RequestUser, @Query() query: ListCollectionQueryDto) {
-    return this.collection.list(user.id, query.limit);
+    return this.collection.list(user.id, query);
   }
-
   @Post()
   @ApiOperation({ summary: "Adicionar carta", description: "Adiciona uma nova carta ao inventário do usuário." })
   add(@CurrentUser() user: RequestUser, @Body() dto: AddCollectionItemDto) {

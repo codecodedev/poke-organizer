@@ -302,9 +302,17 @@ export const api = {
       { silentError: true },
     );
   },
-  listCollection(token: string, params: { limit?: number } = {}) {
+  listCollection(token: string, params: { 
+    limit?: number,
+    type?: string,
+    rarity?: string,
+    variant?: string,
+    sort?: CollectionFolderSort,
+  } = {}) {
     const search = new URLSearchParams();
-    if (params.limit) search.set("limit", String(params.limit));
+    Object.entries(params).forEach(([key, value]) => {
+      if (value) search.set(key, String(value));
+    });
     const suffix = search.toString() ? `?${search.toString()}` : "";
     return request<CollectionItem[]>(`/collection${suffix}`, { token });
   },

@@ -326,7 +326,7 @@ export class NegotiationService {
       throw new BadRequestException("Apenas o vendedor pode remover itens da proposta");
     }
 
-    if (offer.status !== "PENDING" && offer.status !== "COUNTERED") {
+    if (offer.status !== "PENDING" && offer.status !== "COUNTERED" && offer.status !== "BUYER_ACCEPTED") {
       throw new BadRequestException("Itens só podem ser removidos durante a negociação ativa");
     }
 

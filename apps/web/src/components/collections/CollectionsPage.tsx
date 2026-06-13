@@ -56,6 +56,7 @@ type Props = {
   session: Session;
   onSession: (session: Session) => void;
   onUnauthorized: () => Promise<Session | null>;
+  onNavigate: (route: { view: any; [key: string]: any }) => void;
   collectionRoute: string | null;
   onCollectionRouteChange: (collectionId: string | null) => void;
   onUnsavedChanges?: (hasChanges: boolean) => void;
@@ -72,6 +73,7 @@ export function CollectionsPage({
   session,
   onSession,
   onUnauthorized,
+  onNavigate,
   collectionRoute,
   onCollectionRouteChange,
   onUnsavedChanges,
@@ -155,7 +157,13 @@ export function CollectionsPage({
         onUnauthorized,
         async (token) => {
           const [items, folderList] = await Promise.all([
-            api.listCollection(token),
+            api.listCollection(token, {
+              type: typeFilter || undefined,
+              rarity: rarityFilter || undefined,
+              variant: variantFilter || undefined,
+              sort: sort,
+              limit: 200,
+            }),
             api.listCollectionFolders(token),
           ]);
           return [items, folderList] as const;
@@ -173,12 +181,18 @@ export function CollectionsPage({
   }
 
   async function loadFolder(folderId: string) {
+    setLoading(true);
     try {
       const detail = await withAuthRetry(
         session,
         onSession,
         onUnauthorized,
-        (token) => api.getCollectionFolder(token, folderId),
+        (token) => api.getCollectionFolder(token, folderId, {
+          type: typeFilter || undefined,
+          rarity: rarityFilter || undefined,
+          variant: variantFilter || undefined,
+          sort: sort,
+        }),
       );
       setActiveFolder(detail);
       setActiveName(detail.name);
@@ -192,14 +206,14 @@ export function CollectionsPage({
         setOffers([]);
       }
       await refreshPermissions(detail.id);
-      resetFilters();
-      resetPicker();
       setScreen("detail");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Falha ao carregar colecao",
       );
       showList();
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -603,7 +617,7 @@ export function CollectionsPage({
 
   async function updateItemDetails(itemId: string, details: UpdateCardDetails) {
     if (activeFolder && selectedItem?.folderItemId) {
-      const detail = await withAuthRetry(
+      await withAuthRetry(
         session,
         onSession,
         onUnauthorized,
@@ -612,10 +626,13 @@ export function CollectionsPage({
           manualPrice: details.customPrice,
         }),
       );
-      setActiveFolder(detail);
-      setActiveName(detail.name);
-      const updatedFolderItem = detail.items.find((item) => item.id === itemId) ?? null;
-      setSelectedItem(updatedFolderItem);
+      await loadFolder(activeFolder.id);
+      
+      // Update selected item reference from the reloaded folder
+      if (activeFolder) {
+          const updatedItem = activeFolder.items.find(i => i.id === itemId);
+          if (updatedItem) setSelectedItem(updatedItem);
+      }
       return;
     }
 
@@ -625,9 +642,9 @@ export function CollectionsPage({
       onUnauthorized,
       (token) => api.updateCollection(token, itemId, details),
     );
-    setInventory((current) =>
-      current.map((item) => (item.id === itemId ? updated : item)),
-    );
+    
+    // Re-load global inventory to ensure filters/sorting are re-applied correctly by backend
+    await load();
     setSelectedItem(updated);
   }
 
@@ -753,16 +770,8 @@ export function CollectionsPage({
     [inventory],
   );
   const visibleItems = useMemo(() => {
-    const filtered = selectedItems.filter((item) => {
-      if (activeFolder?.isStore && item.store?.isSold && !showSold) return false;
-      if (typeFilter && !item.card.types.includes(typeFilter)) return false;
-      if (rarityFilter && item.card.rarity !== rarityFilter) return false;
-      if (variantFilter && item.variant !== variantFilter) return false;
-      return true;
-    });
-
-    return sortItems(filtered, sort);
-  }, [rarityFilter, selectedItems, sort, typeFilter, variantFilter, activeFolder?.isStore, showSold]);
+    return selectedItems;
+  }, [selectedItems]);
   const pickerItems = useMemo(() => {
     const query = normalizeText(pickerQuery);
     const hasPickerFilter = Boolean(
@@ -832,8 +841,12 @@ export function CollectionsPage({
   );
 
   useEffect(() => {
-    void load();
-  }, []);
+    if (activeFolder) {
+      void loadFolder(activeFolder.id);
+    } else {
+      void load();
+    }
+  }, [typeFilter, rarityFilter, variantFilter, sort]);
 
   useEffect(() => {
     if (loading) return;
@@ -841,7 +854,7 @@ export function CollectionsPage({
       showCreate();
       return;
     }
-    if (collectionRoute) {
+    if (collectionRoute && collectionRoute !== activeFolder?.id) {
       void loadFolder(collectionRoute).then(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.get("openProposals") === "true") {
@@ -850,7 +863,9 @@ export function CollectionsPage({
       });
       return;
     }
-    showList();
+    if (!collectionRoute && activeFolder) {
+      showList();
+    }
   }, [collectionRoute, loading]);
 
   useEffect(() => {
@@ -981,6 +996,9 @@ export function CollectionsPage({
       {screen === "detail" && activeFolder && (
         <CollectionDetailScreen
           activeName={activeName}
+          activeFolderId={activeFolder.id}
+          activeFolderName={activeFolder.name}
+          onNavigate={onNavigate}
           hasChanges={
             activeName !== activeFolder.name ||
             pendingBannerFile !== null ||
@@ -2003,6 +2021,9 @@ function CollectionCreateScreen({
 
 function CollectionDetailScreen({
   activeName,
+  activeFolderId,
+  activeFolderName,
+  onNavigate,
   hasChanges,
   selectedItems,
   unsoldCount,
@@ -2147,6 +2168,9 @@ function CollectionDetailScreen({
   onManagePermissions: () => void;
   blockedNavigationAt?: number;
   restartTour: (tourId: string) => void;
+  activeFolderId: string;
+  activeFolderName: string;
+  onNavigate: (route: { view: any; [key: string]: any }) => void;
 }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -2475,7 +2499,11 @@ function CollectionDetailScreen({
                   type="button"
                   variant="primary"
                   icon={<Layers3 size={16} />}
-                  onClick={onViewOffers}
+                  onClick={() => onNavigate({ 
+                    view: "negotiations", 
+                    collection: activeFolderId,
+                    q: activeFolderName 
+                  })}
                 >
                   Ver propostas
                   {pendingOffersCount > 0 && (

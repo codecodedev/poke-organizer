@@ -19,6 +19,7 @@ import {
   DEFAULT_CARD_VARIANT,
   PriceEstimate,
   PublicCollectionDetail,
+  parseCardNumberParts,
 } from "@poke-organizer/shared";
 import { Prisma } from "@prisma/client";
 import { CatalogService } from "../cards/catalog.service";
@@ -48,6 +49,7 @@ import {
   ClearCollectionDto,
   AddFolderPermissionDto,
   UndoFolderItemSaleDto,
+  ListCollectionQueryDto,
 } from "./dto";
 import type { CollectionFolderSort } from "./dto";
 
@@ -58,7 +60,17 @@ const collectionItemInclude = {
 
 const folderItemInclude = {
   collectionItem: { include: collectionItemInclude },
-  _count: { select: { cartOfferItems: true } },
+  _count: { 
+    select: { 
+      cartOfferItems: {
+        where: {
+          offer: {
+            status: { in: ["PENDING", "COUNTERED", "BUYER_ACCEPTED"] as const }
+          }
+        }
+      } 
+    } 
+  },
   folder: true,
 } satisfies Prisma.CollectionFolderItemInclude;
 
@@ -123,15 +135,15 @@ export class CollectionService {
     return { ok: true };
   }
 
-  async list(userId: string, limit?: number): Promise<CollectionItem[]> {
+  async list(userId: string, query: ListCollectionQueryDto): Promise<CollectionItem[]> {
     const items = await this.prisma.collectionItem.findMany({
-      where: { userId },
+      where: this.collectionItemWhere(userId, query),
       include: collectionItemInclude,
-      orderBy: { updatedAt: "desc" },
-      take: limit,
+      orderBy: this.collectionItemOrderBy(query.sort),
+      take: query.limit,
     });
 
-    return Promise.all(items.map(async (item) => {
+    const mapped = await Promise.all(items.map(async (item) => {
       // Se não carregou o preço mas temos o ID, buscar manualmente para garantir que não apareça zerado
       if (!item.price && item.cardPriceId) {
         const manualPrice = await this.prisma.cardPrice.findUnique({
@@ -144,6 +156,12 @@ export class CollectionService {
       }
       return this.mapItem(item);
     }));
+
+    if (query.sort && (query.sort.startsWith("value") || query.sort.startsWith("price-change") || query.sort === "proposals-desc")) {
+        return this.sortFolderItems(mapped, query.sort);
+    }
+
+    return mapped;
   }
 
   async listFolders(userId: string): Promise<CollectionFolderSummary[]> {
@@ -433,6 +451,11 @@ export class CollectionService {
     const nextFolderQuantity = !isSoldRequest && dto.quantity !== undefined
       ? dto.quantity
       : item.quantity;
+
+    if (dto.quantity !== undefined) {
+      await this.checkFolderItemCommittedQuantity(folderItemId, dto.quantity);
+    }
+
     if (nextFolderQuantity > item.collectionItem.quantity) {
       throw new BadRequestException("A quantidade da coleção não pode ser maior que a quantidade no inventário");
     }
@@ -997,6 +1020,7 @@ export class CollectionService {
     if (!query || query.length < 2) return { items: [], auctions: [] };
 
     const normalized = query.trim().toLowerCase();
+    const numberParts = parseCardNumberParts(query);
     
     // Search public store items
     const storeItems = await this.prisma.collectionFolderItem.findMany({
@@ -1007,6 +1031,12 @@ export class CollectionService {
           card: {
             OR: [
               { name: { contains: normalized, mode: "insensitive" } },
+              {
+                AND: [
+                  { number: { equals: numberParts.number, mode: "insensitive" } },
+                  numberParts.printedTotal ? { printedTotal: numberParts.printedTotal } : {},
+                ]
+              },
               { number: { contains: normalized, mode: "insensitive" } },
             ],
           },
@@ -1019,7 +1049,7 @@ export class CollectionService {
       take: 20,
     });
 
-    // Search active auctions (since listActiveAuctions already exists, we filter here or query prisma)
+    // Search active auctions
     const auctions = await this.prisma.auction.findMany({
       where: {
         status: "OPEN",
@@ -1028,6 +1058,12 @@ export class CollectionService {
           card: {
             OR: [
               { name: { contains: normalized, mode: "insensitive" } },
+              {
+                AND: [
+                  { number: { equals: numberParts.number, mode: "insensitive" } },
+                  numberParts.printedTotal ? { printedTotal: numberParts.printedTotal } : {},
+                ]
+              },
               { number: { contains: normalized, mode: "insensitive" } },
             ],
           },
@@ -1110,6 +1146,33 @@ export class CollectionService {
   async removeFolder(userId: string, id: string) {
     const folder = await this.assertOwnsFolder(userId, id);
 
+    // Verificar se existem negociações ativas ou pedidos pendentes vinculados a esta pasta
+    const activeOffers = await this.prisma.collectionCartOffer.count({
+      where: {
+        folderId: id,
+        status: { in: ["PENDING", "COUNTERED", "BUYER_ACCEPTED"] },
+      },
+    });
+
+    if (activeOffers > 0) {
+      throw new BadRequestException(
+        "Não é possível excluir esta coleção pois ela possui negociações ativas. Cancele ou recuse as propostas primeiro.",
+      );
+    }
+
+    const pendingOrders = await this.prisma.order.count({
+      where: {
+        proposal: { folderId: id },
+        status: "PENDING",
+      },
+    });
+
+    if (pendingOrders > 0) {
+      throw new BadRequestException(
+        "Não é possível excluir esta coleção pois ela possui pedidos pendentes de entrega. Finalize ou cancele os pedidos primeiro.",
+      );
+    }
+
     if (folder.bannerUrl) {
       await this.storage.deleteBanner(folder.bannerUrl);
     }
@@ -1120,10 +1183,44 @@ export class CollectionService {
 
   async removeItemFromFolder(userId: string, folderId: string, folderItemId: string) {
     await this.assertOwnsFolder(userId, folderId);
+    await this.assertFolderItemNotNegotiating(folderItemId);
     await this.prisma.collectionFolderItem.delete({
       where: { id: folderItemId, folderId },
     });
     return this.getFolder(userId, folderId);
+  }
+
+  private async assertFolderItemNotNegotiating(folderItemId: string) {
+    const activeOffers = await this.prisma.collectionCartOfferItem.count({
+      where: {
+        folderItemId,
+        offer: { status: { in: ["PENDING", "COUNTERED", "BUYER_ACCEPTED"] } },
+      },
+    });
+
+    if (activeOffers > 0) {
+      throw new BadRequestException(
+        "Este item está em uma negociação ativa e não pode ser removido da pasta. Cancele a proposta primeiro.",
+      );
+    }
+  }
+
+  private async checkFolderItemCommittedQuantity(folderItemId: string, nextQuantity: number) {
+    const committed = await this.prisma.collectionCartOfferItem.aggregate({
+      where: {
+        folderItemId,
+        offer: { status: { in: ["PENDING", "COUNTERED", "BUYER_ACCEPTED"] } },
+      },
+      _sum: { quantity: true },
+    });
+
+    const committedCount = committed._sum.quantity || 0;
+
+    if (nextQuantity < committedCount) {
+      throw new BadRequestException(
+        `Não é possível reduzir a quantidade para ${nextQuantity}. Existem ${committedCount} unidades comprometidas em propostas ativas desta pasta.`,
+      );
+    }
   }
 
   async add(
@@ -1217,6 +1314,10 @@ export class CollectionService {
 
     if (dto.variant) {
       this.assertValidVariant(current.card.variants, dto.variant);
+    }
+
+    if (dto.quantity !== undefined) {
+      await this.checkCommittedQuantity(userId, id, dto.quantity);
     }
 
     const condition = dto.condition
@@ -1339,6 +1440,7 @@ export class CollectionService {
 
   async remove(userId: string, id: string) {
     await this.assertOwnsItem(userId, id);
+    await this.checkCommittedQuantity(userId, id, 0);
     await this.prisma.collectionItem.delete({ where: { id } });
     return { ok: true };
   }
@@ -1468,6 +1570,38 @@ export class CollectionService {
     }
   }
 
+  private collectionItemWhere(
+    userId: string,
+    query: ListCollectionQueryDto,
+  ): Prisma.CollectionItemWhereInput {
+    const cardFilter: Prisma.CardWhereInput = {};
+    if (query.type) {
+      cardFilter.types = { has: query.type };
+    }
+    if (query.rarity) {
+      cardFilter.rarity = query.rarity;
+    }
+
+    return {
+      userId,
+      variant: query.variant || undefined,
+      card: Object.keys(cardFilter).length ? cardFilter : undefined,
+    };
+  }
+
+  private collectionItemOrderBy(
+    sort?: CollectionFolderSort,
+  ): Prisma.CollectionItemOrderByWithRelationInput {
+    if (sort === "oldest") {
+      return { createdAt: "asc" };
+    }
+    if (sort === "newest") {
+      return { updatedAt: "desc" };
+    }
+    // Para outros tipos de ordenação (valor, variação de preço), faremos via código após o mapeamento
+    return { updatedAt: "desc" };
+  }
+
   private folderItemWhere(
     userId: string,
     query: CollectionFolderQueryDto,
@@ -1514,7 +1648,33 @@ export class CollectionService {
     if (sort === "oldest") {
       return { createdAt: "asc" };
     }
+    // Para outros tipos de ordenação (valor, variação de preço), faremos via código após o mapeamento
     return { collectionItem: { updatedAt: "desc" } };
+  }
+
+  private async checkCommittedQuantity(userId: string, collectionItemId: string, nextQuantity: number) {
+    const committed = await this.getCommittedQuantity(userId, collectionItemId);
+    if (nextQuantity < committed) {
+      throw new BadRequestException(
+        `Não é possível reduzir a quantidade para ${nextQuantity}. Existem ${committed} unidades comprometidas em negociações ou leilões ativos. Finalize ou cancele as negociações primeiro.`,
+      );
+    }
+  }
+
+  private async getCommittedQuantity(userId: string, collectionItemId: string): Promise<number> {
+    const activeOffers = await this.prisma.collectionCartOfferItem.aggregate({
+      where: {
+        folderItem: { collectionItemId, folder: { userId } },
+        offer: { status: { in: ["PENDING", "COUNTERED", "BUYER_ACCEPTED"] } },
+      },
+      _sum: { quantity: true },
+    });
+
+    const activeAuctions = await this.prisma.auction.count({
+      where: { collectionItemId, sellerId: userId, status: "OPEN" },
+    });
+
+    return (activeOffers._sum.quantity || 0) + activeAuctions;
   }
 
   private assertValidVariant(validVariants: string[], variant: string) {

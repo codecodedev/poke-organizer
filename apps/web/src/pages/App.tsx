@@ -446,6 +446,7 @@ function AppContent() {
                 session={session}
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
+                onNavigate={navigate}
                 collectionRoute={route.collection ?? null}
                 onCollectionRouteChange={(collection) =>
                   navigate({ view: "collections", collection })
@@ -504,6 +505,7 @@ function AppContent() {
                 onUnauthorized={handleUnauthorized}
                 onBack={() => navigate({ view: "home" })}
                 initialNegotiationId={route.negotiation ?? null}
+                initialQuery={route.q ?? undefined}
                 onNegotiationRouteChange={(negotiation) => navigate({ view: "negotiations", negotiation })}
               />
             )}
@@ -515,6 +517,7 @@ function AppContent() {
                 onUnauthorized={handleUnauthorized}
                 onBack={() => navigate({ view: "home" })}
                 initialNegotiationId={route.negotiation ?? null}
+                initialQuery={route.q ?? undefined}
                 onNegotiationRouteChange={(negotiation) => navigate({ view: "negotiations", negotiation })}
               />
             )}

@@ -64,7 +64,7 @@ export function CollectionItemCard({
 
   // So mostra variacao se for o preco de mercado puro
   const showPriceChange =
-    latestChange !== 0 && !isSold && manualPrice === null && (customPrice === null || customPrice === undefined);
+    latestChange !== 0 && !isSold && !manualPrice && (customPrice === null || customPrice === undefined);
 
   return (
     <article
@@ -208,6 +208,7 @@ export function CollectionItemCard({
             <div className="flex flex-1 items-center" onClick={(e) => e.stopPropagation()}>
               <span className="text-sm font-black text-muted-foreground mr-1">R$</span>
               <input
+                key={`${item.id}-${manualPrice}-${customPrice}-${marketPrice}`}
                 className="tour-card-price-input w-full bg-input border border-card-border/50 p-1.5 pl-3 rounded-xl text-sm font-black text-foreground outline-none focus:ring-1 focus:ring-cyan/50 transition"
                 type="number"
                 min={0}

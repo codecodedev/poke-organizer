@@ -117,11 +117,11 @@ export function NotificationBell({ session, onSession, onUnauthorized, onNavigat
           
           <div className={`${
             isMobile 
-              ? "fixed inset-x-4 top-20 bottom-20 z-[100] w-auto max-w-none animate-mobile-slide-up flex flex-col h-auto max-h-[70vh]" 
+              ? "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-[1000] w-[calc(100vw-32px)] max-h-[80vh] animate-soft-pop flex flex-col" 
               : "absolute left-0 bottom-12 z-[100] w-[calc(100vw-2rem)] max-w-80 animate-soft-pop overflow-hidden md:left-full md:ml-4 md:bottom-0"
             } rounded-[26px] border border-white/80 bg-white shadow-card backdrop-blur-md overflow-hidden`}>
             
-            <div className="flex items-center justify-between border-b border-line/70 px-6 py-5">
+            <div className="flex shrink-0 items-center justify-between border-b border-line/70 px-6 py-5">
               <h2 className="text-base font-black text-ink">Notificações</h2>
               <button 
                 onClick={() => setOpen(false)} 
@@ -131,7 +131,7 @@ export function NotificationBell({ session, onSession, onUnauthorized, onNavigat
               </button>
             </div>
 
-            <div className={`overflow-auto flex-1 ${isMobile ? "max-h-none" : "max-h-[400px]"}`}>
+            <div className={`overflow-y-auto flex-1 min-h-0 ${isMobile ? "" : "max-h-[400px]"}`}>
               {notifications.length === 0 ? (
                 <div className="py-12 text-center text-sm font-bold text-slate-400">Nenhuma notificação por aqui.</div>
               ) : (

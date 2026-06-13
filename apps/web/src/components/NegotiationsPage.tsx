@@ -42,9 +42,11 @@ export function NegotiationsPage({
   onUnauthorized,
   onBack,
   initialNegotiationId,
+  initialTab,
+  initialQuery,
   onNegotiationRouteChange,
-}: Props) {
-  const [tab, setTab] = useState<Tab>("sales");
+}: Props & { initialTab?: Tab, initialQuery?: string }) {
+  const [tab, setTab] = useState<Tab>(initialTab ?? "sales");
   const [negotiations, setNegotiations] = useState<NegotiationSummary[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(initialNegotiationId ?? null);
   const [detail, setDetail] = useState<NegotiationDetail | null>(null);
@@ -52,6 +54,7 @@ export function NegotiationsPage({
   const [detailLoading, setDetailLoading] = useState(false);
   const [filterType, setFilterType] = useState<"all" | "proposal" | "auction">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "negotiating" | "accepted" | "delivered" | "cancelled">("all");
+  const [query, setQuery] = useState(initialQuery ?? "");
   const [message, setMessage] = useState("");
   const [counterAmount, setCounterAmount] = useState("");
   const [counterMessage, setCounterMessage] = useState("");
@@ -67,6 +70,12 @@ export function NegotiationsPage({
       const typeMatch = filterType === "all" || n.origin === filterType;
       if (!typeMatch) return false;
 
+      const queryMatch = !query.trim() || 
+        n.title.toLowerCase().includes(query.toLowerCase()) || 
+        n.buyerName.toLowerCase().includes(query.toLowerCase()) || 
+        n.sellerName.toLowerCase().includes(query.toLowerCase());
+      if (!queryMatch) return false;
+
       if (filterStatus === "all") return true;
       if (filterStatus === "negotiating") {
         return ["pending", "countered", "buyer_accepted"].includes(n.status);
@@ -78,7 +87,7 @@ export function NegotiationsPage({
       }
       return true;
     });
-  }, [negotiations, filterType, filterStatus]);
+  }, [negotiations, filterType, filterStatus, query]);
 
   async function load() {
     setLoading(true);
@@ -342,7 +351,18 @@ export function NegotiationsPage({
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-2xl">
+              <div className="relative flex-1 min-w-[200px]">
+                <Filter size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Buscar negociação..."
+                  className="premium-input pl-9 w-full h-9 text-xs"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-2xl h-9">
                 <Filter size={14} className="text-muted-foreground" />
                 <select
                   value={filterType}
@@ -520,10 +540,18 @@ function NegotiationCard({ negotiation, onOpen }: { negotiation: NegotiationSumm
               <StatusBadge status={negotiation.status} />
             </div>
             <h3 className="font-black text-foreground truncate">{negotiation.title}</h3>
-            <p className="text-xs font-bold text-muted-foreground">
-              {negotiation.role === "seller" ? "Com comprador" : "Com vendedor"}: {otherParty}
-            </p>
-          </div>
+            <div className="flex flex-col gap-1">
+              <p className="text-xs font-bold text-muted-foreground">
+                {negotiation.role === "seller" ? "Com comprador" : "Com vendedor"}: {otherParty}
+              </p>
+              <div className="flex items-center gap-1.5 text-muted-foreground/60">
+                <Clock size={12} />
+                <span className="text-[10px] font-bold uppercase tracking-wider">
+                  {new Date(negotiation.createdAt).toLocaleDateString("pt-BR", { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+            </div>
         </div>
         
         <div className="flex flex-col sm:items-end justify-center">

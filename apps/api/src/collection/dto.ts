@@ -21,6 +21,17 @@ import {
   ValidateNested,
 } from "class-validator";
 
+export const COLLECTION_FOLDER_SORTS = [
+  "value-desc",
+  "value-asc",
+  "price-change-desc",
+  "price-change-asc",
+  "newest",
+  "oldest",
+  "proposals-desc",
+] as const;
+export type CollectionFolderSort = (typeof COLLECTION_FOLDER_SORTS)[number];
+
 export class AddCollectionItemDto {
   @ApiProperty({ description: "Local card id or external provider id" })
   @IsString()
@@ -113,6 +124,26 @@ export class ListCollectionQueryDto {
   @Min(1)
   @Max(200)
   limit?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  type?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  rarity?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  variant?: string;
+
+  @ApiPropertyOptional({ enum: COLLECTION_FOLDER_SORTS })
+  @IsOptional()
+  @IsIn(COLLECTION_FOLDER_SORTS)
+  sort?: CollectionFolderSort;
 }
 
 export class CreateCollectionFolderDto {
@@ -316,17 +347,6 @@ export class AddFolderPermissionDto {
   @IsString()
   email!: string;
 }
-
-export const COLLECTION_FOLDER_SORTS = [
-  "value-desc",
-  "value-asc",
-  "price-change-desc",
-  "price-change-asc",
-  "newest",
-  "oldest",
-  "proposals-desc",
-] as const;
-export type CollectionFolderSort = (typeof COLLECTION_FOLDER_SORTS)[number];
 
 export class CollectionFolderQueryDto {
   @ApiPropertyOptional()

@@ -104,11 +104,33 @@ export function CardDetailModal({
     return CARD_LANGUAGES.includes("pt-BR") ? "pt-BR" : CARD_LANGUAGES[0];
   });
   const [notes, setNotes] = useState(collectionItem?.notes ?? "");
-  const [customPrice, setCustomPrice] = useState<number | null>(collectionItem?.customPrice ?? null);
+  const [customPrice, setCustomPrice] = useState<number | null>(() => {
+    if (collectionItem?.store?.manualPrice !== undefined && collectionItem?.store?.manualPrice !== null) {
+      return collectionItem.store.manualPrice;
+    }
+    return collectionItem?.customPrice ?? null;
+  });
   
   const [fetchedPrice, setFetchedPrice] = useState<PriceEstimate | null>(null);
   const [isFetchingPrice, setIsFetchingPrice] = useState(false);
   const [imageLoading, setImageLoading] = useState(true);
+
+  // Sync state when collectionItem changes
+  useEffect(() => {
+    if (collectionItem) {
+      setQuantity(collectionItem.quantity);
+      setCondition(collectionItem.condition);
+      setVariant(collectionItem.variant);
+      setLanguage(collectionItem.language);
+      setNotes(collectionItem.notes ?? "");
+      
+      const existingManual = collectionItem.store?.manualPrice !== undefined && collectionItem.store?.manualPrice !== null
+        ? collectionItem.store.manualPrice
+        : collectionItem.customPrice ?? null;
+        
+      setCustomPrice(existingManual);
+    }
+  }, [collectionItem]);
 
   const imageSrc = card?.imageLarge ?? card?.imageSmall;
 
@@ -274,11 +296,17 @@ export function CardDetailModal({
               form="card-detail-form"
               type="submit"
               variant="brand"
-              className="px-12 py-3 shadow-glow"
+              className="px-12 py-3 shadow-glow min-w-[160px] relative"
               disabled={submitting}
-              icon={mode === "add" ? <Plus size={20} /> : <Save size={20} />}
+              icon={!submitting && (mode === "add" ? <Plus size={20} /> : <Save size={20} />)}
             >
-              {submitting ? "Salvando..." : mode === "add" ? "Adicionar" : "Salvar"}
+              {submitting ? (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                </div>
+              ) : (
+                mode === "add" ? "Adicionar" : "Salvar"
+              )}
             </Button>
           </div>
         </div>
@@ -327,9 +355,19 @@ export function CardDetailModal({
               value={card.regulationMark ?? "Não informado"}
             />
             <Detail
+              icon={<Sparkles size={18} />}
+              label="Variante"
+              value={formatCardVariant(variant)}
+            />
+            <Detail
               icon={<Tag size={18} />}
               label="Coleção"
               value={card.setName ?? "Não informado"}
+            />
+            <Detail
+              icon={<Plus size={18} />}
+              label="Idioma"
+              value={language === 'pt-BR' ? 'Português' : language === 'en' ? 'Inglês' : language === 'ja' ? 'Japonês' : 'Desconhecido'}
             />
           </dl>
         </div>
@@ -343,6 +381,16 @@ export function CardDetailModal({
                 </h3>
 
                 <div className="grid gap-5">
+                  {activePrice && (
+                    <div className="rounded-2xl border border-brand/20 bg-brand/5 p-4 mb-2">
+                       <p className="text-[10px] font-black uppercase tracking-widest text-brand/60">Preço de Mercado</p>
+                       <p className="text-lg font-black text-brand mt-0.5">{priceDisplay}</p>
+                       {activePrice.source && (
+                         <p className="text-[9px] font-bold text-brand/40 uppercase mt-1">Fonte: {activePrice.source}</p>
+                       )}
+                    </div>
+                  )}
+
                   <label className="grid gap-2">
                     <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">{quantityLabel}</span>
                     <input

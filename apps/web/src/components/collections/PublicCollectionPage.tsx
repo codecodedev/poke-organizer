@@ -121,7 +121,12 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
       setLoading(true);
       setError(null);
       try {
-        const detail = await api.getPublicCollection(shareToken, {}, session?.accessToken);
+        const detail = await api.getPublicCollection(shareToken, {
+          type: typeFilter || undefined,
+          rarity: rarityFilter || undefined,
+          variant: variantFilter || undefined,
+          sort: sort,
+        }, session?.accessToken);
         if (!cancelled) {
           setCollection(detail);
 
@@ -151,7 +156,7 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
     return () => {
       cancelled = true;
     };
-  }, [shareToken, session, onSession, onUnauthorized]);
+  }, [shareToken, session, onSession, onUnauthorized, typeFilter, rarityFilter, variantFilter, sort]);
 
   const items = collection?.items ?? [];
   const unsoldItems = useMemo(() => items.filter((i) => !i.store?.isSold), [items]);
@@ -174,18 +179,9 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
   );
   const visibleItems = useMemo(() => {
     const normalizedQuery = normalizeText(query);
-    const filtered = items.filter((item) => {
-      // Se for vitrine (NAO for loja), nao mostra vendidos pro publico
-      if (!collection?.isStore && item.store?.isSold) return false;
+    if (!normalizedQuery) return items;
 
-      // Se for loja, respeita o filtro de vendidos
-      if (collection?.isStore && item.store?.isSold && !showSold) return false;
-
-      if (typeFilter && !item.card.types.includes(typeFilter)) return false;
-      if (rarityFilter && item.card.rarity !== rarityFilter) return false;
-      if (variantFilter && item.variant !== variantFilter) return false;
-      if (!normalizedQuery) return true;
-
+    return items.filter((item) => {
       const searchable = normalizeText(
         [
           item.card.name,
@@ -200,9 +196,7 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
 
       return searchable.includes(normalizedQuery);
     });
-
-    return sortItems(filtered, sort);
-  }, [items, query, rarityFilter, sort, typeFilter, variantFilter, collection?.isStore, showSold]);
+  }, [items, query]);
 
   useEffect(() => {
     setPage(1);
@@ -409,8 +403,12 @@ export function PublicCollectionPage({ shareToken, initialQuery = "", session, o
                       variant="primary"
                       className="border-brand/40 bg-brand/5 text-brand"
                       icon={<ShoppingBag size={18} />}
-                      onClick={() => onNavigate({ view: "negotiations" })}
-                    >
+                      onClick={() => onNavigate({ 
+                        view: "negotiations", 
+                        collection: shareToken, 
+                        q: collection.name 
+                      })}
+                      >
                       Minhas propostas
                     </Button>
                   )}
