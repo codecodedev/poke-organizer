@@ -1,5 +1,7 @@
-import { FormEvent, type ReactNode, useEffect, useMemo, useState } from "react";
+import { FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   Check,
   Copy,
@@ -8,8 +10,10 @@ import {
   Filter,
   FolderPlus,
   Gavel,
+  History,
   Layers3,
   Lock,
+  MessageCircle,
   Pencil,
   Plus,
   Save,
@@ -22,6 +26,7 @@ import {
   Upload,
   X,
   HelpCircle,
+  Clock,
 } from "lucide-react";
 import {
   formatCardVariant,
@@ -100,6 +105,7 @@ export function CollectionsPage({
   const [variantFilter, setVariantFilter] = useState(() => localStorage.getItem("cp_variantFilter") ?? "");
   const [sort, setSort] = useState<CollectionFolderSort>(() => (localStorage.getItem("cp_sort") as CollectionFolderSort) ?? "newest");
   const [showSold, setShowSold] = useState(() => localStorage.getItem("cp_showSold") === "true");
+  const [showArchived, setShowArchived] = useState(() => localStorage.getItem("cp_showArchived") === "true");
   const [pickerQuery, setPickerQuery] = useState("");
   const [pickerTypeFilter, setPickerTypeFilter] = useState("");
   const [pickerRarityFilter, setPickerRarityFilter] = useState("");
@@ -122,6 +128,7 @@ export function CollectionsPage({
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [undoingItem, setUndoingItem] = useState<CollectionItem | null>(null);
   const [permissions, setPermissions] = useState<Array<{ id: string; user: { email: string; name: string | null } }>>([]);
+  const [creating, setCreating] = useState(false);
   const [bannerUploading, setBannerUploading] = useState(false);
   const [pendingBannerFile, setPendingBannerFile] = useState<File | null>(null);
   const [pendingBannerRemoval, setPendingBannerRemoval] = useState(false);
@@ -145,7 +152,8 @@ export function CollectionsPage({
     localStorage.setItem("cp_variantFilter", variantFilter);
     localStorage.setItem("cp_sort", sort);
     localStorage.setItem("cp_showSold", String(showSold));
-  }, [typeFilter, rarityFilter, variantFilter, sort, showSold]);
+    localStorage.setItem("cp_showArchived", String(showArchived));
+  }, [typeFilter, rarityFilter, variantFilter, sort, showSold, showArchived]);
 
   async function load() {
     setLoading(true);
@@ -164,7 +172,7 @@ export function CollectionsPage({
               sort: sort,
               limit: 200,
             }),
-            api.listCollectionFolders(token),
+            api.listCollectionFolders(token, showArchived),
           ]);
           return [items, folderList] as const;
         },
@@ -181,6 +189,7 @@ export function CollectionsPage({
   }
 
   async function loadFolder(folderId: string) {
+    if (!folderId) return;
     setLoading(true);
     try {
       const detail = await withAuthRetry(
@@ -211,6 +220,10 @@ export function CollectionsPage({
       setError(
         err instanceof Error ? err.message : "Falha ao carregar colecao",
       );
+      // Se deu erro ao carregar, limpa a rota para evitar loop infinito
+      if (onCollectionRouteChange) {
+        onCollectionRouteChange(null);
+      }
       showList();
     } finally {
       setLoading(false);
@@ -240,7 +253,6 @@ export function CollectionsPage({
   function backToList() {
     if (onCollectionRouteChange) {
       onCollectionRouteChange(null);
-      return;
     }
     showList();
   }
@@ -345,6 +357,7 @@ export function CollectionsPage({
 
     setError(null);
     setMessage(null);
+    setCreating(true);
     try {
       const folder = await withAuthRetry(
         session,
@@ -365,14 +378,35 @@ export function CollectionsPage({
       setSelectedItemQuantities(Object.fromEntries(folder.items.map((item) => [item.id, item.quantity])));
       setNewName("");
       await refreshFolders();
+
+      setScreen("detail");
       if (onCollectionRouteChange) {
         onCollectionRouteChange(folder.id);
-      } else {
-        setScreen("detail");
       }
-      setMessage("Colecao criada.");
+
+      apiFeedback.success("Coleção criada com sucesso.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao criar colecao");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function updateFolder(id: string, payload: { name?: string; isArchived?: boolean }) {
+    setError(null);
+    setMessage(null);
+    try {
+      const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.updateCollectionFolder(token, id, payload),
+      );
+      setActiveFolder(detail);
+      setActiveName(detail.name);
+      await refreshFolders();
+      if (payload.isArchived !== undefined) {
+        setMessage(payload.isArchived ? "Coleção arquivada." : "Coleção desarquivada.");
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao atualizar coleção");
     }
   }
 
@@ -840,22 +874,24 @@ export function CollectionsPage({
     [offers],
   );
 
+  const lastLoadedFolderId = useRef<string | null>(null);
+
   useEffect(() => {
     if (activeFolder) {
       void loadFolder(activeFolder.id);
     } else {
       void load();
     }
-  }, [typeFilter, rarityFilter, variantFilter, sort]);
+  }, [typeFilter, rarityFilter, variantFilter, sort, showArchived]);
 
   useEffect(() => {
-    if (loading) return;
     if (collectionRoute === "new") {
       showCreate();
       return;
     }
-    if (collectionRoute && collectionRoute !== activeFolder?.id) {
+    if (collectionRoute && collectionRoute !== activeFolder?.id && collectionRoute !== lastLoadedFolderId.current) {
       void loadFolder(collectionRoute).then(() => {
+        lastLoadedFolderId.current = collectionRoute;
         const params = new URLSearchParams(window.location.search);
         if (params.get("openProposals") === "true") {
           setShowOffersModal(true);
@@ -866,7 +902,7 @@ export function CollectionsPage({
     if (!collectionRoute && activeFolder) {
       showList();
     }
-  }, [collectionRoute, loading]);
+  }, [collectionRoute]);
 
   useEffect(() => {
     const totalPages = Math.max(
@@ -936,6 +972,8 @@ export function CollectionsPage({
         <CollectionsListScreen
           folders={folders}
           inventoryCount={inventory.length}
+          showArchived={showArchived}
+          onShowArchivedChange={setShowArchived}
           page={foldersPage}
           loading={loading}
           onCreate={startCreate}
@@ -956,6 +994,7 @@ export function CollectionsPage({
           name={newName}
           selectedCount={selectedItemIds.size}
           selectedTotalValue={selectedTotalValue}
+          creating={creating}
           pickerQuery={pickerQuery}
           pickerTypeOptions={pickerTypeOptions}
           pickerRarityOptions={pickerRarityOptions}
@@ -998,6 +1037,9 @@ export function CollectionsPage({
           activeName={activeName}
           activeFolderId={activeFolder.id}
           activeFolderName={activeFolder.name}
+          isArchived={activeFolder.isArchived}
+          canDelete={offers.length === 0}
+          onToggleArchive={(isArchived) => void updateFolder(activeFolder.id, { isArchived })}
           onNavigate={onNavigate}
           hasChanges={
             activeName !== activeFolder.name ||
@@ -1636,6 +1678,8 @@ function OffersModal({
 function CollectionsListScreen({
   folders,
   inventoryCount,
+  showArchived,
+  onShowArchivedChange,
   page,
   loading,
   onCreate,
@@ -1645,6 +1689,8 @@ function CollectionsListScreen({
 }: {
   folders: CollectionFolderSummary[];
   inventoryCount: number;
+  showArchived: boolean;
+  onShowArchivedChange: (value: boolean) => void;
   page: number;
   loading: boolean;
   onCreate: () => void;
@@ -1683,15 +1729,26 @@ function CollectionsListScreen({
               <InfoPill label="Inventario" value={`${inventoryCount} cartas`} className="tour-inventory-info" />
             </div>
           </div>
-          <Button
-            type="button"
-            variant="brand"
-            icon={<FolderPlus size={16} />}
-            onClick={onCreate}
-            className="tour-create-collection"
-          >
-            Nova coleção
-          </Button>
+          <div className="flex flex-wrap items-center gap-3">
+           <label className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-2xl h-10 cursor-pointer hover:bg-muted transition-colors">
+             <input
+               type="checkbox"
+               className="h-4 w-4 rounded border-card-border bg-card text-brand focus:ring-brand cursor-pointer"
+               checked={showArchived}
+               onChange={(e) => onShowArchivedChange(e.target.checked)}
+             />
+             <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Exibir arquivadas</span>
+           </label>
+           <Button
+             type="button"
+             variant="brand"
+             icon={<FolderPlus size={16} />}
+             onClick={onCreate}
+             className="tour-create-collection"
+           >
+             Nova coleção
+           </Button>
+          </div>
         </div>
       </Panel>
 
@@ -1750,6 +1807,12 @@ function CollectionsListScreen({
                       {folder.isPublic ? <Eye size={14} /> : <Lock size={14} />}
                       {folder.isPublic ? "Publica" : "Privada"}
                     </span>
+                    {folder.isArchived && (
+                      <span className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-black text-amber-700">
+                        <Lock size={14} />
+                        Arquivada
+                      </span>
+                    )}
                   </div>
                 </button>
               ))}
@@ -1779,6 +1842,7 @@ function CollectionCreateScreen({
   name,
   selectedCount,
   selectedTotalValue,
+  creating,
   pickerQuery,
   pickerTypeOptions,
   pickerRarityOptions,
@@ -1817,6 +1881,7 @@ function CollectionCreateScreen({
   name: string;
   selectedCount: number;
   selectedTotalValue: number;
+  creating: boolean;
   pickerQuery: string;
   pickerTypeOptions: string[];
   pickerRarityOptions: string[];
@@ -1852,7 +1917,7 @@ function CollectionCreateScreen({
   showPickerModal: boolean;
   onTogglePickerModal: (open: boolean) => void;
 }) {
-  const canCreate = name.trim().length > 0 && selectedCount > 0;
+  const canCreate = name.trim().length > 0 && selectedCount > 0 && !creating;
 
   return (
     <>
@@ -1871,11 +1936,17 @@ function CollectionCreateScreen({
               <Button
                 type="submit"
                 variant={canCreate ? "brand" : "primary"}
-                className={canCreate ? "shadow-glow" : ""}
-                icon={<Save size={16} />}
+                className={canCreate ? "shadow-glow min-w-[160px] relative" : "min-w-[160px] relative"}
+                icon={!creating && <Save size={16} />}
                 disabled={!canCreate}
               >
-                Criar colecao
+                {creating ? (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  </div>
+                ) : (
+                  "Criar coleção"
+                )}
               </Button>
             }
           />
@@ -2023,6 +2094,9 @@ function CollectionDetailScreen({
   activeName,
   activeFolderId,
   activeFolderName,
+  isArchived,
+  canDelete,
+  onToggleArchive,
   onNavigate,
   hasChanges,
   selectedItems,
@@ -2170,6 +2244,9 @@ function CollectionDetailScreen({
   restartTour: (tourId: string) => void;
   activeFolderId: string;
   activeFolderName: string;
+  isArchived: boolean;
+  canDelete: boolean;
+  onToggleArchive: (archived: boolean) => void;
   onNavigate: (route: { view: any; [key: string]: any }) => void;
 }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
@@ -2351,14 +2428,25 @@ function CollectionDetailScreen({
                      Salvar alterações
                    </p>
                    </Button>
-                   <Button
-                    type="button"
-                    variant="ghost"
-                    className="tour-delete-folder w-16 p-0 gap-0 text-white hover:text-red-500 hover:bg-red-50 bg-red-500/80"
-                    icon={<Trash2 size={20} />}
-                    onClick={onRemoveFolder}
-                   >
-                   </Button>
+                   {canDelete && !isArchived ? (
+                     <Button
+                      type="button"
+                      variant="ghost"
+                      className="tour-delete-folder w-16 p-0 gap-0 text-white hover:text-red-500 hover:bg-red-50 bg-red-500/80"
+                      icon={<Trash2 size={20} />}
+                      onClick={onRemoveFolder}
+                      title="Excluir coleção"
+                     />
+                   ) : (
+                     <Button
+                      type="button"
+                      variant="ghost"
+                      className={`w-16 p-0 gap-0 text-white ${isArchived ? "bg-amber-500 hover:bg-amber-600" : "bg-slate-500 hover:bg-slate-600"}`}
+                      icon={isArchived ? <ArchiveRestore size={20} /> : <Archive size={20} />}
+                      onClick={() => onToggleArchive(!isArchived)}
+                      title={isArchived ? "Desarquivar coleção" : "Arquivar coleção"}
+                     />
+                   )}
                    </div>
 
             </div>

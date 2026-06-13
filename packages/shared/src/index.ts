@@ -148,6 +148,7 @@ export type CollectionFolderSummary = {
   userName?: string;
   isPublic: boolean;
   isStore: boolean;
+  isArchived: boolean;
   shareToken?: string | null;
   bannerUrl?: string | null;
   viewCount: number;

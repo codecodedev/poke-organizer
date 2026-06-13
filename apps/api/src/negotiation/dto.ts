@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
+import { IsBoolean, IsEnum, IsNumber, IsOptional, IsString, MaxLength, Min, MinLength } from "class-validator";
 import { Transform } from "class-transformer";
 
 export class ListNegotiationsQueryDto {
@@ -7,6 +7,12 @@ export class ListNegotiationsQueryDto {
   @IsOptional()
   @IsEnum(["sales", "purchases"])
   tab?: "sales" | "purchases";
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  showArchived?: boolean;
 }
 
 export class CreateNegotiationMessageDto {

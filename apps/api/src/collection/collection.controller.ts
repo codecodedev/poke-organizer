@@ -57,8 +57,8 @@ export class CollectionController {
 
   @Get("folders")
   @ApiOperation({ summary: "Listar pastas", description: "Retorna a lista de pastas/coleções do usuário." })
-  listFolders(@CurrentUser() user: RequestUser) {
-    return this.collection.listFolders(user.id);
+  listFolders(@CurrentUser() user: RequestUser, @Query("showArchived") showArchived?: string) {
+    return this.collection.listFolders(user.id, showArchived === "true");
   }
 
   @Post("folders")

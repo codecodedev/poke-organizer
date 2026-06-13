@@ -133,6 +133,7 @@ export class UserService {
       name: f.name,
       isPublic: f.isPublic,
       isStore: f.isStore,
+      isArchived: f.isArchived,
       shareToken: f.shareToken,
       viewCount: f.viewCount,
       itemCount: f.items.length,

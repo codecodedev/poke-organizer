@@ -13,6 +13,7 @@ import { EmailService } from "../email/email.service";
 import { PrismaService } from "../prisma/prisma.service";
 import { OrderService } from "../order/order.service";
 import { NegotiationRealtimeService } from "./negotiation-realtime.service";
+import { ListNegotiationsQueryDto } from "./dto";
 
 const offerInclude = {
   buyer: true,
@@ -90,10 +91,16 @@ export class NegotiationService {
     private readonly realtime: NegotiationRealtimeService,
   ) {}
 
-  async list(userId: string, tab: "sales" | "purchases" = "sales"): Promise<NegotiationSummary[]> {
+  async list(userId: string, query: ListNegotiationsQueryDto): Promise<NegotiationSummary[]> {
+    const tab = query.tab ?? "sales";
+    const showArchived = query.showArchived ?? false;
+
     const [offers, auctionOrders] = await Promise.all([
       this.prisma.collectionCartOffer.findMany({
-        where: tab === "sales" ? { folder: { userId } } : { buyerId: userId },
+        where: {
+          ...(tab === "sales" ? { folder: { userId } } : { buyerId: userId }),
+          ...(!showArchived ? { folder: { isArchived: false } } : {}),
+        },
         include: offerInclude,
         orderBy: { updatedAt: "desc" },
       }),
@@ -101,6 +108,12 @@ export class NegotiationService {
         where: {
           auctionId: { not: null },
           ...(tab === "sales" ? { sellerId: userId } : { buyerId: userId }),
+          ...(!showArchived ? {
+            OR: [
+              { proposal: { folder: { isArchived: false } } },
+              { proposalId: null } // Leilões não tem proposal, assumimos visíveis por enquanto ou checamos a folder do item
+            ]
+          } : {}),
         },
         include: orderInclude,
         orderBy: { updatedAt: "desc" },

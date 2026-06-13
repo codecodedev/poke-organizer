@@ -4,7 +4,7 @@ import type { FastifyRequest } from "fastify";
 import { CurrentUser, RequestUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { AuthService } from "./auth.service";
-import { LoginDto, RefreshDto, RegisterDto, ConfirmEmailDto, RequestPasswordResetDto, ResetPasswordDto, RequestEmailConfirmationDto } from "./dto";
+import { LoginDto, RefreshDto, RegisterDto, ConfirmEmailDto, RequestPasswordResetDto, ResetPasswordDto, RequestEmailConfirmationDto, GoogleLoginDto } from "./dto";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -47,6 +47,19 @@ export class AuthController {
   @Post("login")
   login(@Body() dto: LoginDto) {
     return this.auth.login(dto);
+  }
+
+  @Post("google")
+  googleLogin(@Body() dto: GoogleLoginDto, @Req() req: FastifyRequest) {
+    const forwardedFor = req.headers["x-forwarded-for"];
+    const ip = Array.isArray(forwardedFor)
+      ? forwardedFor[0]
+      : forwardedFor?.split(",")[0]?.trim() || req.ip;
+
+    return this.auth.googleLogin(dto, {
+      ip,
+      userAgent: req.headers["user-agent"],
+    });
   }
 
   @Post("refresh")

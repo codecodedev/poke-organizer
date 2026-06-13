@@ -164,9 +164,12 @@ export class CollectionService {
     return mapped;
   }
 
-  async listFolders(userId: string): Promise<CollectionFolderSummary[]> {
+  async listFolders(userId: string, showArchived = false): Promise<CollectionFolderSummary[]> {
     const folders = await this.prisma.collectionFolder.findMany({
-      where: { userId },
+      where: { 
+        userId,
+        isArchived: showArchived ? undefined : false,
+      },
       include: {
         user: true,
         items: { include: folderItemInclude },
@@ -354,6 +357,13 @@ export class CollectionService {
       await this.prisma.collectionFolder.update({
         where: { id },
         data: { name },
+      });
+    }
+
+    if (dto.isArchived !== undefined) {
+      await this.prisma.collectionFolder.update({
+        where: { id },
+        data: { isArchived: dto.isArchived },
       });
     }
 
@@ -1146,30 +1156,24 @@ export class CollectionService {
   async removeFolder(userId: string, id: string) {
     const folder = await this.assertOwnsFolder(userId, id);
 
-    // Verificar se existem negociações ativas ou pedidos pendentes vinculados a esta pasta
-    const activeOffers = await this.prisma.collectionCartOffer.count({
-      where: {
-        folderId: id,
-        status: { in: ["PENDING", "COUNTERED", "BUYER_ACCEPTED"] },
-      },
+    // Verificar se existem negociações ou pedidos vinculados a esta pasta (mesmo finalizados)
+    const hasOffers = await this.prisma.collectionCartOffer.count({
+      where: { folderId: id },
     });
 
-    if (activeOffers > 0) {
+    if (hasOffers > 0) {
       throw new BadRequestException(
-        "Não é possível excluir esta coleção pois ela possui negociações ativas. Cancele ou recuse as propostas primeiro.",
+        "Esta coleção possui histórico de negociações e não pode ser excluída para preservar os dados. Por favor, utilize a opção de Arquivar.",
       );
     }
 
-    const pendingOrders = await this.prisma.order.count({
-      where: {
-        proposal: { folderId: id },
-        status: "PENDING",
-      },
+    const hasOrders = await this.prisma.order.count({
+      where: { proposal: { folderId: id } },
     });
 
-    if (pendingOrders > 0) {
+    if (hasOrders > 0) {
       throw new BadRequestException(
-        "Não é possível excluir esta coleção pois ela possui pedidos pendentes de entrega. Finalize ou cancele os pedidos primeiro.",
+        "Esta coleção possui pedidos vinculados e não pode ser excluída para preservar o histórico. Por favor, utilize a opção de Arquivar.",
       );
     }
 
@@ -1770,6 +1774,7 @@ export class CollectionService {
       userName: folder.user.name?.trim() || folder.user.email,
       isPublic: folder.isPublic,
       isStore: folder.isStore,
+      isArchived: folder.isArchived,
       shareToken: folder.shareToken,
       bannerUrl: folder.bannerUrl,
       viewCount: folder.viewCount,
@@ -1797,6 +1802,7 @@ export class CollectionService {
       name: folder.name,
       isPublic: folder.isPublic,
       isStore: folder.isStore,
+      isArchived: folder.isArchived,
       shareToken: folder.shareToken,
       bannerUrl: folder.bannerUrl,
       viewCount: folder.viewCount,

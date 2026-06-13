@@ -1,4 +1,4 @@
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { LogIn, UserPlus, Mail } from "lucide-react";
 import { api, Session } from "../lib/api";
 import { saveSession } from "../lib/session";
@@ -14,8 +14,28 @@ type Props = {
   theme?: "light" | "dark";
 };
 
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (options: {
+            client_id: string;
+            callback: (response: { credential?: string }) => void;
+          }) => void;
+          renderButton: (
+            element: HTMLElement,
+            options: { theme?: "outline" | "filled_blue" | "filled_black"; size?: "large" | "medium" | "small"; width?: number; text?: string },
+          ) => void;
+        };
+      };
+    };
+  }
+}
+
 export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }: Props) {
   const dark = theme === "dark";
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
   const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [name, setName] = useState("");
@@ -26,6 +46,72 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
+
+  useEffect(() => {
+    if (!googleClientId || !googleButtonRef.current) return;
+
+    let cancelled = false;
+    const initializeGoogle = () => {
+      if (cancelled || !googleButtonRef.current || !window.google?.accounts?.id) return;
+      googleButtonRef.current.innerHTML = "";
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: async (response) => {
+          if (!response.credential) {
+            setError("Não foi possível autenticar com Google.");
+            return;
+          }
+          setError(null);
+          setSuccessMessage(null);
+          setLoading(true);
+          try {
+            const session = await api.googleLogin(response.credential);
+            saveSession(session);
+            onSession(session);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : "Falha ao autenticar com Google");
+          } finally {
+            setLoading(false);
+          }
+        },
+      });
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: dark ? "filled_black" : "outline",
+        size: "large",
+        width: 360,
+        text: "continue_with",
+      });
+    };
+
+    if (window.google?.accounts?.id) {
+      initializeGoogle();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>("script[src='https://accounts.google.com/gsi/client']");
+    if (existingScript) {
+      existingScript.addEventListener("load", initializeGoogle, { once: true });
+      return () => {
+        cancelled = true;
+        existingScript.removeEventListener("load", initializeGoogle);
+      };
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = initializeGoogle;
+    document.head.appendChild(script);
+
+    return () => {
+      cancelled = true;
+      script.onload = null;
+    };
+  }, [dark, googleClientId, onSession]);
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -258,6 +344,17 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
             </>
           )}
         </button>
+
+        {googleClientId && (
+          <div className="mt-5">
+            <div className="mb-4 flex items-center gap-3">
+              <span className="h-px flex-1 bg-card-border/60" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">ou</span>
+              <span className="h-px flex-1 bg-card-border/60" />
+            </div>
+            <div className="flex justify-center" ref={googleButtonRef} />
+          </div>
+        )}
         
         {mode === "login" && (
           <div className="mt-6 flex flex-col gap-4">

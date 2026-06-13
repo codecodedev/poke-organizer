@@ -31,6 +31,10 @@ describe("CollectionService", () => {
         createMany: vi.fn(),
         deleteMany: vi.fn(),
       },
+      collectionCartOfferItem: {
+        aggregate: vi.fn().mockResolvedValue({ _sum: { quantity: 0 } }),
+        count: vi.fn().mockResolvedValue(0),
+      },
       $transaction: vi.fn(),
     };
     prisma.$transaction.mockImplementation(async (arg: any) => {

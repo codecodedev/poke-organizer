@@ -65,6 +65,12 @@ export class RefreshDto {
   refreshToken!: string;
 }
 
+export class GoogleLoginDto {
+  @ApiProperty()
+  @IsString()
+  idToken!: string;
+}
+
 export class RequestPasswordResetDto {
   @ApiProperty({ example: "ash@example.com" })
   @IsEmail()

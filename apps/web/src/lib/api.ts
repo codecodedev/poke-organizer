@@ -124,9 +124,12 @@ async function request<T>(
 
   try {
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
+
+    if (fetchOptions.body) {
+      headers["Content-Type"] = "application/json";
+    }
 
     if (options.headers) {
       Object.entries(options.headers).forEach(([key, value]) => {
@@ -224,6 +227,12 @@ export const api = {
     return request<Session>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
+    });
+  },
+  googleLogin(idToken: string) {
+    return request<Session>("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ idToken }),
     });
   },
   register(email: string, password: string, name: string, acceptTerms: boolean, acceptPrivacy: boolean, state: string, city: string) {
@@ -347,8 +356,9 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
-  listCollectionFolders(token: string) {
-    return request<CollectionFolderSummary[]>("/collection/folders", { token });
+  listCollectionFolders(token: string, showArchived = false) {
+    const suffix = showArchived ? "?showArchived=true" : "";
+    return request<CollectionFolderSummary[]>(`/collection/folders${suffix}`, { token });
   },
   createCollectionFolder(token: string, name: string, isStore = false) {
     return request<CollectionFolderDetail>("/collection/folders", {
@@ -380,7 +390,7 @@ export const api = {
   updateCollectionFolder(
     token: string,
     id: string,
-    payload: { name?: string; itemIds?: string[]; items?: Array<{ itemId: string; quantity?: number }> },
+    payload: { name?: string; isArchived?: boolean; itemIds?: string[]; items?: Array<{ itemId: string; quantity?: number }> },
   ) {
     return request<CollectionFolderDetail>(
       `/collection/folders/${encodeURIComponent(id)}`,
@@ -637,8 +647,12 @@ export const api = {
       },
     );
   },
-  listNegotiations(token: string, tab: "sales" | "purchases") {
-    return request<NegotiationSummary[]>(`/negotiations?tab=${encodeURIComponent(tab)}`, { token });
+  listNegotiations(token: string, params: { tab?: "sales" | "purchases", showArchived?: boolean } = {}) {
+    const search = new URLSearchParams();
+    if (params.tab) search.set("tab", params.tab);
+    if (params.showArchived) search.set("showArchived", "true");
+    const suffix = search.toString() ? `?${search.toString()}` : "";
+    return request<NegotiationSummary[]>(`/negotiations${suffix}`, { token });
   },
   getNegotiation(token: string, key: string) {
     const [origin, id] = key.split(":");

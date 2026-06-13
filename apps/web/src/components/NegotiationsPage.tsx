@@ -24,6 +24,7 @@ import { createNegotiationSocket, type NegotiationSocket } from "../lib/negotiat
 import { Button } from "./ui/Button";
 import { ConfirmationModal } from "./ui/ConfirmationModal";
 import { Panel } from "./ui/Panel";
+import { Modal } from "./ui/Modal";
 
 type Props = {
   session: Session;
@@ -52,9 +53,11 @@ export function NegotiationsPage({
   const [detail, setDetail] = useState<NegotiationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
   const [filterType, setFilterType] = useState<"all" | "proposal" | "auction">("all");
   const [filterStatus, setFilterStatus] = useState<"all" | "negotiating" | "accepted" | "delivered" | "cancelled">("all");
   const [query, setQuery] = useState(initialQuery ?? "");
+  const [showArchived, setShowArchived] = useState(false);
   const [message, setMessage] = useState("");
   const [counterAmount, setCounterAmount] = useState("");
   const [counterMessage, setCounterMessage] = useState("");
@@ -93,7 +96,7 @@ export function NegotiationsPage({
     setLoading(true);
     try {
       const data = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
-        api.listNegotiations(token, tab),
+        api.listNegotiations(token, { tab, showArchived }),
       );
       setNegotiations(data);
     } catch (err) {
@@ -129,7 +132,7 @@ export function NegotiationsPage({
 
   useEffect(() => {
     void load();
-  }, [tab, session]);
+  }, [tab, session, showArchived]);
 
   useEffect(() => {
     if (selectedId) {
@@ -362,33 +365,13 @@ export function NegotiationsPage({
                 />
               </div>
 
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-2xl h-9">
+              <button
+                onClick={() => setShowFilters(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-muted/50 hover:bg-muted transition-colors rounded-2xl h-9 border border-card-border/40"
+              >
                 <Filter size={14} className="text-muted-foreground" />
-                <select
-                  value={filterType}
-                  onChange={(e) => setFilterType(e.target.value as any)}
-                  className="bg-transparent text-xs font-black uppercase tracking-wider outline-none text-muted-foreground focus:text-foreground"
-                >
-                  <option value="all">Tipos: Tudo</option>
-                  <option value="proposal">Propostas</option>
-                  <option value="auction">Leilões</option>
-                </select>
-              </div>
-
-              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-2xl">
-                <History size={14} className="text-muted-foreground" />
-                <select
-                  value={filterStatus}
-                  onChange={(e) => setFilterStatus(e.target.value as any)}
-                  className="bg-transparent text-xs font-black uppercase tracking-wider outline-none text-muted-foreground focus:text-foreground"
-                >
-                  <option value="all">Situação: Tudo</option>
-                  <option value="negotiating">Em Negociação</option>
-                  <option value="accepted">Aceito</option>
-                  <option value="delivered">Entregues</option>
-                  <option value="cancelled">Canceladas</option>
-                </select>
-              </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Filtros</span>
+              </button>
             </div>
           </div>
 
@@ -457,6 +440,73 @@ export function NegotiationsPage({
           onConfirm={handleCounterOffer}
           onCancel={() => setShowCounterModal(false)}
         />
+      )}
+
+      {showFilters && (
+        <Modal
+          title="Filtros de Negociação"
+          icon={<Filter size={20} />}
+          onClose={() => setShowFilters(false)}
+          maxWidthClass="max-w-md"
+        >
+          <div className="p-6 space-y-6">
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <ShoppingBag size={14} /> Tipos de Negociação
+              </label>
+              <select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value as any)}
+                className="premium-input w-full h-12 px-4 font-bold text-sm"
+              >
+                <option value="all">Tudo</option>
+                <option value="proposal">Propostas</option>
+                <option value="auction">Leilões</option>
+              </select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                <History size={14} /> Situação
+              </label>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as any)}
+                className="premium-input w-full h-12 px-4 font-bold text-sm"
+              >
+                <option value="all">Tudo</option>
+                <option value="negotiating">Em Negociação</option>
+                <option value="accepted">Aceito</option>
+                <option value="delivered">Entregues</option>
+                <option value="cancelled">Canceladas</option>
+              </select>
+            </div>
+
+            <div className="pt-4 border-t border-card-border/40">
+              <label className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 cursor-pointer hover:bg-muted/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={`grid h-8 w-8 place-items-center rounded-lg ${showArchived ? "bg-brand text-white" : "bg-muted text-muted-foreground"}`}>
+                    <Package size={16} />
+                  </div>
+                  <div>
+                    <span className="text-sm font-black text-foreground">Exibir arquivadas</span>
+                    <p className="text-[10px] font-bold text-muted-foreground">Mostrar negociações que já foram concluídas ou canceladas.</p>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  className="h-6 w-6 rounded-lg border-card-border text-brand focus:ring-brand"
+                  checked={showArchived}
+                  onChange={(e) => setShowArchived(e.target.checked)}
+                />
+              </label>
+            </div>
+            
+            <Button variant="brand" className="w-full h-12" onClick={() => setShowFilters(false)}>
+              Aplicar Filtros
+            </Button>
+          </div>
+        </Modal>
       )}
     </div>
   );

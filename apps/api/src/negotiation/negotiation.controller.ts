@@ -21,7 +21,7 @@ export class NegotiationController {
 
   @Get()
   list(@CurrentUser("id") userId: string, @Query() query: ListNegotiationsQueryDto) {
-    return this.negotiationService.list(userId, query.tab ?? "sales");
+    return this.negotiationService.list(userId, query);
   }
 
   @Get("proposal/:offerId")

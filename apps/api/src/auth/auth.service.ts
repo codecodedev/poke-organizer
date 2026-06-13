@@ -8,7 +8,7 @@ import * as randomstring from "randomstring";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
 import { AddressValidationService } from "../common/address-validation.service";
-import { LoginDto, RegisterDto, RequestPasswordResetDto, ResetPasswordDto, ConfirmEmailDto, RequestEmailConfirmationDto } from "./dto";
+import { LoginDto, RegisterDto, RequestPasswordResetDto, ResetPasswordDto, ConfirmEmailDto, RequestEmailConfirmationDto, GoogleLoginDto } from "./dto";
 
 type TokenPair = {
   accessToken: string;
@@ -18,6 +18,14 @@ type TokenPair = {
 type RegisterContext = {
   ip?: string;
   userAgent?: string | string[];
+};
+
+type GoogleTokenInfo = {
+  sub?: string;
+  aud?: string;
+  email?: string;
+  email_verified?: string | boolean;
+  name?: string;
 };
 
 @Injectable()
@@ -227,6 +235,77 @@ export class AuthService {
     return this.buildAuthResponse(user);
   }
 
+  async googleLogin(dto: GoogleLoginDto, context: RegisterContext = {}) {
+    const googleUser = await this.verifyGoogleIdToken(dto.idToken);
+    const email = googleUser.email?.toLowerCase().trim();
+    if (!googleUser.sub || !email) {
+      throw new UnauthorizedException("Token do Google inválido");
+    }
+    if (googleUser.email_verified === false || googleUser.email_verified === "false") {
+      throw new UnauthorizedException("E-mail do Google não verificado");
+    }
+
+    const provider = "google";
+    const existingIdentity = await this.prisma.userIdentity.findUnique({
+      where: {
+        provider_providerUserId: {
+          provider,
+          providerUserId: googleUser.sub,
+        },
+      },
+      include: { user: true },
+    });
+
+    if (existingIdentity) {
+      return this.buildAuthResponse(existingIdentity.user);
+    }
+
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      const user = await this.prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          emailConfirmedAt: existingUser.emailConfirmedAt ?? new Date(),
+          identities: {
+            create: {
+              provider,
+              providerUserId: googleUser.sub,
+            },
+          },
+        },
+      });
+      return this.buildAuthResponse(user);
+    }
+
+    const user = await this.prisma.user.create({
+      data: {
+        email,
+        name: googleUser.name?.trim() || email.split("@")[0],
+        passwordHash: await argon2.hash(randomstring.generate(48)),
+        emailConfirmedAt: new Date(),
+        termsAcceptedAt: new Date(),
+        termsVersion: LEGAL_TERMS_VERSION,
+        privacyAcceptedAt: new Date(),
+        privacyVersion: LEGAL_PRIVACY_VERSION,
+        legalAcceptedIp: context.ip || null,
+        legalAcceptedUserAgent: Array.isArray(context.userAgent)
+          ? context.userAgent.join(", ")
+          : context.userAgent || null,
+        identities: {
+          create: {
+            provider,
+            providerUserId: googleUser.sub,
+          },
+        },
+      },
+    });
+
+    return this.buildAuthResponse(user);
+  }
+
   async refresh(refreshToken: string) {
     const payload = await this.jwtService.verifyAsync<{ sub: string; email: string; jti: string }>(refreshToken, {
       secret: this.config.get<string>("JWT_REFRESH_SECRET")
@@ -240,11 +319,6 @@ export class AuthService {
     if (!(await argon2.verify(stored.tokenHash, refreshToken))) {
       throw new UnauthorizedException("Invalid refresh token");
     }
-
-    await this.prisma.refreshToken.update({
-      where: { id: stored.id },
-      data: { revokedAt: new Date() }
-    });
 
     return this.buildAuthResponse(stored.user);
   }
@@ -295,11 +369,22 @@ export class AuthService {
   }
 
   private async issueTokens(user: User): Promise<TokenPair> {
+    const refreshTtl = this.config.get<string>("JWT_REFRESH_TTL") ?? "90d";
+    await this.prisma.refreshToken.deleteMany({
+      where: {
+        userId: user.id,
+        OR: [
+          { expiresAt: { lt: new Date() } },
+          { revokedAt: { not: null } },
+        ],
+      },
+    });
+
     const refresh = await this.prisma.refreshToken.create({
       data: {
         userId: user.id,
         tokenHash: "pending",
-        expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        expiresAt: new Date(Date.now() + this.durationToMs(refreshTtl))
       }
     });
 
@@ -307,14 +392,14 @@ export class AuthService {
       { sub: user.id, email: user.email },
       {
         secret: this.config.get<string>("JWT_ACCESS_SECRET"),
-        expiresIn: this.config.get<string>("JWT_ACCESS_TTL") ?? "15m"
+        expiresIn: this.config.get<string>("JWT_ACCESS_TTL") ?? "30m"
       }
     );
     const refreshToken = await this.jwtService.signAsync(
       { sub: user.id, email: user.email, jti: refresh.id },
       {
         secret: this.config.get<string>("JWT_REFRESH_SECRET"),
-        expiresIn: this.config.get<string>("JWT_REFRESH_TTL") ?? "30d"
+        expiresIn: refreshTtl
       }
     );
 
@@ -324,6 +409,37 @@ export class AuthService {
     });
 
     return { accessToken, refreshToken };
+  }
+
+  private async verifyGoogleIdToken(idToken: string): Promise<GoogleTokenInfo> {
+    const clientId = this.config.get<string>("GOOGLE_CLIENT_ID");
+    if (!clientId) {
+      throw new BadRequestException("Login com Google não está configurado");
+    }
+
+    const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(idToken)}`);
+    if (!response.ok) {
+      throw new UnauthorizedException("Token do Google inválido");
+    }
+
+    const payload = await response.json() as GoogleTokenInfo;
+    if (payload.aud !== clientId) {
+      throw new UnauthorizedException("Token do Google inválido para este aplicativo");
+    }
+
+    return payload;
+  }
+
+  private durationToMs(value: string): number {
+    const match = value.trim().match(/^(\d+)([smhd])$/i);
+    if (!match) return 90 * 24 * 60 * 60 * 1000;
+
+    const amount = Number(match[1]);
+    const unit = match[2].toLowerCase();
+    if (unit === "s") return amount * 1000;
+    if (unit === "m") return amount * 60 * 1000;
+    if (unit === "h") return amount * 60 * 60 * 1000;
+    return amount * 24 * 60 * 60 * 1000;
   }
 
   async verifyPassword(userId: string, password: string): Promise<boolean> {

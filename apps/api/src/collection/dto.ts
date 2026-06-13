@@ -144,6 +144,12 @@ export class ListCollectionQueryDto {
   @IsOptional()
   @IsIn(COLLECTION_FOLDER_SORTS)
   sort?: CollectionFolderSort;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  showArchived?: boolean;
 }
 
 export class CreateCollectionFolderDto {
@@ -162,6 +168,11 @@ export class UpdateCollectionFolderDto {
   @IsOptional()
   @IsString()
   name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  isArchived?: boolean;
 
   @ApiPropertyOptional({ type: [String] })
   @IsOptional()
@@ -368,4 +379,10 @@ export class CollectionFolderQueryDto {
   @IsOptional()
   @IsIn(COLLECTION_FOLDER_SORTS)
   sort?: CollectionFolderSort;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === "true")
+  @IsBoolean()
+  showArchived?: boolean;
 }

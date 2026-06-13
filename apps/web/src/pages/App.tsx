@@ -1,5 +1,5 @@
 // Main application component
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import {
   BarChart3,
@@ -86,6 +86,8 @@ export function App() {
 
 function AppContent() {
   const [session, setSession] = useState<Session | null>(() => loadSession());
+  const sessionRef = useRef<Session | null>(session);
+  const refreshPromiseRef = useRef<Promise<Session | null> | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
   const [route, setRoute] = useState<AppRoute>(() => parseRoute());
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -123,26 +125,43 @@ function AppContent() {
 
   const handleSession = useCallback((nextSession: Session) => {
     saveSession(nextSession);
+    sessionRef.current = nextSession;
     setSession(nextSession);
   }, []);
 
   const handleUnauthorized = useCallback(async () => {
-    if (!session?.refreshToken) {
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
+    }
+
+    const currentSession = sessionRef.current;
+    if (!currentSession?.refreshToken) {
       clearSession();
+      sessionRef.current = null;
       setSession(null);
       return null;
     }
 
-    try {
-      const nextSession = await api.refresh(session.refreshToken);
-      handleSession(nextSession);
-      return nextSession;
-    } catch {
-      clearSession();
-      setSession(null);
-      return null;
-    }
-  }, [handleSession, session?.refreshToken]);
+    const refreshToken = currentSession.refreshToken;
+    refreshPromiseRef.current = api.refresh(refreshToken)
+      .then((nextSession) => {
+        handleSession(nextSession);
+        return nextSession;
+      })
+      .catch(() => {
+        if (sessionRef.current?.refreshToken === refreshToken) {
+          clearSession();
+          sessionRef.current = null;
+          setSession(null);
+        }
+        return null;
+      })
+      .finally(() => {
+        refreshPromiseRef.current = null;
+      });
+
+    return refreshPromiseRef.current;
+  }, [handleSession]);
 
   useEffect(() => {
     if (session) {
@@ -205,6 +224,8 @@ function AppContent() {
 
   function logout() {
     clearSession();
+    sessionRef.current = null;
+    refreshPromiseRef.current = null;
     
     // Limpar carrinhos do localStorage para evitar conflitos entre usuarios
     const keysToRemove: string[] = [];
@@ -528,12 +549,10 @@ function AppContent() {
                 onSession={handleSession}
                 onUnauthorized={handleUnauthorized}
                 onBack={() => navigate({ view: "home" })}
-                initialTab="settings"
                 onUnsavedChanges={setHasUnsavedChanges}
                 blockedNavigationAt={blockedNavigationAt}
               />
             )}
-
             {!isPublicView && view === "orders" && session && (
               <OrdersPage
                 session={session}

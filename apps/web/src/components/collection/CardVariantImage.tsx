@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { CircleDot, Gem, RotateCcw, Sparkles } from "lucide-react";
 import { formatCardVariant } from "@poke-organizer/shared";
 
@@ -27,6 +28,11 @@ export function CardVariantImage({
   onError,
 }: Props) {
   const kind = variantKind(variant);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [src]);
   
   const isHeavyHoloEnabled = import.meta.env.VITE_ENABLE_HEAVY_HOLO_EFFECT !== "false";
   
@@ -41,14 +47,17 @@ export function CardVariantImage({
     >
       {isLoading ? (
         <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-card-border/20 via-card-border/40 to-card-border/20" />
-      ) : src ? (
+      ) : src && !failed ? (
         <img
           className={`variant-card-image__img ${imageClassName} h-full w-full object-contain`}
           src={src}
           alt={alt}
           loading="lazy"
           onLoad={onLoad}
-          onError={onError}
+          onError={() => {
+            setFailed(true);
+            onError?.();
+          }}
         />
       ) : (
         <div className="relative z-10 flex h-full flex-col items-center justify-center gap-4 px-4 text-center">

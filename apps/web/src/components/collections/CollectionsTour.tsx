@@ -32,8 +32,8 @@ export const COLLECTION_DETAIL_TOUR: Step[] = [
   },
   {
     target: ".tour-delete-folder",
-    title: "Excluir pasta",
-    content: "Se não precisar mais desta pasta, você pode excluí-la aqui. Fique tranquilo, as cartas voltarão para o seu inventário geral.",
+    title: "Excluir ou Arquivar",
+    content: "Se não precisar mais desta pasta, você pode excluí-la aqui. Caso a pasta já tenha histórico de negociações, o botão mudará automaticamente para ARQUIVAR, garantindo que seu histórico de chats e propostas seja preservado com segurança.",
   },
   {
     target: ".tour-add-cards",
