@@ -52,6 +52,7 @@ import { Sidebar } from "../components/layout/Sidebar";
 import { ThemeToggle } from "../components/ui/ThemeToggle";
 import { FloatingCartButton } from "../components/ui/FloatingCartButton";
 import { ConfirmationModal } from "../components/ui/ConfirmationModal";
+import { Skeleton } from "../components/ui/Skeleton";
 import { RequestPasswordResetPanel } from "../components/RequestPasswordResetPanel";
 import { ResetPasswordPanel } from "../components/ResetPasswordPanel";
 import { ConfirmEmailPanel } from "../components/ConfirmEmailPanel";
@@ -197,6 +198,17 @@ function AppContent() {
     } else {
       document.documentElement.classList.remove("dark");
     }
+
+    // Update theme-color meta tag for mobile browsers consistency
+    let meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      document.head.appendChild(meta);
+    }
+    const color = theme === "dark" ? "#020617" : "#fbf8ff";
+    meta.setAttribute('content', color);
+
     window.localStorage.setItem("poke-organizer-theme", theme);
   }, [theme]);
 
@@ -845,75 +857,99 @@ function HomeView({
           </div>
           
           <div className="flex flex-col gap-4">
-            {summary?.ranking?.map((folder, index) => (
-              <button
-                key={folder.id}
-                onClick={() => navigate({ view: "home", publicCollection: folder.shareToken })}
-                className="group flex flex-col gap-2 text-left"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 dark:bg-white/5 text-[10px] font-black text-slate-500 group-hover:bg-cyan group-hover:text-white dark:group-hover:text-black transition-colors">
-                    #{index + 1}
-                  </div>
-                  <div className="flex-1 overflow-hidden">
-                    <div className="flex items-center gap-2">
-                      <p className="truncate font-bold text-ink dark:text-white text-sm group-hover:text-cyan transition-colors">
-                        {folder.name}
-                      </p>
-                      {folder.isStore ? (
-                        <span className="shrink-0 flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
-                          <ShoppingBag size={10} />
-                        </span>
-                      ) : (
-                        <span className="shrink-0 flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
-                          <LibraryBig size={10} />
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-3 text-[10px] text-slate-500">
-                      <span className="flex items-center gap-1 font-black text-slate-400 uppercase tracking-tighter">
-                        {folder.userName || "Usuário"}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <Eye size={12} /> {folder.viewCount}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <LibraryBig size={12} /> {folder.itemCount} cartas
-                      </span>
+            {loading ? (
+              [...Array(5)].map((_, i) => (
+                <div key={i} className="flex flex-col gap-2">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-7 w-7 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
                     </div>
                   </div>
                 </div>
-                <div className="h-1 w-full rounded-full bg-white/5 overflow-hidden">
-                  <div 
-                    className="h-full bg-gradient-to-r from-cyan to-magenta" 
-                    style={{ width: `${Math.min(100, (folder.viewCount / (summary?.ranking?.[0]?.viewCount || 1)) * 100)}%` }} 
-                  />
-                </div>
-              </button>
-            ))}
+              ))
+            ) : (
+              summary?.ranking?.map((folder, index) => (
+                <button
+                  key={folder.id}
+                  onClick={() => navigate({ view: "home", publicCollection: folder.shareToken })}
+                  className="group flex flex-col gap-2 text-left"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="grid h-7 w-7 place-items-center rounded-full bg-slate-200 dark:bg-white/5 text-[10px] font-black text-slate-500 group-hover:bg-cyan group-hover:text-white dark:group-hover:text-black transition-colors">
+                      #{index + 1}
+                    </div>
+                    <div className="flex-1 overflow-hidden">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate font-bold text-ink dark:text-white text-sm group-hover:text-cyan transition-colors">
+                          {folder.name}
+                        </p>
+                        {folder.isStore ? (
+                          <span className="shrink-0 flex items-center gap-1 rounded bg-amber-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-amber-700 dark:bg-amber-500/20 dark:text-amber-400">
+                            <ShoppingBag size={10} />
+                          </span>
+                        ) : (
+                          <span className="shrink-0 flex items-center gap-1 rounded bg-indigo-100 px-1.5 py-0.5 text-[8px] font-black uppercase tracking-widest text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">
+                            <LibraryBig size={10} />
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-[10px] text-slate-500">
+                        <span className="flex items-center gap-1 font-black text-slate-400 uppercase tracking-tighter">
+                          {folder.userName || "Usuário"}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Eye size={12} /> {folder.viewCount}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <LibraryBig size={12} /> {folder.itemCount} cartas
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="h-1 w-full rounded-full bg-white/5 overflow-hidden">
+                    <div 
+                      className="h-full bg-gradient-to-r from-cyan to-magenta" 
+                      style={{ width: `${Math.min(100, (folder.viewCount / (summary?.ranking?.[0]?.viewCount || 1)) * 100)}%` }} 
+                    />
+                  </div>
+                </button>
+              ))
+            )}
           </div>
         </div>
 
         {/* Expanções */}
-        {summary?.expansionProgress && summary.expansionProgress.length > 0 && (
-          <div className="glass-panel overflow-hidden p-5">
-            <div className="mb-5 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/10 text-indigo-500">
-                  <Layers3 size={18} />
-                </div>
-                <h3 className="font-bold text-ink dark:text-white">Expansões</h3>
+        <div className="glass-panel overflow-hidden p-5">
+          <div className="mb-5 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-500/10 text-indigo-500">
+                <Layers3 size={18} />
               </div>
-              <button 
-                onClick={() => navigate({ view: "expansions" })}
-                className="text-[10px] font-black uppercase tracking-widest text-brand hover:underline flex items-center gap-1"
-              >
-                Ver Todos <ChevronRight size={12} />
-              </button>
+              <h3 className="font-bold text-ink dark:text-white">Expansões</h3>
             </div>
+            <button 
+              onClick={() => navigate({ view: "expansions" })}
+              className="text-[10px] font-black uppercase tracking-widest text-brand hover:underline flex items-center gap-1"
+            >
+              Ver Todos <ChevronRight size={12} />
+            </button>
+          </div>
 
-            <div className="flex flex-col gap-4">
-              {summary.expansionProgress.map((set) => (
+          <div className="flex flex-col gap-4">
+            {loading ? (
+              [...Array(5)].map((_, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <Skeleton className="h-10 w-16 rounded-lg" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-2 w-full rounded-full" />
+                  </div>
+                </div>
+              ))
+            ) : summary?.expansionProgress && summary.expansionProgress.length > 0 ? (
+              summary.expansionProgress.map((set) => (
                 <button
                   key={set.id}
                   onClick={() => navigate({ view: "expansion-detail", setId: set.id })}
@@ -945,10 +981,12 @@ function HomeView({
                     </div>
                   </div>
                 </button>
-              ))}
-            </div>
+              ))
+            ) : (
+              <p className="py-4 text-center text-slate-400 text-sm italic">Você ainda não possui cartas cadastradas.</p>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Leilões em destaque */}
         <div className="glass-panel p-5">
@@ -1015,7 +1053,13 @@ function HomeView({
             </div>
             <h3 className="font-bold text-ink dark:text-white">Suas propostas</h3>
           </div>
-          {!summary?.recentProposals?.length && !loading ? (
+          {loading ? (
+            <div className="flex flex-col gap-3">
+              {[...Array(3)].map((_, i) => (
+                <Skeleton key={i} className="h-16 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : !summary?.recentProposals?.length ? (
             <p className="py-4 text-center text-slate-400 text-sm italic">Nenhuma proposta enviada ainda.</p>
           ) : (
             <div className="flex flex-col gap-3">

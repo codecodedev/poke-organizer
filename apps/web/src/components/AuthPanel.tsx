@@ -25,7 +25,14 @@ declare global {
           }) => void;
           renderButton: (
             element: HTMLElement,
-            options: { theme?: "outline" | "filled_blue" | "filled_black"; size?: "large" | "medium" | "small"; width?: number; text?: string },
+            options: { 
+              theme?: "outline" | "filled_blue" | "filled_black"; 
+              size?: "large" | "medium" | "small"; 
+              width?: number; 
+              text?: string;
+              shape?: "rectangular" | "pill";
+              logo_alignment?: "left" | "center";
+            },
           ) => void;
         };
       };
@@ -79,8 +86,10 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
       window.google.accounts.id.renderButton(googleButtonRef.current, {
         theme: dark ? "filled_black" : "outline",
         size: "large",
-        width: 360,
+        width: googleButtonRef.current.parentElement?.offsetWidth || 380,
+        shape: "pill",
         text: "continue_with",
+        logo_alignment: "left",
       });
     };
 
@@ -346,13 +355,13 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
         </button>
 
         {googleClientId && (
-          <div className="mt-5">
-            <div className="mb-4 flex items-center gap-3">
-              <span className="h-px flex-1 bg-card-border/60" />
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">ou</span>
-              <span className="h-px flex-1 bg-card-border/60" />
+          <div className="mt-8">
+            <div className="mb-6 flex items-center gap-4">
+              <span className="h-px flex-1 bg-card-border/40" />
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">ou entre com sua conta</span>
+              <span className="h-px flex-1 bg-card-border/40" />
             </div>
-            <div className="flex justify-center" ref={googleButtonRef} />
+            <div className="flex justify-center w-full min-h-[44px]" ref={googleButtonRef} />
           </div>
         )}
         

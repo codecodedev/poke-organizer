@@ -201,7 +201,7 @@ export function CardDetailModal({
 
   const fullNumber = formatCardNumber(card.number, card.printedTotal);
 
-  const hasAmount = activePrice?.amount !== null && activePrice?.amount !== undefined;
+  const hasAmount = activePrice?.amount !== null && activePrice?.amount !== undefined && activePrice.amount > 0;
   const priceDisplay = hasAmount
     ? formatBrl(activePrice!.amount!)
     : isFetchingPrice ? "Carregando..." : "Valor não disponível";

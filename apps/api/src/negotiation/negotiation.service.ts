@@ -270,36 +270,68 @@ export class NegotiationService {
     if (accepted && isSeller) {
       // Seller accepted buyer's proposal/counter -> Finalize
       await this.acceptProposal(offer);
-    } else {
+    } else if (accepted && !isSeller) {
+      // Buyer accepted seller's counter-offer
       await this.prisma.$transaction(async (tx) => {
-        const type = accepted ? "BUYER_ACCEPTED" : "REJECTED";
         await tx.collectionCartOfferEvent.create({
           data: {
             offerId,
             senderId: userId,
-            type,
-            message,
-            proposedTotalBrl: accepted ? offer.totalOfferBrl : null,
+            type: "BUYER_ACCEPTED",
+            proposedTotalBrl: offer.totalOfferBrl,
           },
         });
         await tx.collectionCartOffer.update({
           where: { id: offerId },
+          data: { status: "BUYER_ACCEPTED" },
+        });
+        await tx.notification.create({
           data: {
-            status: type,
-            decidedAt: accepted ? null : new Date(),
+            userId: recipientId,
+            title: "Contraproposta aceita",
+            message: `${offer.buyer.name || offer.buyer.email} aceitou sua contraproposta. Confirme para abrir o pedido.`,
+            link: `/?page=negotiations&negotiation=proposal:${offerId}`,
+          },
+        });
+      });
+    } else if (!accepted && !isSeller) {
+      // Buyer REJECTED seller's counter-offer.
+      // We keep the negotiation active so the seller can decide what to do next.
+      // We should revert the totalOfferBrl to the buyer's last proposed value.
+      const lastBuyerOffer = [...offer.events]
+        .filter(e => e.senderId === offer.buyerId && (e.type === "INITIAL_OFFER" || e.type === "COUNTER_OFFER" || e.type === "BUYER_ACCEPTED"))
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
+      
+      const revertedTotal = lastBuyerOffer?.proposedTotalBrl || offer.totalOfferBrl;
+
+      await this.prisma.$transaction(async (tx) => {
+        await tx.collectionCartOfferEvent.create({
+          data: {
+            offerId,
+            senderId: userId,
+            type: "REJECTED",
+            message: message || "O comprador não aceitou a contraproposta.",
+          },
+        });
+        await tx.collectionCartOffer.update({
+          where: { id: offerId },
+          data: { 
+            status: "PENDING",
+            totalOfferBrl: revertedTotal,
           },
         });
         await tx.notification.create({
           data: {
             userId: recipientId,
-            title: accepted ? "Proposta aceita" : "Proposta recusada",
-            message: accepted
-              ? `${offer.buyer.name || offer.buyer.email} aceitou sua contraproposta. Confirme para abrir o pedido.`
-              : `${isSeller ? (offer.folder.user.name || offer.folder.user.email) : (offer.buyer.name || offer.buyer.email)} recusou a proposta.`,
+            title: "Contraproposta recusada",
+            message: `${offer.buyer.name || offer.buyer.email} não aceitou sua contraproposta. Você pode enviar outra ou aceitar a proposta anterior dele.`,
             link: `/?page=negotiations&negotiation=proposal:${offerId}`,
           },
         });
       });
+    } else {
+      // Seller rejected (this case might not be reachable via respondCounterProposal but let's be safe)
+      await this.rejectProposal(offer, userId);
     }
 
     return this.emitProposal(userId, offerId);
@@ -517,6 +549,7 @@ export class NegotiationService {
           offerId: offer.id,
           senderId: userId,
           type: "REJECTED",
+          message: "O vendedor recusou a proposta e encerrou a negociação.",
         },
       });
       await tx.collectionCartOffer.update({
@@ -643,7 +676,8 @@ export class NegotiationService {
       .filter((event) =>
         event.type === "INITIAL_OFFER" ||
         event.type === "COUNTER_OFFER" ||
-        event.type === "BUYER_ACCEPTED"
+        event.type === "BUYER_ACCEPTED" ||
+        event.type === "REJECTED"
       )
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
 

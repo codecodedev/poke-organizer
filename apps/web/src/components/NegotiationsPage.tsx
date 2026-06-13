@@ -62,7 +62,7 @@ export function NegotiationsPage({
   const [counterAmount, setCounterAmount] = useState("");
   const [counterMessage, setCounterMessage] = useState("");
   const [sending, setSending] = useState(false);
-  const [confirming, setConfirming] = useState<null | { action: "delivered" | "cancelled" | "reject" }>(null);
+  const [confirming, setConfirming] = useState<null | { action: "delivered" | "cancelled" | "reject" | "accept" }>(null);
   const [showCounterModal, setShowCounterModal] = useState(false);
   const socketRef = useRef<NegotiationSocket | null>(null);
 
@@ -325,7 +325,7 @@ export function NegotiationsPage({
           onMessageChange={setMessage}
           onSendMessage={handleSendMessage}
           onRespondCounter={handleRespondCounter}
-          onAcceptProposal={() => handleDecideProposal("accepted")}
+          onAcceptProposal={() => setConfirming({ action: "accept" })}
           onRejectProposal={() => setConfirming({ action: "reject" })}
           onConfirmDelivered={() => setConfirming({ action: "delivered" })}
           onConfirmCancelled={() => setConfirming({ action: "cancelled" })}
@@ -403,26 +403,33 @@ export function NegotiationsPage({
               ? "Marcar como entregue"
               : confirming.action === "cancelled"
                 ? "Cancelar pedido"
-                : "Encerrar negociação"
+                : confirming.action === "accept"
+                  ? "Aceitar e fechar negócio"
+                  : "Recusar e encerrar negociação"
           }
           description={
             confirming.action === "delivered"
               ? "Ao marcar como entregue, a negociação será finalizada e o chat ficará somente leitura."
               : confirming.action === "cancelled"
                 ? "Ao cancelar, a negociação será finalizada e o chat ficará somente leitura."
-                : "Ao recusar, a negociação será encerrada e o chat ficará somente leitura."
+                : confirming.action === "accept"
+                  ? "Ao aceitar, a negociação será fechada com o valor atual e não será mais possível negociar. Um pedido será gerado automaticamente."
+                  : "Ao recusar, a negociação será permanentemente encerrada e o chat ficará somente leitura. Esta ação é irreversível."
           }
           confirmLabel={
             confirming.action === "delivered"
               ? "Marcar como entregue"
               : confirming.action === "cancelled"
                 ? "Cancelar pedido"
-                : "Recusar proposta"
+                : confirming.action === "accept"
+                  ? "Aceitar proposta"
+                  : "Encerrar negociação"
           }
           cancelLabel="Voltar"
-          confirmVariant={confirming.action === "delivered" ? "brand" : "ghost"}
+          confirmVariant={confirming.action === "delivered" || confirming.action === "accept" ? "brand" : "ghost"}
           onConfirm={() => {
             if (confirming.action === "reject") void handleDecideProposal("rejected");
+            else if (confirming.action === "accept") void handleDecideProposal("accepted");
             else void handleUpdateStatus(confirming.action);
           }}
           onCancel={() => setConfirming(null)}
@@ -787,7 +794,8 @@ function NegotiationDetailView({
                           ? (isSeller ? onRejectProposal : () => onRespondCounter("rejected"))
                           : undefined,
                         onCounter: canCounterOfferInChat ? onOpenCounterModal : undefined,
-                        label: isSeller ? "Aceitar proposta" : "Aceitar contraproposta"
+                        label: isSeller ? "Aceitar proposta" : "Aceitar contraproposta",
+                        currentAmount: detail.totalAmount
                       } : undefined}
                       sending={sending}
                     />
@@ -832,6 +840,7 @@ function NegotiationMessageBubble({
     onReject?: () => void;
     onCounter?: () => void;
     label?: string;
+    currentAmount?: number;
   };
   sending?: boolean;
 }) {
@@ -848,22 +857,30 @@ function NegotiationMessageBubble({
         {entry.message && <p className="mt-2 whitespace-pre-wrap text-sm font-semibold text-foreground">{entry.message}</p>}
 
         {visibleActions && (
-          <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {visibleActions.onAccept && (
-              <Button variant="brand" className="h-9 px-4 bg-leaf text-white hover:bg-emerald-600 text-xs" icon={<CheckCircle2 size={14} />} onClick={visibleActions.onAccept} disabled={sending}>
-                {visibleActions.label || "Aceitar"}
-              </Button>
+          <div className="mt-4 pt-4 border-t border-card-border/20">
+            {visibleActions.currentAmount !== undefined && (
+              <div className="mb-4">
+                <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-1">Valor da proposta vigente</p>
+                <p className="text-xl font-black text-brand">{formatBrl(visibleActions.currentAmount)}</p>
+              </div>
             )}
-            {visibleActions.onCounter && (
-              <Button variant="outline" className="h-9 px-4 border-cyan/30 text-cyan hover:bg-cyan/5 text-xs" icon={<Send size={14} />} onClick={visibleActions.onCounter} disabled={sending}>
-                Contraproposta
-              </Button>
-            )}
-            {visibleActions.onReject && (
-              <Button variant="outline" className="h-9 px-4 text-magenta border-magenta/30 hover:bg-magenta/5 text-xs" icon={<XCircle size={14} />} onClick={visibleActions.onReject} disabled={sending}>
-                Recusar
-              </Button>
-            )}
+            <div className="flex flex-wrap justify-center gap-2">
+              {visibleActions.onAccept && (
+                <Button variant="brand" className="h-9 px-4 bg-leaf text-white hover:bg-emerald-600 text-xs" icon={<CheckCircle2 size={14} />} onClick={visibleActions.onAccept} disabled={sending}>
+                  {visibleActions.label || "Aceitar"}
+                </Button>
+              )}
+              {visibleActions.onCounter && (
+                <Button variant="outline" className="h-9 px-4 border-cyan/30 text-cyan hover:bg-cyan/5 text-xs" icon={<Send size={14} />} onClick={visibleActions.onCounter} disabled={sending}>
+                  Contraproposta
+                </Button>
+              )}
+              {visibleActions.onReject && (
+                <Button variant="outline" className="h-9 px-4 text-magenta border-magenta/30 hover:bg-magenta/5 text-xs" icon={<XCircle size={14} />} onClick={visibleActions.onReject} disabled={sending}>
+                  Recusar
+                </Button>
+              )}
+            </div>
           </div>
         )}
 
@@ -977,7 +994,7 @@ function eventLabel(type: NegotiationMessage["type"]) {
   if (type === "counter_offer") return "Contraproposta";
   if (type === "buyer_accepted") return "Comprador aceitou";
   if (type === "seller_accepted") return "Vendedor confirmou";
-  if (type === "rejected") return "Negociação encerrada";
+  if (type === "rejected") return "Proposta recusada";
   if (type === "cancelled") return "Pedido cancelado";
   return "Atualização";
 }
