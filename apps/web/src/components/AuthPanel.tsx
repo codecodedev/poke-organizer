@@ -1,8 +1,12 @@
 import { FormEvent, useState } from "react";
-import { LogIn, Sparkles, UserPlus } from "lucide-react";
+import { LogIn, UserPlus, Mail } from "lucide-react";
 import { api, Session } from "../lib/api";
 import { saveSession } from "../lib/session";
-import { Button } from "./ui/Button";
+
+const BRAZILIAN_STATES = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+];
 
 type Props = {
   onSession: (session: Session) => void;
@@ -35,17 +39,51 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
         saveSession(session);
         onSession(session);
       } else {
-        if (!acceptedLegal) {
-          setError("Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar a conta.");
+        if (!name.trim() || name.trim().length < 3) {
+          setError("O nome é obrigatório e deve ter pelo menos 3 caracteres.");
+          setLoading(false);
           return;
         }
-        await api.register(email, password, name || undefined, acceptedLegal, acceptedLegal, state || undefined, city || undefined);
-        setSuccessMessage("Conta criada! Verifique seu e-mail para confirmar seu cadastro antes de entrar.");
+        if (!state) {
+          setError("O estado (UF) é obrigatório.");
+          setLoading(false);
+          return;
+        }
+        if (!city.trim()) {
+          setError("A cidade é obrigatória.");
+          setLoading(false);
+          return;
+        }
+        if (!acceptedLegal) {
+          setError("Você precisa aceitar os Termos de Uso e a Política de Privacidade para criar a conta.");
+          setLoading(false);
+          return;
+        }
+        const res = await api.register(email, password, name.trim(), acceptedLegal, acceptedLegal, state, city.trim());
+        setSuccessMessage(res.message || "Conta criada! Verifique seu e-mail para confirmar seu cadastro antes de entrar.");
         setMode("login");
         setAcceptedLegal(false);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Falha ao autenticar");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResendConfirmation() {
+    if (!email) {
+      setError("Informe seu e-mail para reenviar a confirmação.");
+      return;
+    }
+    setError(null);
+    setSuccessMessage(null);
+    setLoading(true);
+    try {
+      const res = await api.requestEmailConfirmation(email);
+      setSuccessMessage(res.message);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Falha ao reenviar e-mail");
     } finally {
       setLoading(false);
     }
@@ -91,25 +129,30 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
         {mode === "register" && (
           <>
             <div className="mb-5">
-              <label className="mb-2 block text-sm font-bold text-muted-foreground">Nome</label>
+              <label className="mb-2 block text-sm font-bold text-muted-foreground">Nome completo</label>
               <input
                 className="input-dark w-full"
                 value={name}
                 onChange={(event) => setName(event.target.value)}
                 placeholder="Ex: Ash Ketchum"
+                required
               />
             </div>
 
             <div className="mb-5 grid grid-cols-2 gap-4">
               <div>
                 <label className="mb-2 block text-sm font-bold text-muted-foreground">Estado (UF)</label>
-                <input
-                  className="input-dark w-full"
+                <select
+                  className="input-dark w-full h-11"
                   value={state}
-                  onChange={(event) => setState(event.target.value.toUpperCase().slice(0, 2))}
-                  placeholder="Ex: SP"
-                  maxLength={2}
-                />
+                  onChange={(event) => setState(event.target.value)}
+                  required
+                >
+                  <option value="">Selecione</option>
+                  {BRAZILIAN_STATES.map(uf => (
+                    <option key={uf} value={uf}>{uf}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="mb-2 block text-sm font-bold text-muted-foreground">Cidade</label>
@@ -118,6 +161,7 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
                   value={city}
                   onChange={(event) => setCity(event.target.value)}
                   placeholder="Ex: São Paulo"
+                  required
                 />
               </div>
             </div>
@@ -160,7 +204,21 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
           />
         </div>
 
-        {error && <p className="mb-6 rounded-xl border border-magenta/20 bg-magenta/10 px-4 py-3 text-sm font-semibold text-magenta">{error}</p>}
+        {error && (
+          <div className="mb-6 rounded-xl border border-magenta/20 bg-magenta/10 px-4 py-3 text-sm font-semibold text-magenta flex flex-col gap-2">
+            <p>{error}</p>
+            {(error.includes("confirme seu e-mail") || error.includes("Aguarde") || error.includes(" reenviar")) && (
+              <button
+                type="button"
+                onClick={handleResendConfirmation}
+                className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-magenta/70 hover:text-magenta transition self-start"
+              >
+                <Mail size={12} />
+                Tentar reenviar e-mail agora
+              </button>
+            )}
+          </div>
+        )}
         {successMessage && <p className="mb-6 rounded-xl border border-leaf/20 bg-leaf/10 px-4 py-3 text-sm font-semibold text-leaf">{successMessage}</p>}
 
         {mode === "register" && (
@@ -202,12 +260,14 @@ export function AuthPanel({ onSession, onRequestPasswordReset, theme = "dark" }:
         </button>
         
         {mode === "login" && (
-          <p className="mt-6 text-center text-xs font-semibold text-muted-foreground/60">
-            Ao entrar, você continua sujeito aos{" "}
-            <a className="text-brand hover:underline" href="/terms" target="_blank" rel="noreferrer">Termos de Uso</a>
-            {" "}e à{" "}
-            <a className="text-brand hover:underline" href="/privacy" target="_blank" rel="noreferrer">Política de Privacidade</a>.
-          </p>
+          <div className="mt-6 flex flex-col gap-4">
+            <p className="text-center text-xs font-semibold text-muted-foreground/60">
+              Ao entrar, você continua sujeito aos{" "}
+              <a className="text-brand hover:underline" href="/terms" target="_blank" rel="noreferrer">Termos de Uso</a>
+              {" "}e à{" "}
+              <a className="text-brand hover:underline" href="/privacy" target="_blank" rel="noreferrer">Política de Privacidade</a>.
+            </p>
+          </div>
         )}
       </form>
     </section>

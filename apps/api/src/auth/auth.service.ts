@@ -7,7 +7,8 @@ import * as argon2 from "argon2";
 import * as randomstring from "randomstring";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
-import { LoginDto, RegisterDto, RequestPasswordResetDto, ResetPasswordDto, ConfirmEmailDto } from "./dto";
+import { AddressValidationService } from "../common/address-validation.service";
+import { LoginDto, RegisterDto, RequestPasswordResetDto, ResetPasswordDto, ConfirmEmailDto, RequestEmailConfirmationDto } from "./dto";
 
 type TokenPair = {
   accessToken: string;
@@ -25,7 +26,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
-    private readonly emailService: EmailService
+    private readonly emailService: EmailService,
+    private readonly addressValidation: AddressValidationService
   ) {}
 
   async register(dto: RegisterDto, context: RegisterContext = {}) {
@@ -34,6 +36,12 @@ export class AuthService {
     }
 
     const email = dto.email.toLowerCase().trim();
+
+    // Validate city/state
+    const isCityValid = await this.addressValidation.validateCity(dto.state, dto.city);
+    if (!isCityValid) {
+      throw new BadRequestException(`A cidade "${dto.city}" não foi encontrada no estado ${dto.state}.`);
+    }
     
     // Check if user or identity already exists
     const existing = await this.prisma.user.findFirst({ 
@@ -55,11 +63,12 @@ export class AuthService {
       const user = await this.prisma.user.create({
         data: {
           email,
-          name: dto.name?.trim() || null,
-          state: dto.state?.trim() || null,
-          city: dto.city?.trim() || null,
+          name: dto.name.trim(),
+          state: dto.state,
+          city: dto.city.trim(),
           passwordHash: await argon2.hash(dto.password),
           emailConfirmationToken,
+          emailConfirmationSentAt: new Date(),
           termsAcceptedAt: new Date(),
           termsVersion: LEGAL_TERMS_VERSION,
           privacyAcceptedAt: new Date(),
@@ -93,6 +102,42 @@ export class AuthService {
     }
   }
 
+  async requestEmailConfirmation(dto: RequestEmailConfirmationDto) {
+    const email = dto.email.toLowerCase().trim();
+    const user = await this.prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      // Don't leak user existence
+      return { message: "Se o e-mail estiver cadastrado e não confirmado, um novo link será enviado." };
+    }
+
+    if (user.emailConfirmedAt) {
+      throw new BadRequestException("Este e-mail já foi confirmado. Por favor, faça login.");
+    }
+
+    // Cooldown check (1 minute)
+    if (user.emailConfirmationSentAt && Date.now() - user.emailConfirmationSentAt.getTime() < 60 * 1000) {
+      const remaining = Math.ceil((60 * 1000 - (Date.now() - user.emailConfirmationSentAt.getTime())) / 1000);
+      throw new BadRequestException(`Aguarde ${remaining} segundos para solicitar um novo e-mail.`);
+    }
+
+    const emailConfirmationToken = randomstring.generate(32);
+    
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: {
+        emailConfirmationToken,
+        emailConfirmationSentAt: new Date(),
+      }
+    });
+
+    // Send email asynchronously
+    void this.emailService.sendWelcomeEmail(user.email, user.name || "Treinador", emailConfirmationToken)
+      .catch(err => console.error("Failed to resend welcome email", err));
+
+    return { message: "Um novo link de confirmação foi enviado para o seu e-mail." };
+  }
+
   async confirmEmail(dto: ConfirmEmailDto) {
     const user = await this.prisma.user.findUnique({
       where: { emailConfirmationToken: dto.token }
@@ -119,7 +164,15 @@ export class AuthService {
 
     // We don't want to leak if the email exists or not
     if (!user) {
-      return { ok: true };
+      return { message: "Se o e-mail estiver cadastrado, um link de recuperação será enviado." };
+    }
+
+    // Cooldown check (1 minute)
+    // passwordResetExpiresAt is set to 1 hour from request. 
+    // If it's more than 59 minutes from now, it was sent less than a minute ago.
+    if (user.passwordResetExpiresAt && (user.passwordResetExpiresAt.getTime() - Date.now() > 59 * 60 * 1000)) {
+      const remaining = Math.ceil((user.passwordResetExpiresAt.getTime() - 59 * 60 * 1000 - Date.now()) / 1000);
+      throw new BadRequestException(`Aguarde ${remaining} segundos para solicitar uma nova recuperação.`);
     }
 
     const passwordResetToken = randomstring.generate(32);
@@ -137,7 +190,7 @@ export class AuthService {
     void this.emailService.sendPasswordResetEmail(user.email, passwordResetToken)
       .catch(err => console.error("Failed to send password reset email", err));
 
-    return { ok: true };
+    return { message: "Um link de recuperação foi enviado para o seu e-mail." };
   }
 
   async resetPassword(dto: ResetPasswordDto) {
@@ -164,11 +217,11 @@ export class AuthService {
   async login(dto: LoginDto) {
     const user = await this.prisma.user.findUnique({ where: { email: dto.email.toLowerCase().trim() } });
     if (!user || !(await argon2.verify(user.passwordHash, dto.password))) {
-      throw new UnauthorizedException("Invalid credentials");
+      throw new UnauthorizedException("E-mail ou senha inválidos");
     }
 
     if (!user.emailConfirmedAt) {
-      throw new UnauthorizedException("Please confirm your email before logging in");
+      throw new UnauthorizedException("Por favor, confirme seu e-mail antes de entrar.");
     }
 
     return this.buildAuthResponse(user);

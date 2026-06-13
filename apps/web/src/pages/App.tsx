@@ -210,6 +210,7 @@ function AppContent() {
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
+      // Mantemos o tour e o tema, limpamos apenas dados transientes como carrinhos
       if (key?.startsWith("cart_")) {
         keysToRemove.push(key);
       }

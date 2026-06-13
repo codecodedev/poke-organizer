@@ -87,6 +87,8 @@ export function CollectionsPage({
     () => new Set(),
   );
   const [tempSelectedItemIds, setTempSelectedItemIds] = useState<Set<string>>(new Set());
+  const [selectedItemQuantities, setSelectedItemQuantities] = useState<Record<string, number>>({});
+  const [tempSelectedItemQuantities, setTempSelectedItemQuantities] = useState<Record<string, number>>({});
   const [selectedItem, setSelectedItem] = useState<CollectionItem | null>(null);
   const [newName, setNewName] = useState("");
   const [newIsStore, setNewIsStore] = useState(false);
@@ -183,6 +185,7 @@ export function CollectionsPage({
       setPendingBannerFile(null);
       setPendingBannerRemoval(false);
       setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
+      setSelectedItemQuantities(Object.fromEntries(detail.items.map((item) => [item.id, item.quantity])));
       if (detail.isStore) {
         await refreshOffers(detail.id);
       } else {
@@ -213,6 +216,7 @@ export function CollectionsPage({
     setNewIsStore(false);
     setActiveFolder(null);
     setSelectedItemIds(new Set());
+    setSelectedItemQuantities({});
     resetPicker();
     setMessage(null);
     setError(null);
@@ -232,6 +236,7 @@ export function CollectionsPage({
     setActiveFolder(null);
     setActiveName("");
     setSelectedItemIds(new Set());
+    setSelectedItemQuantities({});
     resetFilters();
     resetPicker();
   }
@@ -239,6 +244,7 @@ export function CollectionsPage({
   function handleTogglePicker(open: boolean) {
     if (open) {
       setTempSelectedItemIds(new Set(selectedItemIds));
+      setTempSelectedItemQuantities({ ...selectedItemQuantities });
     }
     setShowPickerModal(open);
   }
@@ -261,6 +267,7 @@ export function CollectionsPage({
     setActiveFolder(detail);
     setActiveName(detail.name);
     setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
+    setSelectedItemQuantities(Object.fromEntries(detail.items.map((item) => [item.id, item.quantity])));
     setItemToRemove(null);
     setMessage("Carta removida da colecao.");
   }
@@ -269,12 +276,16 @@ export function CollectionsPage({
     if (!activeFolder) return;
     const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
       api.updateCollectionFolder(token, activeFolder.id, {
-        itemIds: [...activeFolder.items.map(i => i.id), itemId]
+        items: [
+          ...activeFolder.items.map((item) => ({ itemId: item.id, quantity: item.quantity })),
+          { itemId, quantity: inventory.find((item) => item.id === itemId)?.quantity ?? 1 },
+        ],
       }),
     );
     setActiveFolder(detail);
     setActiveName(detail.name);
     setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
+    setSelectedItemQuantities(Object.fromEntries(detail.items.map((item) => [item.id, item.quantity])));
     setMessage("Carta adicionada a colecao.");
   }
 
@@ -296,14 +307,16 @@ export function CollectionsPage({
     try {
       const detail = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
         api.updateCollectionFolder(token, activeFolder.id, {
-          itemIds: Array.from(tempSelectedItemIds)
+          items: selectedFolderPayload(tempSelectedItemIds, tempSelectedItemQuantities),
         }),
       );
       setActiveFolder(detail);
       setActiveName(detail.name);
       const nextIds = new Set(detail.items.map((item) => item.id));
       setSelectedItemIds(nextIds);
+      setSelectedItemQuantities(Object.fromEntries(detail.items.map((item) => [item.id, item.quantity])));
       setTempSelectedItemIds(new Set(nextIds));
+      setTempSelectedItemQuantities(Object.fromEntries(detail.items.map((item) => [item.id, item.quantity])));
       setShowPickerModal(false);
       setMessage("Cartas adicionadas a colecao.");
     } catch (err) {
@@ -328,13 +341,14 @@ export function CollectionsPage({
           if (selectedItemIds.size === 0) return created;
           return api.updateCollectionFolder(token, created.id, {
             name,
-            itemIds: Array.from(selectedItemIds),
+            items: selectedFolderPayload(selectedItemIds, selectedItemQuantities),
           });
         },
       );
       setActiveFolder(folder);
       setActiveName(folder.name);
       setSelectedItemIds(new Set(folder.items.map((item) => item.id)));
+      setSelectedItemQuantities(Object.fromEntries(folder.items.map((item) => [item.id, item.quantity])));
       setNewName("");
       await refreshFolders();
       if (onCollectionRouteChange) {
@@ -363,7 +377,7 @@ export function CollectionsPage({
         (token) =>
           api.updateCollectionFolder(token, activeFolder.id, {
             name: activeName.trim(),
-            itemIds: Array.from(selectedItemIds),
+            items: selectedFolderPayload(selectedItemIds, selectedItemQuantities),
           }),
       );
 
@@ -380,6 +394,7 @@ export function CollectionsPage({
       setActiveFolder(detail);
       setActiveName(detail.name);
       setSelectedItemIds(new Set(detail.items.map((item) => item.id)));
+      setSelectedItemQuantities(Object.fromEntries(detail.items.map((item) => [item.id, item.quantity])));
       setPendingBannerFile(null);
       setPendingBannerRemoval(false);
       await refreshFolders();
@@ -587,6 +602,23 @@ export function CollectionsPage({
   }
 
   async function updateItemDetails(itemId: string, details: UpdateCardDetails) {
+    if (activeFolder && selectedItem?.folderItemId) {
+      const detail = await withAuthRetry(
+        session,
+        onSession,
+        onUnauthorized,
+        (token) => api.updateCollectionFolderItemSale(token, activeFolder.id, selectedItem.folderItemId!, {
+          quantity: details.quantity,
+          manualPrice: details.customPrice,
+        }),
+      );
+      setActiveFolder(detail);
+      setActiveName(detail.name);
+      const updatedFolderItem = detail.items.find((item) => item.id === itemId) ?? null;
+      setSelectedItem(updatedFolderItem);
+      return;
+    }
+
     const updated = await withAuthRetry(
       session,
       onSession,
@@ -621,13 +653,29 @@ export function CollectionsPage({
     setPickerPage(1);
   }
 
+  function selectedFolderPayload(ids: Set<string>, quantities: Record<string, number>) {
+    return Array.from(ids).map((itemId) => {
+      const inventoryQuantity = inventory.find((item) => item.id === itemId)?.quantity ?? 1;
+      return {
+        itemId,
+        quantity: Math.max(1, Math.min(inventoryQuantity, quantities[itemId] ?? inventoryQuantity)),
+      };
+    });
+  }
+
   function toggleItem(itemId: string) {
     setSelectedItemIds((current) => {
       const next = new Set(current);
       if (next.has(itemId)) {
         next.delete(itemId);
+        setSelectedItemQuantities(({ [itemId]: _removed, ...rest }) => rest);
       } else {
         next.add(itemId);
+        const inventoryQuantity = inventory.find((item) => item.id === itemId)?.quantity ?? 1;
+        setSelectedItemQuantities((currentQuantities) => ({
+          ...currentQuantities,
+          [itemId]: currentQuantities[itemId] ?? inventoryQuantity,
+        }));
       }
       return next;
     });
@@ -638,8 +686,14 @@ export function CollectionsPage({
       const next = new Set(current);
       if (next.has(itemId)) {
         next.delete(itemId);
+        setTempSelectedItemQuantities(({ [itemId]: _removed, ...rest }) => rest);
       } else {
         next.add(itemId);
+        const inventoryQuantity = inventory.find((item) => item.id === itemId)?.quantity ?? 1;
+        setTempSelectedItemQuantities((currentQuantities) => ({
+          ...currentQuantities,
+          [itemId]: currentQuantities[itemId] ?? inventoryQuantity,
+        }));
       }
       return next;
     });
@@ -647,7 +701,16 @@ export function CollectionsPage({
 
   function confirmSelection() {
     setSelectedItemIds(new Set(tempSelectedItemIds));
+    setSelectedItemQuantities({ ...tempSelectedItemQuantities });
     setShowPickerModal(false);
+  }
+
+  function updateTempSelectedQuantity(itemId: string, quantity: number) {
+    const inventoryQuantity = inventory.find((item) => item.id === itemId)?.quantity ?? 1;
+    setTempSelectedItemQuantities((current) => ({
+      ...current,
+      [itemId]: Math.max(1, Math.min(inventoryQuantity, quantity)),
+    }));
   }
 
   const selectedItems = useMemo(
@@ -753,13 +816,15 @@ export function CollectionsPage({
   const selectedTotalValue = useMemo(
     () =>
       selectedItems.reduce(
-        (sum, item) =>
-          sum +
-          (item.customPrice ?? item.price?.amount ?? 0) *
-            (item.quantity - (item.store?.soldQuantity ?? 0)),
+        (sum, item) => {
+          const selectedQuantity = screen === "create"
+            ? (selectedItemQuantities[item.id] ?? item.quantity)
+            : (item.quantity - (item.store?.soldQuantity ?? 0));
+          return sum + (item.customPrice ?? item.price?.amount ?? 0) * selectedQuantity;
+        },
         0,
       ),
-    [selectedItems],
+    [screen, selectedItemQuantities, selectedItems],
   );
   const pendingOffersCount = useMemo(
     () => offers.filter((o) => !["accepted", "rejected"].includes(o.status)).length,
@@ -889,6 +954,7 @@ export function CollectionsPage({
           pickerPage={pickerPage}
           selectedItemIds={selectedItemIds}
           tempSelectedItemIds={tempSelectedItemIds}
+          tempSelectedItemQuantities={tempSelectedItemQuantities}
           selectedItems={selectedItems}
           isStore={newIsStore}
           onBack={backToList}
@@ -903,6 +969,7 @@ export function CollectionsPage({
           onPickerPageChange={setPickerPage}
           onToggleItem={toggleItem}
           onToggleTempItem={toggleTempItem}
+          onTempQuantityChange={updateTempSelectedQuantity}
           onConfirmPicker={confirmSelection}
           onOpenCard={setSelectedItem}
           onSubmit={createFolder}
@@ -947,6 +1014,7 @@ export function CollectionsPage({
           pickerItems={pickerItems}
           pickerPage={pickerPage}
           selectedItemIds={selectedItemIds}
+          tempSelectedItemQuantities={tempSelectedItemQuantities}
           isPublic={activeFolder.isPublic}
           isStore={activeFolder.isStore}
           shareUrl={
@@ -985,6 +1053,7 @@ export function CollectionsPage({
           }}
           onToggleItem={toggleItem}
           onToggleTempItem={toggleTempItem}
+          onTempQuantityChange={updateTempSelectedQuantity}
           onConfirmPicker={() => void addSelectedCardsToFolder()}
           onOpenCard={setSelectedItem}
           showPickerModal={showPickerModal}
@@ -1031,6 +1100,14 @@ export function CollectionsPage({
         card={selectedItem?.card ?? null}
         collectionItem={selectedItem}
         collectionPrice={selectedItem?.price ?? null}
+        quantityLabel={activeFolder && selectedItem?.folderItemId ? "Quantidade na coleção" : undefined}
+        quantityHelp={activeFolder && selectedItem?.folderItemId
+          ? `Inventário: ${selectedItem.store?.inventoryQuantity ?? selectedItem.quantity}`
+          : undefined}
+        maxQuantity={activeFolder && selectedItem?.folderItemId
+          ? (selectedItem.store?.inventoryQuantity ?? selectedItem.quantity)
+          : undefined}
+        metadataEditable={!activeFolder || !selectedItem?.folderItemId}
         onClose={() => setSelectedItem(null)}
         onUpdate={updateItemDetails}
       />
@@ -1213,7 +1290,7 @@ function UndoSaleModal({
       >
         <div className="flex items-center justify-between border-b border-card-border/50 px-5 py-4">
           <div>
-            <h2 className="text-lg font-black text-foreground">Desfazer venda</h2>
+            <h2 className="text-lg font-black text-foreground">Deixar carta disponivel</h2>
             <p className="text-xs font-semibold text-muted-foreground">{item.card.name}</p>
           </div>
           <button
@@ -1227,7 +1304,7 @@ function UndoSaleModal({
         <div className="p-5">
           <div className="grid gap-4">
             <p className="text-xs font-bold text-muted-foreground">
-              Você tem {soldQuantity} unidades marcadas como vendidas. Quantas deseja retornar ao inventário?
+              Você tem {soldQuantity} unidades . Quantas deseja adicionar?
             </p>
             <label className="grid gap-2">
               <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quantidade a devolver</span>
@@ -1266,6 +1343,7 @@ function SellModal({
   onConfirm: (price: number, quantity: number) => Promise<void>;
 }) {
   const initialPrice = item.store?.manualPrice ?? item.price?.amount ?? 0;
+  const availableQuantity = Math.max(1, item.quantity - (item.store?.soldQuantity ?? 0));
   const [price, setPrice] = useState(initialPrice.toString());
   const [quantity, setQuantity] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -1323,9 +1401,9 @@ function SellModal({
                   className="premium-input w-full text-center"
                   type="number"
                   min={1}
-                  max={item.quantity}
+                  max={availableQuantity}
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.min(item.quantity, Math.max(1, Number(e.target.value))))}
+                  onChange={(e) => setQuantity(Math.min(availableQuantity, Math.max(1, Number(e.target.value))))}
                 />
               </label>
             </div>
@@ -1456,16 +1534,35 @@ function OffersModal({
                       </p>
                     )}
                   </div>
-                  <Button
-                    type="button"
-                    className="h-9"
-                    icon={<Send size={14} />}
-                    onClick={() => {
-                      window.location.href = `/?page=negotiations&negotiation=proposal:${offer.id}`;
-                    }}
-                  >
-                    Abrir negociação
-                  </Button>
+                  {(offer.status === "pending" || offer.status === "buyer_accepted") && (
+                    <div className="flex flex-wrap gap-2">
+                      <Button
+                        type="button"
+                        className="h-9 bg-leaf text-white hover:bg-emerald-600 shadow-sm"
+                        onClick={() => onDecide(offer.id, "accepted")}
+                      >
+                        {offer.status === "buyer_accepted" ? "Confirmar pedido" : "Aceitar"}
+                      </Button>
+                      <Button
+                        type="button"
+                        className="h-9 bg-red-50 text-red-600 border-red-100 hover:bg-red-100 dark:bg-red-950/30 dark:border-red-900/50 dark:text-red-400 dark:hover:bg-red-900/50"
+                        onClick={() => onDecide(offer.id, "rejected")}
+                      >
+                        Rejeitar
+                      </Button>
+                    </div>
+                  )}
+                  {(offer.status === "pending" || offer.status === "countered") && (
+                    <Button
+                      type="button"
+                      className="h-9 border-cyan/30 text-cyan hover:bg-cyan/5"
+                      variant="outline"
+                      icon={<Send size={14} />}
+                      onClick={() => openCounter(offer)}
+                    >
+                      {offer.status === "countered" ? "Ajustar contraproposta" : "Contrapropor"}
+                    </Button>
+                  )}
                 </div>
                 {counterOfferId === offer.id && (
                   <div className="mt-4 rounded-2xl border border-cyan/20 bg-cyan/5 p-4">
@@ -1677,6 +1774,7 @@ function CollectionCreateScreen({
   pickerPage,
   selectedItemIds,
   tempSelectedItemIds,
+  tempSelectedItemQuantities,
   selectedItems,
   isStore,
   onBack,
@@ -1691,6 +1789,7 @@ function CollectionCreateScreen({
   onPickerPageChange,
   onToggleItem,
   onToggleTempItem,
+  onTempQuantityChange,
   onConfirmPicker,
   onOpenCard,
   onSubmit,
@@ -1713,6 +1812,7 @@ function CollectionCreateScreen({
   pickerPage: number;
   selectedItemIds: Set<string>;
   tempSelectedItemIds: Set<string>;
+  tempSelectedItemQuantities: Record<string, number>;
   selectedItems: CollectionItem[];
   isStore: boolean;
   onBack: () => void;
@@ -1727,6 +1827,7 @@ function CollectionCreateScreen({
   onPickerPageChange: (page: number) => void;
   onToggleItem: (itemId: string) => void;
   onToggleTempItem: (itemId: string) => void;
+  onTempQuantityChange: (itemId: string, quantity: number) => void;
   onConfirmPicker: () => void;
   onOpenCard: (item: CollectionItem) => void;
   onSubmit: (event: FormEvent) => void;
@@ -1883,6 +1984,7 @@ function CollectionCreateScreen({
             pickerItems={pickerItems}
             pickerPage={pickerPage}
             selectedItemIds={tempSelectedItemIds}
+            selectedQuantities={tempSelectedItemQuantities}
             onQueryChange={onQueryChange}
             onPickerTypeFilter={onPickerTypeFilter}
             onPickerRarityFilter={onPickerRarityFilter}
@@ -1891,6 +1993,7 @@ function CollectionCreateScreen({
             onShowAllChange={onShowAllChange}
             onPickerPageChange={onPickerPageChange}
             onToggleItem={onToggleTempItem}
+            onQuantityChange={onTempQuantityChange}
           />
         </Modal>
       )}
@@ -1930,6 +2033,7 @@ function CollectionDetailScreen({
   pickerPage,
   selectedItemIds,
   tempSelectedItemIds,
+  tempSelectedItemQuantities,
   isPublic,
   isStore,
   shareUrl,
@@ -1960,6 +2064,7 @@ function CollectionDetailScreen({
   onRemoveCollectionItem,
   onToggleItem,
   onToggleTempItem,
+  onTempQuantityChange,
   onConfirmPicker,
   onOpenCard,
   showPickerModal,
@@ -2001,6 +2106,7 @@ function CollectionDetailScreen({
   pickerPage: number;
   selectedItemIds: Set<string>;
   tempSelectedItemIds: Set<string>;
+  tempSelectedItemQuantities: Record<string, number>;
   isPublic: boolean;
   isStore: boolean;
   shareUrl: string | null;
@@ -2014,7 +2120,7 @@ function CollectionDetailScreen({
   onUploadBanner: (file: File) => void;
   bannerUploading: boolean;
   onToggleStore: (isStore: boolean) => void;
-  onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null }) => void;
+  onUpdateSale: (folderItemId: string, payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null; quantity?: number }) => void;
   onCopyShareLink: () => void;
   onUndoSale: (item: CollectionItem) => void;
   onTypeFilter: (value: string) => void;
@@ -2032,6 +2138,7 @@ function CollectionDetailScreen({
   onRemoveCollectionItem: (itemId: string) => void;
   onToggleItem: (itemId: string) => void;
   onToggleTempItem: (itemId: string) => void;
+  onTempQuantityChange: (itemId: string, quantity: number) => void;
   onConfirmPicker: () => void;
   onOpenCard: (item: CollectionItem) => void;
   showPickerModal: boolean;
@@ -2545,7 +2652,7 @@ function CollectionDetailScreen({
                         className="h-8 w-full text-[10px] text-slate-500 hover:text-red-500"
                         onClick={() => onUndoSale(item)}
                       >
-                        Desfazer venda
+                        Deixar disponivel
                       </Button>
                     )}
                   </div>
@@ -2618,6 +2725,7 @@ function CollectionDetailScreen({
             pickerItems={pickerItems}
             pickerPage={pickerPage}
             selectedItemIds={tempSelectedItemIds}
+            selectedQuantities={tempSelectedItemQuantities}
             onQueryChange={onQueryChange}
             onPickerTypeFilter={onPickerTypeFilter}
             onPickerRarityFilter={onPickerRarityFilter}
@@ -2626,6 +2734,7 @@ function CollectionDetailScreen({
             onShowAllChange={onShowAllChange}
             onPickerPageChange={onPickerPageChange}
             onToggleItem={onToggleTempItem}
+            onQuantityChange={onTempQuantityChange}
           />
         </Modal>
       )}
@@ -2646,10 +2755,12 @@ function CardPickerPanel({
   pickerItems,
   pickerPage,
   selectedItemIds,
+  selectedQuantities,
   onQueryChange,
   onShowAllChange,
   onPickerPageChange,
   onToggleItem,
+  onQuantityChange,
   onPickerTypeFilter,
   onPickerRarityFilter,
   onPickerVariantFilter,
@@ -2667,6 +2778,7 @@ function CardPickerPanel({
   pickerItems: CollectionItem[];
   pickerPage: number;
   selectedItemIds: Set<string>;
+  selectedQuantities: Record<string, number>;
   onQueryChange: (value: string) => void;
   onPickerTypeFilter: (value: string) => void;
   onPickerRarityFilter: (value: string) => void;
@@ -2675,6 +2787,7 @@ function CardPickerPanel({
   onShowAllChange: (value: boolean) => void;
   onPickerPageChange: (page: number) => void;
   onToggleItem: (itemId: string) => void;
+  onQuantityChange: (itemId: string, quantity: number) => void;
 }) {
   const [showFiltersModal, setShowFiltersModal] = useState(false);
   const paginatedPickerItems = useMemo(
@@ -2834,6 +2947,9 @@ function CardPickerPanel({
                 key={item.id}
                 item={item}
                 selected={selectedItemIds.has(item.id)}
+                selectedQuantity={selectedQuantities[item.id] ?? item.quantity}
+                maxQuantity={item.quantity}
+                onQuantityChange={onQuantityChange}
                 onToggleSelection={onToggleItem}
               />
             ))}

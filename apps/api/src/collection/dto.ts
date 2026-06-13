@@ -137,6 +137,25 @@ export class UpdateCollectionFolderDto {
   @IsArray()
   @IsString({ each: true })
   itemIds?: string[];
+
+  @ApiPropertyOptional({ type: () => [UpdateCollectionFolderItemDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => UpdateCollectionFolderItemDto)
+  items?: UpdateCollectionFolderItemDto[];
+}
+
+export class UpdateCollectionFolderItemDto {
+  @ApiProperty()
+  @IsString()
+  itemId!: string;
+
+  @ApiPropertyOptional({ default: 1 })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  quantity?: number;
 }
 
 export class UpdateCollectionSharingDto {
@@ -188,7 +207,8 @@ export class UpdateFolderItemSaleDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsNumber()
+  @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+  @IsInt()
   @Min(1)
   quantity?: number;
 }

@@ -1,40 +1,52 @@
 import { ApiProperty } from "@nestjs/swagger";
-import { Equals, IsBoolean, IsEmail, IsOptional, IsString, MinLength } from "class-validator";
+import { Equals, IsBoolean, IsEmail, IsEnum, IsNotEmpty, IsString, MinLength } from "class-validator";
+
+export enum BrazilianState {
+  AC = "AC", AL = "AL", AP = "AP", AM = "AM", BA = "BA", CE = "CE", DF = "DF", ES = "ES", GO = "GO",
+  MA = "MA", MT = "MT", MS = "MS", MG = "MG", PA = "PA", PB = "PB", PR = "PR", PE = "PE", PI = "PI",
+  RJ = "RJ", RN = "RN", RS = "RS", RO = "RO", RR = "RR", SC = "SC", SP = "SP", SE = "SE", TO = "TO"
+}
 
 export class RegisterDto {
   @ApiProperty({ example: "ash@example.com" })
-  @IsEmail()
+  @IsEmail({}, { message: "E-mail inválido" })
   email!: string;
 
-  @ApiProperty({ example: "Ash Ketchum", required: false })
-  @IsOptional()
+  @ApiProperty({ example: "Ash Ketchum" })
   @IsString()
-  name?: string;
+  @IsNotEmpty({ message: "Nome é obrigatório" })
+  @MinLength(3, { message: "Nome deve ter pelo menos 3 caracteres" })
+  name!: string;
 
-  @ApiProperty({ example: "SP", required: false })
-  @IsOptional()
-  @IsString()
-  state?: string;
+  @ApiProperty({ example: "SP" })
+  @IsEnum(BrazilianState, { message: "Estado (UF) inválido" })
+  state!: BrazilianState;
 
-  @ApiProperty({ example: "São Paulo", required: false })
-  @IsOptional()
+  @ApiProperty({ example: "São Paulo" })
   @IsString()
-  city?: string;
+  @IsNotEmpty({ message: "Cidade é obrigatória" })
+  city!: string;
 
   @ApiProperty({ minLength: 8 })
   @IsString()
-  @MinLength(8)
+  @MinLength(8, { message: "Senha deve ter pelo menos 8 caracteres" })
   password!: string;
 
   @ApiProperty({ example: true })
   @IsBoolean()
-  @Equals(true)
+  @Equals(true, { message: "Você deve aceitar os Termos de Uso" })
   acceptTerms!: boolean;
 
   @ApiProperty({ example: true })
   @IsBoolean()
-  @Equals(true)
+  @Equals(true, { message: "Você deve aceitar a Política de Privacidade" })
   acceptPrivacy!: boolean;
+}
+
+export class RequestEmailConfirmationDto {
+  @ApiProperty({ example: "ash@example.com" })
+  @IsEmail({}, { message: "E-mail inválido" })
+  email!: string;
 }
 
 export class LoginDto {

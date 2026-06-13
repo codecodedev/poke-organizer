@@ -25,10 +25,18 @@ describe("CollectionService", () => {
       collectionFolderItem: {
         findMany: vi.fn(),
         findUnique: vi.fn(),
+        findFirst: vi.fn(),
         update: vi.fn(),
         delete: vi.fn(),
+        createMany: vi.fn(),
+        deleteMany: vi.fn(),
       },
+      $transaction: vi.fn(),
     };
+    prisma.$transaction.mockImplementation(async (arg: any) => {
+      if (typeof arg === "function") return arg(prisma);
+      return Promise.all(arg);
+    });
 
     service = new CollectionService(
       prisma,
@@ -102,6 +110,62 @@ describe("CollectionService", () => {
         where: { id: "folder-1" },
         data: { name: "same-name" },
       });
+    });
+
+    it("should reject folder item quantity greater than inventory quantity", async () => {
+      prisma.collectionFolder.findFirst.mockResolvedValue({ id: "folder-1", userId: "user-1" });
+      prisma.collectionItem.findMany.mockResolvedValue([
+        { id: "item-1", quantity: 2 },
+      ]);
+      prisma.collectionFolderItem.findMany.mockResolvedValue([]);
+
+      await expect(
+        service.updateFolder("user-1", "folder-1", {
+          items: [{ itemId: "item-1", quantity: 3 }],
+        }),
+      ).rejects.toThrow(new BadRequestException("A quantidade da coleção não pode ser maior que a quantidade no inventário"));
+
+      expect(prisma.collectionFolderItem.createMany).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("updateFolderItemSale", () => {
+    it("should update only the folder item quantity when the item is edited inside a folder", async () => {
+      prisma.collectionFolder.findFirst.mockResolvedValue({ id: "folder-1", userId: "user-1" });
+      prisma.collectionFolderItem.findFirst.mockResolvedValue({
+        id: "folder-item-1",
+        folderId: "folder-1",
+        collectionItemId: "item-1",
+        quantity: 3,
+        soldQuantity: 1,
+        isSold: false,
+        soldAt: null,
+        soldToUserId: null,
+        collectionItem: {
+          id: "item-1",
+          quantity: 5,
+        },
+      });
+      vi.spyOn(service, "getFolder").mockResolvedValue({
+        id: "folder-1",
+        name: "folder",
+      } as any);
+
+      await service.updateFolderItemSale("user-1", "folder-1", "folder-item-1", {
+        quantity: 2,
+        manualPrice: 10,
+      });
+
+      expect(prisma.collectionFolderItem.update).toHaveBeenCalledWith({
+        where: { id: "folder-item-1" },
+        data: expect.objectContaining({
+          quantity: 2,
+          manualPriceBrl: 10,
+          soldQuantity: 1,
+          isSold: false,
+        }),
+      });
+      expect(prisma.collectionItem.update).not.toHaveBeenCalled();
     });
   });
 

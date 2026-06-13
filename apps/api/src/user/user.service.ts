@@ -2,11 +2,15 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { UserPublicProfile, AuctionStatus } from "@poke-organizer/shared";
 import { PrismaService } from "../prisma/prisma.service";
 import { toCardSummary } from "../common/mappers";
+import { AddressValidationService } from "../common/address-validation.service";
 import { UpdateProfileDto } from "./dto";
 
 @Injectable()
 export class UserService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly addressValidation: AddressValidationService
+  ) {}
 
   async getPublicProfile(slug: string): Promise<UserPublicProfile> {
     const user = await this.prisma.user.findUnique({
@@ -88,16 +92,30 @@ export class UserService {
       if (existing) throw new BadRequestException("Este link de perfil já está em uso");
     }
 
+    // Validate city/state if provided
+    if (dto.city || dto.state) {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      const finalCity = dto.city || user?.city;
+      const finalState = dto.state || user?.state;
+
+      if (finalCity && finalState) {
+        const isCityValid = await this.addressValidation.validateCity(finalState, finalCity);
+        if (!isCityValid) {
+          throw new BadRequestException(`A cidade "${finalCity}" não foi encontrada no estado ${finalState}.`);
+        }
+      }
+    }
+
     return this.prisma.user.update({
       where: { id: userId },
       data: {
-        name: dto.name,
-        profileSlug: dto.profileSlug,
-        profileBio: dto.profileBio,
+        name: dto.name?.trim(),
+        profileSlug: dto.profileSlug?.trim(),
+        profileBio: dto.profileBio?.trim(),
         isPublicProfile: dto.isPublicProfile,
-        whatsapp: dto.whatsapp,
+        whatsapp: dto.whatsapp?.trim(),
         state: dto.state,
-        city: dto.city
+        city: dto.city?.trim()
       }
     });
   }

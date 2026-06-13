@@ -226,10 +226,16 @@ export const api = {
       body: JSON.stringify({ email, password }),
     });
   },
-  register(email: string, password: string, name: string | undefined, acceptTerms: boolean, acceptPrivacy: boolean, state?: string, city?: string) {
+  register(email: string, password: string, name: string, acceptTerms: boolean, acceptPrivacy: boolean, state: string, city: string) {
     return request<{ message: string }>("/auth/register", {
       method: "POST",
       body: JSON.stringify({ email, password, name, acceptTerms, acceptPrivacy, state, city }),
+    });
+  },
+  requestEmailConfirmation(email: string) {
+    return request<{ message: string }>("/auth/request-email-confirmation", {
+      method: "POST",
+      body: JSON.stringify({ email }),
     });
   },
   refresh(refreshToken: string) {
@@ -366,7 +372,7 @@ export const api = {
   updateCollectionFolder(
     token: string,
     id: string,
-    payload: { name?: string; itemIds?: string[] },
+    payload: { name?: string; itemIds?: string[]; items?: Array<{ itemId: string; quantity?: number }> },
   ) {
     return request<CollectionFolderDetail>(
       `/collection/folders/${encodeURIComponent(id)}`,
@@ -426,7 +432,7 @@ export const api = {
     token: string,
     folderId: string,
     folderItemId: string,
-    payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null },
+    payload: { manualPrice?: number | null; isSold?: boolean; soldPrice?: number | null; quantity?: number },
   ) {
     return request<CollectionFolderDetail>(
       `/collection/folders/${encodeURIComponent(folderId)}/items/${encodeURIComponent(folderItemId)}/sale`,
@@ -666,6 +672,13 @@ export const api = {
       method: "POST",
       token,
       body: JSON.stringify({ status }),
+    });
+  },
+  removeItemFromNegotiationProposal(token: string, offerId: string, itemId: string) {
+    return request<NegotiationDetail>(`/negotiations/proposal/${encodeURIComponent(offerId)}/items/${encodeURIComponent(itemId)}/delete`, {
+      method: "POST",
+      token,
+      body: JSON.stringify({}),
     });
   },
   updateNegotiationOrderStatus(token: string, origin: string, id: string, status: "delivered" | "cancelled") {

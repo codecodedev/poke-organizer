@@ -4,7 +4,7 @@ import type { FastifyRequest } from "fastify";
 import { CurrentUser, RequestUser } from "../common/current-user.decorator";
 import { JwtAuthGuard } from "../common/jwt-auth.guard";
 import { AuthService } from "./auth.service";
-import { LoginDto, RefreshDto, RegisterDto, ConfirmEmailDto, RequestPasswordResetDto, ResetPasswordDto } from "./dto";
+import { LoginDto, RefreshDto, RegisterDto, ConfirmEmailDto, RequestPasswordResetDto, ResetPasswordDto, RequestEmailConfirmationDto } from "./dto";
 
 @ApiTags("auth")
 @Controller("auth")
@@ -27,6 +27,11 @@ export class AuthController {
   @Post("confirm-email")
   confirmEmail(@Body() dto: ConfirmEmailDto) {
     return this.auth.confirmEmail(dto);
+  }
+
+  @Post("request-email-confirmation")
+  requestEmailConfirmation(@Body() dto: RequestEmailConfirmationDto) {
+    return this.auth.requestEmailConfirmation(dto);
   }
 
   @Post("request-password-reset")

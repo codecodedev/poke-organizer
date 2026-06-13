@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { OrderDetail, OrderMessage, OrderSummary, OrderStatus } from "@poke-organizer/shared";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { EmailService } from "../email/email.service";
 import { OrderRealtimeService } from "./order-realtime.service";
@@ -144,46 +145,35 @@ export class OrderService {
           seller: true,
           buyer: true,
           items: true,
-          proposal: { include: { items: { include: { folderItem: { include: { collectionItem: { include: { card: true } } } } } } } },
+          proposal: { include: { items: { include: { folderItem: true } } } },
           auction: { include: { collectionItem: { include: { card: true } } } },
         },
       });
 
       if (status === "delivered") {
-        // Find folder and items to reduce inventory
-        const folder = await tx.collectionFolder.findFirst({
-          where: {
-            OR: [
-              { id: order.proposalId ? (await tx.collectionCartOffer.findUnique({ where: { id: order.proposalId } }))?.folderId : undefined },
-              { items: { some: { collectionItem: { auctions: { some: { id: order.auctionId || undefined } } } } } }
-            ]
+        if (orderUpdated.proposal) {
+          for (const offerItem of orderUpdated.proposal.items) {
+            await this.decrementInventoryItem(tx, offerItem.folderItem.collectionItemId, offerItem.quantity);
           }
-        });
-
-        if (folder) {
-          for (const item of order.items) {
-            // Find the collection item owned by the seller
-            // We need to match by card name, condition, variant as the order items are snapshots
-            const collectionItem = await tx.collectionItem.findFirst({
-              where: {
-                userId,
-                card: { name: item.name },
-                condition: item.condition as any,
-                variant: item.variant ?? undefined,
+        } else if (orderUpdated.auction?.collectionItemId) {
+          await this.decrementInventoryItem(tx, orderUpdated.auction.collectionItemId, 1);
+        }
+      } else if (status === "cancelled") {
+        // Reverse sold status in CollectionFolderItem if it came from a proposal
+        if (orderUpdated.proposal) {
+          for (const offerItem of orderUpdated.proposal.items) {
+            const folderItem = offerItem.folderItem;
+            const newSoldQuantity = Math.max(0, folderItem.soldQuantity - offerItem.quantity);
+            
+            await tx.collectionFolderItem.update({
+              where: { id: folderItem.id },
+              data: {
+                soldQuantity: newSoldQuantity,
+                isSold: newSoldQuantity >= folderItem.quantity,
+                soldAt: newSoldQuantity === 0 ? null : folderItem.soldAt,
+                soldToUserId: newSoldQuantity === 0 ? null : folderItem.soldToUserId,
               }
             });
-
-            if (collectionItem) {
-              const newQuantity = Math.max(0, collectionItem.quantity - item.quantity);
-              if (newQuantity === 0) {
-                await tx.collectionItem.delete({ where: { id: collectionItem.id } });
-              } else {
-                await tx.collectionItem.update({
-                  where: { id: collectionItem.id },
-                  data: { quantity: newQuantity }
-                });
-              }
-            }
           }
         }
       }
@@ -206,6 +196,28 @@ export class OrderService {
     return summary;
   }
 
+  private async decrementInventoryItem(
+    tx: Prisma.TransactionClient,
+    collectionItemId: string,
+    quantity: number,
+  ) {
+    const collectionItem = await tx.collectionItem.findUnique({
+      where: { id: collectionItemId },
+    });
+    if (!collectionItem) return;
+
+    const newQuantity = Math.max(0, collectionItem.quantity - quantity);
+    if (newQuantity === 0) {
+      await tx.collectionItem.delete({ where: { id: collectionItem.id } });
+      return;
+    }
+
+    await tx.collectionItem.update({
+      where: { id: collectionItem.id },
+      data: { quantity: newQuantity },
+    });
+  }
+
   private mapOrder(o: any): OrderSummary {
     return {
       id: o.id,
@@ -226,9 +238,9 @@ export class OrderService {
         if (!language) {
           if (o.proposal) {
             const match = o.proposal.items.find((pi: any) => 
-              pi.folderItem.collectionItem.card.name === i.name && 
-              pi.folderItem.collectionItem.condition === i.condition && 
-              pi.folderItem.collectionItem.variant === i.variant
+              pi.folderItem?.collectionItem?.card?.name === i.name &&
+              pi.folderItem?.collectionItem?.condition === i.condition &&
+              pi.folderItem?.collectionItem?.variant === i.variant
             );
             if (match) {
               language = match.folderItem.collectionItem.language;

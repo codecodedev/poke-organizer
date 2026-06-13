@@ -77,7 +77,8 @@ export function ProposalCart({
     setCart(prev => {
       const entry = prev[id];
       if (!entry) return prev;
-      const nextQuantity = Math.max(1, Math.min(entry.item.quantity, entry.quantity + delta));
+      const availableQuantity = Math.max(1, entry.item.quantity - (entry.item.store?.soldQuantity ?? 0));
+      const nextQuantity = Math.max(1, Math.min(availableQuantity, entry.quantity + delta));
       return {
         ...prev,
         [id]: { ...entry, quantity: nextQuantity }

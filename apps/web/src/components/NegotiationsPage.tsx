@@ -2,12 +2,17 @@ import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "re
 import {
   ArrowLeft,
   CheckCircle2,
+  ChevronRight,
   Clock,
+  Filter,
   Gavel,
+  History,
+  Layers,
   MessageCircle,
   Package,
   Send,
   ShoppingBag,
+  Trash2,
   Truck,
   XCircle,
 } from "lucide-react";
@@ -45,6 +50,8 @@ export function NegotiationsPage({
   const [detail, setDetail] = useState<NegotiationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [filterType, setFilterType] = useState<"all" | "proposal" | "auction">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "negotiating" | "accepted" | "delivered" | "cancelled">("all");
   const [message, setMessage] = useState("");
   const [counterAmount, setCounterAmount] = useState("");
   const [counterMessage, setCounterMessage] = useState("");
@@ -54,6 +61,24 @@ export function NegotiationsPage({
   const socketRef = useRef<NegotiationSocket | null>(null);
 
   const isDetail = Boolean(selectedId);
+
+  const filteredNegotiations = useMemo(() => {
+    return negotiations.filter((n) => {
+      const typeMatch = filterType === "all" || n.origin === filterType;
+      if (!typeMatch) return false;
+
+      if (filterStatus === "all") return true;
+      if (filterStatus === "negotiating") {
+        return ["pending", "countered", "buyer_accepted"].includes(n.status);
+      }
+      if (filterStatus === "accepted") return n.status === "accepted";
+      if (filterStatus === "delivered") return n.status === "delivered";
+      if (filterStatus === "cancelled") {
+        return ["cancelled", "rejected"].includes(n.status);
+      }
+      return true;
+    });
+  }, [negotiations, filterType, filterStatus]);
 
   async function load() {
     setLoading(true);
@@ -222,6 +247,22 @@ export function NegotiationsPage({
     }
   }
 
+  async function handleRemoveItem(itemId: string) {
+    if (!detail?.proposalId) return;
+    setSending(true);
+    try {
+      const next = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
+        api.removeItemFromNegotiationProposal(token, detail.proposalId!, itemId),
+      );
+      setDetail(next);
+      apiFeedback.success("Item removido da negociação.");
+    } catch (err) {
+      apiFeedback.error(err instanceof Error ? err.message : "Erro ao remover item");
+    } finally {
+      setSending(false);
+    }
+  }
+
   async function handleUpdateStatus(status: "delivered" | "cancelled") {
     if (!detail) return;
     const targetId = detail.origin === "proposal" ? detail.proposalId : detail.orderId;
@@ -276,6 +317,7 @@ export function NegotiationsPage({
           onRejectProposal={() => setConfirming({ action: "reject" })}
           onConfirmDelivered={() => setConfirming({ action: "delivered" })}
           onConfirmCancelled={() => setConfirming({ action: "cancelled" })}
+          onRemoveItem={handleRemoveItem}
           onOpenCounterModal={() => {
             setCounterAmount(String(detail?.totalAmount ?? ""));
             setShowCounterModal(true);
@@ -283,31 +325,63 @@ export function NegotiationsPage({
         />
       ) : (
         <>
-          <div className="flex gap-2 p-1 bg-muted rounded-2xl w-fit">
-            <button
-              onClick={() => setTab("sales")}
-              className={`px-6 py-2 rounded-xl text-sm font-black transition ${tab === "sales" ? "bg-card shadow-sm text-brand" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Vendas
-            </button>
-            <button
-              onClick={() => setTab("purchases")}
-              className={`px-6 py-2 rounded-xl text-sm font-black transition ${tab === "purchases" ? "bg-card shadow-sm text-brand" : "text-muted-foreground hover:text-foreground"}`}
-            >
-              Compras
-            </button>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex gap-2 p-1 bg-muted rounded-2xl w-fit">
+              <button
+                onClick={() => setTab("sales")}
+                className={`px-6 py-2 rounded-xl text-sm font-black transition ${tab === "sales" ? "bg-card shadow-sm text-brand" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Vendas
+              </button>
+              <button
+                onClick={() => setTab("purchases")}
+                className={`px-6 py-2 rounded-xl text-sm font-black transition ${tab === "purchases" ? "bg-card shadow-sm text-brand" : "text-muted-foreground hover:text-foreground"}`}
+              >
+                Compras
+              </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-2xl">
+                <Filter size={14} className="text-muted-foreground" />
+                <select
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value as any)}
+                  className="bg-transparent text-xs font-black uppercase tracking-wider outline-none text-muted-foreground focus:text-foreground"
+                >
+                  <option value="all">Tipos: Tudo</option>
+                  <option value="proposal">Propostas</option>
+                  <option value="auction">Leilões</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-2xl">
+                <History size={14} className="text-muted-foreground" />
+                <select
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as any)}
+                  className="bg-transparent text-xs font-black uppercase tracking-wider outline-none text-muted-foreground focus:text-foreground"
+                >
+                  <option value="all">Situação: Tudo</option>
+                  <option value="negotiating">Em Negociação</option>
+                  <option value="accepted">Aceito</option>
+                  <option value="delivered">Entregues</option>
+                  <option value="cancelled">Canceladas</option>
+                </select>
+              </div>
+            </div>
           </div>
 
           <div className="grid gap-5">
             {loading ? (
               <div className="py-24 text-center font-black text-muted-foreground animate-pulse">Carregando negociações...</div>
-            ) : negotiations.length === 0 ? (
+            ) : filteredNegotiations.length === 0 ? (
               <div className="py-24 text-center bg-card rounded-[32px] border border-card-border border-dashed">
                 <MessageCircle size={48} className="mx-auto text-muted-foreground/20 mb-4" />
-                <p className="text-sm font-bold text-muted-foreground">Nenhuma negociação encontrada.</p>
+                <p className="text-sm font-bold text-muted-foreground">Nenhuma negociação encontrada para os filtros selecionados.</p>
               </div>
             ) : (
-              negotiations.map((negotiation) => (
+              filteredNegotiations.map((negotiation) => (
                 <NegotiationCard
                   key={negotiation.id}
                   negotiation={negotiation}
@@ -433,10 +507,11 @@ function CounterOfferModal({
 
 function NegotiationCard({ negotiation, onOpen }: { negotiation: NegotiationSummary; onOpen: () => void }) {
   const otherParty = negotiation.role === "seller" ? negotiation.buyerName : negotiation.sellerName;
+  const itemCount = negotiation.items.reduce((acc, item) => acc + item.quantity, 0);
 
   return (
-    <Panel className="p-0 overflow-hidden">
-      <div className="p-4 sm:p-6 border-b border-card-border/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <Panel className="p-0 overflow-hidden cursor-pointer hover:border-brand/30 transition shadow-sm" onClick={onOpen}>
+      <div className="p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <OriginIcon origin={negotiation.origin} />
           <div className="min-w-0">
@@ -450,16 +525,18 @@ function NegotiationCard({ negotiation, onOpen }: { negotiation: NegotiationSumm
             </p>
           </div>
         </div>
-        <div className="sm:text-right">
-          <p className="text-[10px] font-bold text-muted-foreground uppercase">Total</p>
-          <p className="text-xl font-black text-foreground">{formatBrl(negotiation.totalAmount)}</p>
+        
+        <div className="flex flex-col sm:items-end justify-center">
+          <div className="flex items-center gap-2 text-muted-foreground mb-1">
+            <Layers size={14} />
+            <span className="text-xs font-black uppercase tracking-widest">{itemCount} {itemCount === 1 ? "Item" : "Itens"}</span>
+          </div>
+          <p className="text-xl font-black text-brand">{formatBrl(negotiation.totalAmount)}</p>
         </div>
-      </div>
-      <NegotiationItems items={negotiation.items} compact />
-      <div className="p-4 sm:p-6 border-t border-card-border/30">
-        <Button variant="brand" className="h-11 px-6" icon={<MessageCircle size={18} />} onClick={onOpen}>
-          Abrir negociação
-        </Button>
+
+        <div className="hidden sm:block pl-4 border-l border-card-border/30">
+          <Button variant="ghost" className="h-11 w-11 p-0 rounded-2xl" icon={<ChevronRight size={22} />} onClick={(e) => { e.stopPropagation(); onOpen(); }} />
+        </div>
       </div>
     </Panel>
   );
@@ -478,6 +555,7 @@ function NegotiationDetailView({
   onRejectProposal,
   onConfirmDelivered,
   onConfirmCancelled,
+  onRemoveItem,
   onOpenCounterModal,
 }: {
   currentUserId: string;
@@ -492,10 +570,23 @@ function NegotiationDetailView({
   onRejectProposal: () => void;
   onConfirmDelivered: () => void;
   onConfirmCancelled: () => void;
+  onRemoveItem: (itemId: string) => void;
   onOpenCounterModal: () => void;
 }) {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const messages = useMemo(() => detail?.messages ?? [], [detail?.messages]);
+  const latestActionMessage = useMemo(() => {
+    if (detail?.actionMessageId) {
+      const actionMessage = messages.find((entry) => entry.id === detail.actionMessageId);
+      if (actionMessage) return actionMessage;
+    }
+
+    return [...messages].reverse().find((entry) =>
+      entry.type === "initial_offer" ||
+      entry.type === "counter_offer" ||
+      entry.type === "buyer_accepted"
+    ) ?? null;
+  }, [detail?.actionMessageId, messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ block: "end" });
@@ -510,11 +601,24 @@ function NegotiationDetailView({
   
   const otherParty = isSeller ? detail.buyerName : detail.sellerName;
   const readonly = !detail.canChat;
+  const proposalStatus = detail.proposalStatus ?? detail.status;
+  const isActiveProposal = detail.origin === "proposal" && !detail.orderId && detail.canChat && (
+    proposalStatus === "pending" ||
+    proposalStatus === "countered" ||
+    proposalStatus === "buyer_accepted"
+  );
+  const canAnswerProposal = isActiveProposal && detail.actionTargetUserId === currentUserId;
+  const canAcceptProposalInChat = canAnswerProposal && isSeller;
+  const canRejectProposalInChat = canAnswerProposal;
+  const canCounterOfferInChat = canAnswerProposal;
+  const canBuyerRespondCounter = canAnswerProposal && isBuyer && proposalStatus === "countered";
 
   // Stable permission flags independent of the socket's 'role' context
   const canUpdateStatus = isSeller && detail.origin === "auction" 
     ? detail.status === "pending" 
     : (isSeller && !!detail.orderId && detail.orderStatus === "pending");
+
+  const canRemoveItems = isSeller && !detail.orderId && (detail.status === "pending" || detail.status === "countered");
 
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_430px]">
@@ -532,7 +636,14 @@ function NegotiationDetailView({
                   </span>
                 </div>
                 <h2 className="text-2xl font-black text-foreground">{detail.title}</h2>
-                <p className="text-xl font-black text-brand">{formatBrl(detail.totalAmount)}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-xl font-black text-brand">{formatBrl(detail.totalAmount)}</p>
+                  {canRemoveItems && (
+                    <span className="text-[10px] font-bold text-muted-foreground/60 italic">
+                      (Passe o mouse nos itens para remover)
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="flex flex-col gap-2 sm:items-end">
@@ -557,7 +668,11 @@ function NegotiationDetailView({
               )}
             </div>
           </div>
-          <NegotiationItems items={detail.items} />
+          <NegotiationItems 
+            items={detail.items} 
+            canRemove={canRemoveItems}
+            onRemove={onRemoveItem}
+          />
         </Panel>
       </div>
 
@@ -573,19 +688,13 @@ function NegotiationDetailView({
               </div>
             ) : (
               (() => {
-                // Find the index of the last message that is either an initial offer or a counter offer
-                let targetIdx = -1;
-                for (let i = messages.length - 1; i >= 0; i--) {
-                  if (messages[i].type === "initial_offer" || messages[i].type === "counter_offer") {
-                    targetIdx = i;
-                    break;
-                  }
-                }
+                const targetIdx = latestActionMessage
+                  ? messages.findIndex((entry) => entry.id === latestActionMessage.id)
+                  : -1;
 
                 return messages.map((entry, idx) => {
                   const isTarget = idx === targetIdx;
-                  // Only show actions if it's the target offer AND the detail state says we can actually respond
-                  const canRespond = isTarget && (detail.canAcceptProposal || detail.canRejectProposal || detail.canRespondCounterOffer);
+                  const canRespond = isTarget && canAnswerProposal;
 
                   return (
                     <NegotiationMessageBubble
@@ -593,13 +702,14 @@ function NegotiationDetailView({
                       entry={entry}
                       mine={entry.senderId === currentUserId}
                       actions={canRespond ? {
-                        onAccept: detail.canAcceptProposal
+                        onAccept: canAcceptProposalInChat
                           ? onAcceptProposal
-                          : (detail.canRespondCounterOffer ? () => onRespondCounter("accepted") : undefined),
-                        onReject: detail.canRejectProposal
-                          ? onRejectProposal
-                          : (detail.canRespondCounterOffer ? () => onRespondCounter("rejected") : undefined),
-                        label: detail.proposalStatus === "buyer_accepted" ? "Confirmar pedido" : "Aceitar proposta"
+                          : (canBuyerRespondCounter ? () => onRespondCounter("accepted") : undefined),
+                        onReject: canRejectProposalInChat
+                          ? (isSeller ? onRejectProposal : () => onRespondCounter("rejected"))
+                          : undefined,
+                        onCounter: canCounterOfferInChat ? onOpenCounterModal : undefined,
+                        label: isSeller ? "Aceitar proposta" : "Aceitar contraproposta"
                       } : undefined}
                       sending={sending}
                     />
@@ -611,17 +721,6 @@ function NegotiationDetailView({
           </div>
 
           <div className="mt-3 space-y-2">
-            {detail.canSendCounterOffer && (
-              <Button
-                variant="outline"
-                className="w-full h-11 border-cyan/30 text-cyan hover:bg-cyan/5 font-black uppercase tracking-widest text-xs"
-                icon={<Send size={16} />}
-                onClick={onOpenCounterModal}
-                disabled={sending}
-              >
-                Enviar contraproposta
-              </Button>
-            )}
             <form onSubmit={onSendMessage} className="flex gap-2">
               <textarea
                 value={message}
@@ -653,12 +752,13 @@ function NegotiationMessageBubble({
   actions?: {
     onAccept?: () => void;
     onReject?: () => void;
+    onCounter?: () => void;
     label?: string;
   };
   sending?: boolean;
 }) {
   const isSystem = entry.type !== "message" && entry.type !== "order_message";
-  const hasActions = (actions?.onAccept || actions?.onReject) && !mine;
+  const visibleActions = actions && (actions.onAccept || actions.onReject || actions.onCounter) ? actions : null;
 
   if (isSystem) {
     return (
@@ -669,15 +769,20 @@ function NegotiationMessageBubble({
         )}
         {entry.message && <p className="mt-2 whitespace-pre-wrap text-sm font-semibold text-foreground">{entry.message}</p>}
 
-        {hasActions && (
+        {visibleActions && (
           <div className="mt-4 flex flex-wrap justify-center gap-2">
-            {actions.onAccept && (
-              <Button variant="brand" className="h-9 px-4 bg-leaf text-white hover:bg-emerald-600 text-xs" icon={<CheckCircle2 size={14} />} onClick={actions.onAccept} disabled={sending}>
-                {actions.label || "Aceitar"}
+            {visibleActions.onAccept && (
+              <Button variant="brand" className="h-9 px-4 bg-leaf text-white hover:bg-emerald-600 text-xs" icon={<CheckCircle2 size={14} />} onClick={visibleActions.onAccept} disabled={sending}>
+                {visibleActions.label || "Aceitar"}
               </Button>
             )}
-            {actions.onReject && (
-              <Button variant="outline" className="h-9 px-4 text-magenta border-magenta/30 hover:bg-magenta/5 text-xs" icon={<XCircle size={14} />} onClick={actions.onReject} disabled={sending}>
+            {visibleActions.onCounter && (
+              <Button variant="outline" className="h-9 px-4 border-cyan/30 text-cyan hover:bg-cyan/5 text-xs" icon={<Send size={14} />} onClick={visibleActions.onCounter} disabled={sending}>
+                Contraproposta
+              </Button>
+            )}
+            {visibleActions.onReject && (
+              <Button variant="outline" className="h-9 px-4 text-magenta border-magenta/30 hover:bg-magenta/5 text-xs" icon={<XCircle size={14} />} onClick={visibleActions.onReject} disabled={sending}>
                 Recusar
               </Button>
             )}
@@ -705,11 +810,21 @@ function NegotiationMessageBubble({
   );
 }
 
-function NegotiationItems({ items, compact = false }: { items: OrderItem[]; compact?: boolean }) {
+function NegotiationItems({ 
+  items, 
+  compact = false,
+  canRemove = false,
+  onRemove
+}: { 
+  items: OrderItem[]; 
+  compact?: boolean;
+  canRemove?: boolean;
+  onRemove?: (id: string) => void;
+}) {
   return (
     <div className={`grid gap-3 ${compact ? "p-4 sm:grid-cols-2 lg:grid-cols-3" : "p-5 sm:grid-cols-2"}`}>
       {items.map((item) => (
-        <div key={item.id} className="flex items-center gap-3 rounded-2xl border border-card-border/40 bg-muted/20 p-3">
+        <div key={item.id} className="group relative flex items-center gap-3 rounded-2xl border border-card-border/40 bg-muted/20 p-3">
           <div className="h-14 w-10 overflow-hidden rounded-lg bg-input border border-card-border/40 shrink-0">
             {item.imageSmall && <img src={item.imageSmall} alt={item.name} className="h-full w-full object-cover" />}
           </div>
@@ -720,6 +835,16 @@ function NegotiationItems({ items, compact = false }: { items: OrderItem[]; comp
             </p>
           </div>
           <p className="shrink-0 text-sm font-black text-foreground">{formatBrl(item.price)}</p>
+          
+          {canRemove && onRemove && (
+            <button
+              onClick={() => onRemove(item.id)}
+              className="absolute -right-2 -top-2 hidden h-8 w-8 place-items-center rounded-full bg-magenta text-white shadow-lg transition hover:scale-110 group-hover:grid"
+              title="Remover da negociação"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
         </div>
       ))}
     </div>
@@ -765,7 +890,7 @@ function statusLabel(status: NegotiationSummary["status"]) {
   if (status === "rejected") return "Recusada";
   if (status === "countered") return "Contraproposta";
   if (status === "buyer_accepted") return "Aguardando vendedor";
-  if (status === "accepted") return "Pedido aberto";
+  if (status === "accepted") return "Aceito";
   return "Pendente";
 }
 
@@ -775,5 +900,6 @@ function eventLabel(type: NegotiationMessage["type"]) {
   if (type === "buyer_accepted") return "Comprador aceitou";
   if (type === "seller_accepted") return "Vendedor confirmou";
   if (type === "rejected") return "Negociação encerrada";
+  if (type === "cancelled") return "Pedido cancelado";
   return "Atualização";
 }

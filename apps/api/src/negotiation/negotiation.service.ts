@@ -320,6 +320,63 @@ export class NegotiationService {
     return this.emitProposal(userId, offerId);
   }
 
+  async removeItemFromProposal(userId: string, offerId: string, itemId: string): Promise<NegotiationDetail> {
+    const offer = await this.findOfferForUser(userId, offerId);
+    if (offer.folder.userId !== userId) {
+      throw new BadRequestException("Apenas o vendedor pode remover itens da proposta");
+    }
+
+    if (offer.status !== "PENDING" && offer.status !== "COUNTERED") {
+      throw new BadRequestException("Itens só podem ser removidos durante a negociação ativa");
+    }
+
+    const item = offer.items.find(i => i.id === itemId);
+    if (!item) {
+      throw new NotFoundException("Item não encontrado nesta proposta");
+    }
+
+    if (offer.items.length <= 1) {
+      throw new BadRequestException("A proposta deve ter pelo menos um item. Se desejar, recuse a proposta inteira.");
+    }
+
+    const newTotalBrl = Number(offer.totalOfferBrl) - Number(item.amountBrl);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.collectionCartOfferItem.delete({
+        where: { id: itemId },
+      });
+
+      await tx.collectionCartOffer.update({
+        where: { id: offerId },
+        data: {
+          totalOfferBrl: newTotalBrl,
+          status: "COUNTERED",
+          updatedAt: new Date(),
+        },
+      });
+
+      await tx.collectionCartOfferEvent.create({
+        data: {
+          offerId,
+          senderId: userId,
+          type: "MESSAGE",
+          message: `O vendedor removeu o item "${item.folderItem.collectionItem.card.name}" da negociação. O novo total é ${newTotalBrl.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`,
+        },
+      });
+
+      await tx.notification.create({
+        data: {
+          userId: offer.buyerId,
+          title: "Item removido da negociação",
+          message: `O vendedor removeu o item "${item.folderItem.collectionItem.card.name}" da sua proposta. O novo total é R$ ${newTotalBrl.toFixed(2)}.`,
+          link: `/?page=negotiations&negotiation=proposal:${offerId}`,
+        },
+      });
+    });
+
+    return this.emitProposal(userId, offerId);
+  }
+
   async updateOrderStatus(
     userId: string,
     origin: string,
@@ -329,6 +386,30 @@ export class NegotiationService {
     const detail = await this.getByOriginAndId(userId, origin, id);
     if (!detail.orderId) throw new BadRequestException("Esta negociação ainda não possui pedido");
     await this.orderService.updateStatus(userId, detail.orderId, status);
+
+    if (status === "cancelled") {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      const userName = user?.name || user?.email || "Vendedor";
+      
+      if (detail.origin === "proposal" && detail.proposalId) {
+        await this.prisma.collectionCartOfferEvent.create({
+          data: {
+            offerId: detail.proposalId,
+            senderId: userId,
+            type: "MESSAGE",
+            message: `${userName} cancelou o pedido.`,
+          },
+        });
+      } else if (detail.origin === "auction") {
+        await this.prisma.orderMessage.create({
+          data: {
+            orderId: detail.orderId,
+            senderId: userId,
+            message: `${userName} cancelou o pedido.`,
+          },
+        });
+      }
+    }
 
     if (detail.origin === "proposal" && detail.proposalId) {
       return this.emitProposal(userId, detail.proposalId);
@@ -380,11 +461,15 @@ export class NegotiationService {
       });
 
       for (const offerItem of offer.items) {
+        const availableQuantity = Math.max(0, offerItem.folderItem.quantity - offerItem.folderItem.soldQuantity);
+        if (offerItem.quantity > availableQuantity) {
+          throw new BadRequestException(`Quantidade indisponível para ${offerItem.folderItem.collectionItem.card.name}`);
+        }
         const totalSoldNow = offerItem.folderItem.soldQuantity + offerItem.quantity;
         await tx.collectionFolderItem.update({
           where: { id: offerItem.folderItemId },
           data: {
-            isSold: totalSoldNow >= offerItem.folderItem.collectionItem.quantity,
+            isSold: totalSoldNow >= offerItem.folderItem.quantity,
             soldQuantity: totalSoldNow,
             soldPriceBrl: offerItem.amountBrl,
             soldAt: new Date(),
@@ -511,9 +596,12 @@ export class NegotiationService {
 
     const canChat = this.canChatOnOffer(offer);
     const messages = this.offerMessages(offer);
-    
-    const lastOfferSenderId = this.getLastOfferSenderId(offer);
-    const isReceiverOfLastOffer = userId !== lastOfferSenderId;
+    const hasActiveOffer = offer.status === "PENDING" || offer.status === "COUNTERED" || offer.status === "BUYER_ACCEPTED";
+    const latestAction = this.getLatestOfferAction(offer);
+    const actionTargetUserId = canChat && !order && hasActiveOffer
+      ? this.getOfferActionTargetUserId(offer, latestAction.senderId)
+      : null;
+    const isActionTarget = userId === actionTargetUserId;
 
     return {
       ...summary,
@@ -523,20 +611,38 @@ export class NegotiationService {
       folderShareToken: offer.folder.shareToken,
       isGlobalOffer: offer.isGlobalOffer,
       canChat,
-      canSendCounterOffer: canChat && !order && (offer.status === "PENDING" || offer.status === "COUNTERED") && isReceiverOfLastOffer,
-      canRespondCounterOffer: canChat && !order && (offer.status === "PENDING" || offer.status === "COUNTERED") && isReceiverOfLastOffer,
-      canAcceptProposal: role === "seller" && canChat && !order && (offer.status === "PENDING" || offer.status === "BUYER_ACCEPTED" || (offer.status === "COUNTERED" && isReceiverOfLastOffer)),
-      canRejectProposal: canChat && !order && offer.status !== "ACCEPTED" && offer.status !== "REJECTED" && isReceiverOfLastOffer,
+      canSendCounterOffer: canChat && !order && hasActiveOffer && isActionTarget,
+      canRespondCounterOffer: canChat && !order && offer.status === "COUNTERED" && isActionTarget,
+      canAcceptProposal: role === "seller" && canChat && !order && hasActiveOffer && isActionTarget,
+      canRejectProposal: canChat && !order && hasActiveOffer && isActionTarget,
       canUpdateOrderStatus: role === "seller" && order?.status === "PENDING",
+      actionTargetUserId,
+      actionMessageId: actionTargetUserId ? latestAction.messageId : null,
     };
   }
 
   private getLastOfferSenderId(offer: OfferWithRelations): string {
-    const lastCounterEvent = [...offer.events]
-      .filter(e => e.type === "COUNTER_OFFER")
+    return this.getLatestOfferAction(offer).senderId;
+  }
+
+  private getLatestOfferAction(offer: OfferWithRelations): { messageId: string; senderId: string } {
+    const lastEvent = [...offer.events]
+      .filter((event) =>
+        event.type === "INITIAL_OFFER" ||
+        event.type === "COUNTER_OFFER" ||
+        event.type === "BUYER_ACCEPTED"
+      )
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0];
-    
-    return lastCounterEvent ? lastCounterEvent.senderId : offer.buyerId;
+
+    return lastEvent
+      ? { messageId: lastEvent.id, senderId: lastEvent.senderId }
+      : { messageId: `initial:${offer.id}`, senderId: offer.buyerId };
+  }
+
+  private getOfferActionTargetUserId(offer: OfferWithRelations, senderId: string): string | null {
+    if (senderId === offer.buyerId) return offer.folder.userId;
+    if (senderId === offer.folder.userId) return offer.buyerId;
+    return null;
   }
 
 
@@ -600,7 +706,8 @@ export class NegotiationService {
       createdAt: event.createdAt.toISOString(),
     }));
 
-    const initial = proposalEvents.length > 0 ? [] : [{
+    const hasInitialOfferEvent = (offer.events ?? []).some((event) => event.type === "INITIAL_OFFER");
+    const initial = hasInitialOfferEvent ? [] : [{
       id: `initial:${offer.id}`,
       senderId: offer.buyerId,
       senderName: offer.buyer.name || offer.buyer.email,
@@ -661,6 +768,7 @@ export class NegotiationService {
     if (type === "BUYER_ACCEPTED") return "buyer_accepted";
     if (type === "SELLER_ACCEPTED") return "seller_accepted";
     if (type === "REJECTED") return "rejected";
+    if (type === "CANCELLED") return "cancelled";
     return "message";
   }
 

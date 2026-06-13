@@ -1,11 +1,14 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
-import { IsBoolean, IsOptional, IsString } from "class-validator";
+import { IsBoolean, IsEnum, IsNotEmpty, IsOptional, IsString, MinLength } from "class-validator";
+import { BrazilianState } from "../auth/dto";
 
 export class UpdateProfileDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @IsNotEmpty({ message: "Nome não pode ser vazio" })
+  @MinLength(3, { message: "Nome deve ter pelo menos 3 caracteres" })
   name?: string;
 
   @ApiPropertyOptional()
@@ -31,11 +34,12 @@ export class UpdateProfileDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsString()
-  state?: string;
+  @IsEnum(BrazilianState, { message: "Estado (UF) inválido" })
+  state?: BrazilianState;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @IsNotEmpty({ message: "Cidade não pode ser vazia" })
   city?: string;
 }

@@ -7,11 +7,12 @@ type PanelProps = {
   action?: ReactNode;
   children: ReactNode;
   className?: string;
+  onClick?: () => void;
 };
 
-export function Panel({ title, description, action, children, className = "" }: PanelProps) {
+export function Panel({ title, description, action, children, className = "", onClick }: PanelProps) {
   return (
-    <section className={`glass-panel panel-padding ${className}`}>
+    <section className={`glass-panel panel-padding ${className}`} onClick={onClick}>
       {(title || description || action) && (
         <div className="mb-4 flex items-start gap-3">
           <div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-aqua/20 text-cyan">

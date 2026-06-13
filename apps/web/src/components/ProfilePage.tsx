@@ -2,10 +2,8 @@ import { useEffect, useState } from "react";
 import { 
   ArrowLeft, 
   ExternalLink, 
-  Gavel, 
   Globe, 
   ShoppingBag, 
-  User as UserIcon,
   Check,
   Copy,
   AlertCircle,
@@ -20,6 +18,11 @@ import { Panel } from "./ui/Panel";
 import { Modal } from "./ui/Modal";
 import { formatBrl } from "../lib/format";
 import type { CollectionCartOffer } from "@poke-organizer/shared";
+
+const BRAZILIAN_STATES = [
+  "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", 
+  "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+];
 
 function offerStatusLabel(status: CollectionCartOffer["status"]) {
   if (status === "accepted") return "Aceita";
@@ -361,7 +364,7 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
       await withAuthRetry(session, onSession, onUnauthorized, (token) =>
         api.decideCollectionOffer(token, offer.folderId, offer.id, status)
       );
-      apiFeedback.success(status === "accepted" ? "Proposta aceita e pedido aberto!" : "Proposta recusada.");
+      apiFeedback.success(status === "accepted" ? "Proposta aceita!" : "Proposta recusada.");
       void loadProposals();
     } catch (err) {
       apiFeedback.error(err instanceof Error ? err.message : "Erro ao decidir proposta");
@@ -409,17 +412,30 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
   }
 
   async function handleUpdateProfile() {
+    if (!name.trim() || name.trim().length < 3) {
+      apiFeedback.error("O nome deve ter pelo menos 3 caracteres.");
+      return;
+    }
+    if (!state) {
+      apiFeedback.error("O estado (UF) é obrigatório.");
+      return;
+    }
+    if (!city.trim()) {
+      apiFeedback.error("A cidade é obrigatória.");
+      return;
+    }
+
     setMessage(null);
     setUpdating(true);
     try {
       const updatedUser = await withAuthRetry(session, onSession, onUnauthorized, (token) =>
         api.updateUserProfile(token, {
-          name,
-          whatsapp,
-          state,
-          city,
-          profileSlug,
-          profileBio,
+          name: name.trim(),
+          whatsapp: whatsapp?.trim(),
+          state: state as any,
+          city: city.trim(),
+          profileSlug: profileSlug?.trim(),
+          profileBio: profileBio?.trim(),
           isPublicProfile
         })
       );
@@ -494,6 +510,21 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
         </div>
       </div>
 
+      <div className="flex gap-2 p-1 bg-muted rounded-2xl w-fit">
+        <button
+          onClick={() => setTab("proposals")}
+          className={`px-6 py-2 rounded-xl text-sm font-black transition ${tab === "proposals" ? "bg-card shadow-sm text-brand" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          Propostas
+        </button>
+        <button
+          onClick={() => setTab("settings")}
+          className={`px-6 py-2 rounded-xl text-sm font-black transition ${tab === "settings" ? "bg-card shadow-sm text-brand" : "text-muted-foreground hover:text-foreground"}`}
+        >
+          Configurações
+        </button>
+      </div>
+
       <Panel className="p-0 overflow-hidden border-card-border/40">
         {loading ? (
           <div className="py-24 text-center font-black text-muted-foreground animate-pulse">Carregando dados...</div>
@@ -538,7 +569,6 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                         url.searchParams.delete('collectionId');
                         url.searchParams.delete('collection');
                         window.history.pushState({}, '', url);
-                        // Trigger re-render by doing a shallow nav or state update. Let's just force reload for simplicity or we can add a state.
                         window.location.reload();
                     }}>Limpar filtro</Button>
                   </div>
@@ -615,7 +645,7 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                                         onClick={() => handleDecideOffer(offer, "accepted")}
                                         disabled={submittingOfferAction}
                                     >
-                                        {offer.status === "buyer_accepted" ? "Confirmar pedido" : "Aceitar"}
+                                        Aceitar proposta
                                     </Button>
                                     <Button
                                         variant="outline"
@@ -713,6 +743,7 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Seu nome ou apelido"
+                      required
                     />
                   </div>
 
@@ -729,13 +760,17 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Estado (UF)</label>
-                      <input
-                        className="premium-input w-full"
+                      <select
+                        className="premium-input w-full h-12"
                         value={state}
-                        onChange={(e) => setState(e.target.value.toUpperCase().slice(0, 2))}
-                        placeholder="Ex: SP"
-                        maxLength={2}
-                      />
+                        onChange={(e) => setState(e.target.value)}
+                        required
+                      >
+                        <option value="">Selecione</option>
+                        {BRAZILIAN_STATES.map(uf => (
+                          <option key={uf} value={uf}>{uf}</option>
+                        ))}
+                      </select>
                     </div>
                     <div className="space-y-2">
                       <label className="text-xs font-black uppercase tracking-widest text-muted-foreground">Cidade</label>
@@ -744,6 +779,7 @@ export function ProfilePage({ session, onSession, onUnauthorized, onBack, initia
                         value={city}
                         onChange={(e) => setCity(e.target.value)}
                         placeholder="Ex: São Paulo"
+                        required
                       />
                     </div>
                   </div>

@@ -53,6 +53,10 @@ type Props = {
   onAdd?: (details: AddCardDetails) => Promise<CollectionAddResult | undefined>;
   onUpdate?: (itemId: string, details: UpdateCardDetails) => Promise<void>;
   onStartAuction?: (item: CollectionItem) => void;
+  quantityLabel?: string;
+  quantityHelp?: string;
+  maxQuantity?: number;
+  metadataEditable?: boolean;
   onClose: () => void;
 };
 
@@ -66,6 +70,10 @@ export function CardDetailModal({
   onAdd,
   onUpdate,
   onStartAuction,
+  quantityLabel = "Quantidade",
+  quantityHelp,
+  maxQuantity,
+  metadataEditable = true,
   onClose,
 }: Props) {
   const card = detailCard || collectionItem?.card;
@@ -336,54 +344,63 @@ export function CardDetailModal({
 
                 <div className="grid gap-5">
                   <label className="grid gap-2">
-                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quantidade</span>
+                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">{quantityLabel}</span>
                     <input
                       type="number"
                       min="1"
+                      max={maxQuantity}
                       className="premium-input"
                       value={quantity}
-                      onChange={(event) => setQuantity(Math.max(1, parseInt(event.target.value) || 1))}
+                      onChange={(event) => {
+                        const nextQuantity = Math.max(1, parseInt(event.target.value) || 1);
+                        setQuantity(maxQuantity ? Math.min(maxQuantity, nextQuantity) : nextQuantity);
+                      }}
                     />
+                    {quantityHelp && <span className="px-1 text-xs font-bold text-muted-foreground">{quantityHelp}</span>}
                   </label>
 
-                  <label className="grid gap-2">
-                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Condição</span>
-                    <select
-                      className="premium-select"
-                      value={condition}
-                      onChange={(event) => setCondition(event.target.value as CardCondition)}
-                    >
-                      {CARD_CONDITIONS.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                  </label>
+                  {metadataEditable && (
+                    <>
+                      <label className="grid gap-2">
+                        <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Condição</span>
+                        <select
+                          className="premium-select"
+                          value={condition}
+                          onChange={(event) => setCondition(event.target.value as CardCondition)}
+                        >
+                          {CARD_CONDITIONS.map((c) => (
+                            <option key={c} value={c}>{c}</option>
+                          ))}
+                        </select>
+                      </label>
 
-                  <label className="grid gap-2">
-                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Variante</span>
-                    <select
-                      className="premium-select"
-                      value={variant}
-                      onChange={(event) => setVariant(event.target.value)}
-                    >
-                      {variants.map((v) => (
-                        <option key={v} value={v}>{formatCardVariant(v)}</option>
-                      ))}
-                    </select>
-                  </label>
+                      <label className="grid gap-2">
+                        <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Variante</span>
+                        <select
+                          className="premium-select"
+                          value={variant}
+                          onChange={(event) => setVariant(event.target.value)}
+                        >
+                          {variants.map((v) => (
+                            <option key={v} value={v}>{formatCardVariant(v)}</option>
+                          ))}
+                        </select>
+                      </label>
 
-                  <label className="grid gap-2">
-                    <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Idioma</span>
-                    <select
-                      className="premium-select"
-                      value={language}
-                      onChange={(event) => setLanguage(event.target.value as CardLanguage)}
-                    >
-                      {CARD_LANGUAGES.map((l) => (
-                        <option key={l} value={l}>{l === 'pt-BR' ? 'Português' : l === 'en' ? 'Inglês' : l === 'ja' ? 'Japonês' : 'Desconhecido'}</option>
-                      ))}
-                    </select>
-                  </label>
+                      <label className="grid gap-2">
+                        <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Idioma</span>
+                        <select
+                          className="premium-select"
+                          value={language}
+                          onChange={(event) => setLanguage(event.target.value as CardLanguage)}
+                        >
+                          {CARD_LANGUAGES.map((l) => (
+                            <option key={l} value={l}>{l === 'pt-BR' ? 'Português' : l === 'en' ? 'Inglês' : l === 'ja' ? 'Japonês' : 'Desconhecido'}</option>
+                          ))}
+                        </select>
+                      </label>
+                    </>
+                  )}
 
                   <label className="grid gap-2">
                     <span className="px-1 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Preço Manual (Opcional)</span>

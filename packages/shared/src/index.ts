@@ -115,6 +115,7 @@ export type CollectionItem = {
 };
 
 export type CollectionItemStore = {
+  inventoryQuantity?: number;
   manualPrice: number | null;
   effectivePrice: number | null;
   isSold: boolean;
@@ -240,7 +241,8 @@ export type CollectionOfferEventType =
   | "counter_offer"
   | "buyer_accepted"
   | "seller_accepted"
-  | "rejected";
+  | "rejected"
+  | "cancelled";
 
 export type CollectionCartOfferItem = {
   id: string;
@@ -539,6 +541,8 @@ export type NegotiationDetail = NegotiationSummary & {
   canAcceptProposal: boolean;
   canRejectProposal: boolean;
   canUpdateOrderStatus: boolean;
+  actionTargetUserId?: string | null;
+  actionMessageId?: string | null;
 };
 
 export const LEGAL_TERMS_VERSION = "2026-06-12";

@@ -84,6 +84,15 @@ export class NegotiationController {
     return this.negotiationService.decideProposal(userId, offerId, dto.status);
   }
 
+  @Post("proposal/:offerId/items/:itemId/delete")
+  removeItemFromProposal(
+    @CurrentUser("id") userId: string,
+    @Param("offerId") offerId: string,
+    @Param("itemId") itemId: string,
+  ) {
+    return this.negotiationService.removeItemFromProposal(userId, offerId, itemId);
+  }
+
   @Post(":origin/:id/order-status")
   updateOrderStatus(
     @CurrentUser("id") userId: string,

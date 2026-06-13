@@ -118,6 +118,7 @@ model User {
   // Email confirmation
   emailConfirmedAt      DateTime?
   emailConfirmationToken String?    @unique
+  emailConfirmationSentAt DateTime?
 
   // Password reset
   passwordResetToken     String?    @unique
@@ -304,6 +305,7 @@ model CollectionFolderItem {
   id               String           @id @default(cuid())
   folderId         String
   collectionItemId String
+  quantity         Int              @default(1)
   manualPriceBrl   Decimal?         @db.Decimal(10, 2)
   isSold           Boolean          @default(false)
   soldPriceBrl     Decimal?         @db.Decimal(10, 2)

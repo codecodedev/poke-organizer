@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check, Minus, Plus } from "lucide-react";
 import {
   type CollectionItem,
   formatCardNumber,
@@ -9,16 +9,24 @@ import { CardVariantImage } from "./CardVariantImage";
 type Props = {
   item: CollectionItem;
   selected?: boolean;
+  selectedQuantity?: number;
+  maxQuantity?: number;
   onToggleSelection: (itemId: string) => void;
+  onQuantityChange?: (itemId: string, quantity: number) => void;
 };
 
 export function SimpleCardPickerItem({
   item,
   selected,
+  selectedQuantity,
+  maxQuantity,
   onToggleSelection,
+  onQuantityChange,
 }: Props) {
   const displayPrice = item.price?.amount ?? 0;
   const fullNumber = formatCardNumber(item.card.number, item.card.printedTotal);
+  const quantity = selectedQuantity ?? item.quantity;
+  const max = maxQuantity ?? item.quantity;
 
   return (
     <article
@@ -61,6 +69,30 @@ export function SimpleCardPickerItem({
           <span className="truncate uppercase">{item.card.setCode}</span>
           <span className="shrink-0">{fullNumber}</span>
         </div>
+        {selected && onQuantityChange && (
+          <div
+            className="mt-2 flex items-center justify-between rounded-xl border border-card-border/50 bg-background/50 p-1"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted/40"
+              onClick={() => onQuantityChange(item.id, quantity - 1)}
+              disabled={quantity <= 1}
+            >
+              <Minus size={14} />
+            </button>
+            <span className="text-xs font-black text-foreground">{quantity}/{max}</span>
+            <button
+              type="button"
+              className="grid h-7 w-7 place-items-center rounded-lg text-muted-foreground hover:bg-muted/40"
+              onClick={() => onQuantityChange(item.id, quantity + 1)}
+              disabled={quantity >= max}
+            >
+              <Plus size={14} />
+            </button>
+          </div>
+        )}
       </div>
     </article>
   );

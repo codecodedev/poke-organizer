@@ -302,8 +302,21 @@ export class CollectionService {
   ): Promise<CollectionFolderDetail> {
     await this.assertOwnsFolder(userId, id);
 
-    if (dto.itemIds) {
-      await this.replaceFolderItems(userId, id, dto.itemIds);
+    if (dto.items) {
+      await this.replaceFolderItems(
+        userId,
+        id,
+        dto.items.map((item) => ({
+          collectionItemId: item.itemId,
+          quantity: item.quantity ?? 1,
+        })),
+      );
+    } else if (dto.itemIds) {
+      await this.replaceFolderItems(
+        userId,
+        id,
+        dto.itemIds.map((itemId) => ({ collectionItemId: itemId })),
+      );
     }
 
     if (dto.name !== undefined) {
@@ -417,16 +430,31 @@ export class CollectionService {
     await this.assertOwnsFolder(userId, folderId);
     const item = await this.assertFolderItem(folderId, folderItemId);
     const isSoldRequest = dto.isSold ?? false;
-    const currentQuantity = item.collectionItem.quantity;
-    const soldQuantity = dto.quantity ?? (isSoldRequest ? currentQuantity : 0);
+    const nextFolderQuantity = !isSoldRequest && dto.quantity !== undefined
+      ? dto.quantity
+      : item.quantity;
+    if (nextFolderQuantity > item.collectionItem.quantity) {
+      throw new BadRequestException("A quantidade da coleção não pode ser maior que a quantidade no inventário");
+    }
+    if (nextFolderQuantity < item.soldQuantity) {
+      throw new BadRequestException("A quantidade da coleção não pode ser menor que a quantidade já vendida ou reservada");
+    }
+
+    const soldQuantity = isSoldRequest
+      ? (dto.quantity ?? this.availableFolderItemQuantity(item))
+      : 0;
+    if (isSoldRequest && soldQuantity > this.availableFolderItemQuantity(item)) {
+      throw new BadRequestException("Quantidade indisponível nesta coleção");
+    }
     const totalSoldNow = isSoldRequest ? item.soldQuantity + soldQuantity : item.soldQuantity;
 
     await this.prisma.$transaction(async (tx) => {
       await tx.collectionFolderItem.update({
         where: { id: folderItemId },
         data: {
+          quantity: !isSoldRequest && dto.quantity !== undefined ? nextFolderQuantity : undefined,
           manualPriceBrl: dto.manualPrice === undefined ? undefined : dto.manualPrice,
-          isSold: isSoldRequest ? totalSoldNow >= currentQuantity : item.isSold,
+          isSold: isSoldRequest ? totalSoldNow >= item.quantity : item.isSold,
           soldQuantity: totalSoldNow,
           soldPriceBrl: dto.soldPrice === undefined ? undefined : dto.soldPrice,
           soldAt: isSoldRequest ? new Date() : item.soldAt,
@@ -501,6 +529,13 @@ export class CollectionService {
     }
 
     const itemsById = new Map(dto.items.map((item) => [item.folderItemId, item]));
+    for (const item of folderItems) {
+      const offerItem = itemsById.get(item.id);
+      const requestedQuantity = offerItem?.quantity ?? 1;
+      if (requestedQuantity > this.availableFolderItemQuantity(item)) {
+        throw new BadRequestException(`Quantidade indisponível para ${item.collectionItem.card.name}`);
+      }
+    }
     const calculatedTotal = folderItems.reduce((sum, item) => {
       const offerItem = itemsById.get(item.id);
       const amount = dto.isGlobalOffer 
@@ -637,7 +672,7 @@ export class CollectionService {
         for (const offerItem of offer.items) {
           const folderItem = offerItem.folderItem;
           const soldQuantity = offerItem.quantity;
-          const currentQuantity = folderItem.collectionItem.quantity;
+          const currentQuantity = folderItem.quantity;
           const totalSoldBefore = folderItem.soldQuantity;
           const totalSoldNow = totalSoldBefore + soldQuantity;
 
@@ -1283,17 +1318,23 @@ export class CollectionService {
 
   private async syncFolderItemsReplenishment(collectionItemId: string, newQuantity: number) {
     const folderItems = await this.prisma.collectionFolderItem.findMany({
-      where: { collectionItemId, isSold: true },
+      where: { collectionItemId },
     });
 
     for (const fi of folderItems) {
-      if (newQuantity > fi.soldQuantity) {
-        await this.prisma.collectionFolderItem.update({
-          where: { id: fi.id },
-          data: { isSold: false },
-        });
-      }
+      const nextQuantity = Math.max(1, Math.min(fi.quantity, newQuantity));
+      await this.prisma.collectionFolderItem.update({
+        where: { id: fi.id },
+        data: {
+          quantity: nextQuantity,
+          isSold: fi.soldQuantity >= nextQuantity ? true : false,
+        },
+      });
     }
+  }
+
+  private availableFolderItemQuantity(item: { quantity: number; soldQuantity: number }): number {
+    return Math.max(0, item.quantity - item.soldQuantity);
   }
 
   async remove(userId: string, id: string) {
@@ -1345,22 +1386,38 @@ export class CollectionService {
   private async replaceFolderItems(
     userId: string,
     folderId: string,
-    itemIds: string[],
+    items: Array<{ collectionItemId: string; quantity?: number }>,
   ) {
-    const uniqueItemIds = Array.from(new Set(itemIds));
-    const ownedCount = await this.prisma.collectionItem.count({
+    const itemsById = new Map<string, { collectionItemId: string; quantity?: number }>();
+    for (const item of items) {
+      itemsById.set(item.collectionItemId, {
+        collectionItemId: item.collectionItemId,
+        quantity: item.quantity === undefined ? undefined : Math.max(1, item.quantity),
+      });
+    }
+    const uniqueItemIds = Array.from(itemsById.keys());
+    const ownedItems = await this.prisma.collectionItem.findMany({
       where: { userId, id: { in: uniqueItemIds } },
+      select: { id: true, quantity: true },
     });
 
-    if (ownedCount !== uniqueItemIds.length) {
+    if (ownedItems.length !== uniqueItemIds.length) {
       throw new BadRequestException(
         "Some selected cards do not belong to this user",
       );
     }
+    const ownedQuantityById = new Map(ownedItems.map((item) => [item.id, item.quantity]));
+    for (const item of itemsById.values()) {
+      if (item.quantity === undefined) continue;
+      const inventoryQuantity = ownedQuantityById.get(item.collectionItemId) ?? 0;
+      if (item.quantity > inventoryQuantity) {
+        throw new BadRequestException("A quantidade da coleção não pode ser maior que a quantidade no inventário");
+      }
+    }
 
     const existingItems = await this.prisma.collectionFolderItem.findMany({
       where: { folderId },
-      select: { id: true, collectionItemId: true },
+      select: { id: true, collectionItemId: true, soldQuantity: true },
     });
     const selectedItemIds = new Set(uniqueItemIds);
     const existingItemIds = new Set(existingItems.map((item) => item.collectionItemId));
@@ -1383,8 +1440,26 @@ export class CollectionService {
           data: collectionItemIdsToCreate.map((collectionItemId) => ({
             folderId,
             collectionItemId,
+            quantity: itemsById.get(collectionItemId)?.quantity ?? ownedQuantityById.get(collectionItemId) ?? 1,
           })),
           skipDuplicates: true,
+        }),
+      );
+    }
+    for (const existing of existingItems) {
+      const nextItem = itemsById.get(existing.collectionItemId);
+      if (!nextItem) continue;
+      if (nextItem.quantity === undefined) continue;
+      if (nextItem.quantity < existing.soldQuantity) {
+        throw new BadRequestException("A quantidade da coleção não pode ser menor que a quantidade já vendida ou reservada");
+      }
+      operations.push(
+        this.prisma.collectionFolderItem.update({
+          where: { id: existing.id },
+          data: {
+            quantity: nextItem.quantity,
+            isSold: existing.soldQuantity >= nextItem.quantity,
+          },
         }),
       );
     }
@@ -1487,7 +1562,7 @@ export class CollectionService {
       id: item.id,
       folderItemId: folderItem?.id,
       card: toCardSummary(item.card),
-      quantity: item.quantity,
+      quantity: folderItem?.quantity ?? item.quantity,
       condition: item.condition,
       variant: item.variant,
       foil: item.foil,
@@ -1496,6 +1571,7 @@ export class CollectionService {
       customPrice,
       price: catalogPrice,
       store: folderItem ? {
+        inventoryQuantity: item.quantity,
         manualPrice,
         effectivePrice: manualPrice ?? customPrice ?? catalogPrice?.amount ?? null,
         isSold: folderItem.isSold,
@@ -1513,13 +1589,13 @@ export class CollectionService {
   private async mapFolderSummary(
     folder: FolderWithItems & { user: { name: string | null; email: string } },
   ): Promise<CollectionFolderSummary> {
-    const items = folder.items.map((entry) => entry.collectionItem);
-    const totalValue = items.reduce(
-      (sum, item) => {
+    const totalValue = folder.items.reduce(
+      (sum, entry) => {
+        const item = entry.collectionItem;
         const itemPrice = item.customPrice !== null && item.customPrice !== undefined
           ? Number(item.customPrice)
           : (this.mapCardPrice(item.price)?.amount ?? 0);
-        return sum + itemPrice * item.quantity;
+        return sum + itemPrice * entry.quantity;
       },
       0,
     );
