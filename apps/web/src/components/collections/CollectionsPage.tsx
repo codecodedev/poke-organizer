@@ -27,6 +27,7 @@ import {
   X,
   HelpCircle,
   Clock,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   formatCardVariant,
@@ -54,6 +55,7 @@ import { CollapsibleSection } from "../ui/CollapsibleSection";
 import { FilterField, FilterGroup } from "../ui/Filters";
 import { COLLECTIONS_LIST_TOUR, COLLECTION_DETAIL_TOUR, COLLECTION_CREATE_TOUR } from "./CollectionsTour";
 import { lazy, Suspense } from "react";
+import { ShareImageModal } from "./ShareImageModal";
 
 const AppTour = lazy(() => import("../ui/AppTour").then(module => ({ default: module.AppTour })));
 
@@ -132,6 +134,7 @@ export function CollectionsPage({
   const [bannerUploading, setBannerUploading] = useState(false);
   const [pendingBannerFile, setPendingBannerFile] = useState<File | null>(null);
   const [pendingBannerRemoval, setPendingBannerRemoval] = useState(false);
+  const [showShareImagesModal, setShowShareImagesModal] = useState(false);
 
   const hasChanges = useMemo(() => {
     if (!activeFolder) return false;
@@ -1121,8 +1124,18 @@ export function CollectionsPage({
           tempSelectedItemIds={tempSelectedItemIds}
           setSellingItem={setSellingItem}
           onManagePermissions={() => setShowPermissionsModal(true)}
+          onShowShareImages={() => setShowShareImagesModal(true)}
           blockedNavigationAt={blockedNavigationAt}
           restartTour={restartTour}
+        />
+      )}
+
+      {showShareImagesModal && activeFolder && (
+        <ShareImageModal
+          isOpen={showShareImagesModal}
+          onClose={() => setShowShareImagesModal(false)}
+          folderName={activeFolder.name}
+          items={activeFolder.items}
         />
       )}
 
@@ -2167,6 +2180,7 @@ function CollectionDetailScreen({
   setSellingItem,
   onUndoSale,
   onManagePermissions,
+  onShowShareImages,
   blockedNavigationAt,
   restartTour,
 }: {
@@ -2240,6 +2254,7 @@ function CollectionDetailScreen({
   onTogglePickerModal: (open: boolean) => void;
   setSellingItem: (item: CollectionItem | null) => void;
   onManagePermissions: () => void;
+  onShowShareImages: () => void;
   blockedNavigationAt?: number;
   restartTour: (tourId: string) => void;
   activeFolderId: string;
@@ -2473,7 +2488,7 @@ function CollectionDetailScreen({
               </label>
             }
           >
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-start">
+            <div className="grid w-full gap-2 lg:items-start">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-3">
                   <span
@@ -2519,11 +2534,12 @@ function CollectionDetailScreen({
                 )}
               </div>
 
-              <div className="flex gap-2 self-start lg:mt-1">
+              <div className="flex flex-col gap-2 w-full self-start lg:mt-1">
                 {!isPublic && (
                   <Button
                     type="button"
                     variant="ghost"
+                    className="w-full mt-4"
                     icon={<Plus size={16} />}
                     onClick={onManagePermissions}
                   >
@@ -2539,6 +2555,20 @@ function CollectionDetailScreen({
                     Gerar link
                   </Button>
                 )}
+                <div className="mt-4 grid gap-1.5 border-t border-line/40 pt-4">
+                  <span className="px-1 text-[10px] font-black uppercase tracking-[0.14em] text-slate-500">
+                    Gerar imagens para compartilhamento
+                  </span>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full justify-start py-3"
+                    icon={<ImageIcon size={16} />}
+                    onClick={onShowShareImages}
+                  >
+                    Gerar imagens
+                  </Button>
+                </div>
               </div>
             </div>
           </CollapsibleSection>
